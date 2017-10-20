@@ -5,7 +5,7 @@ import argparse
 from .langserver import LangServer, FIXED_EXT_REGEX
 from .jsonrpc import JSONRPC2Connection, ReadWriter
 from .parse_fortran import process_file
-__version__ = 0.1
+__version__ = '0.1.2'
 
 
 def main():
