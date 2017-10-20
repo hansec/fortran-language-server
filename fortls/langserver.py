@@ -4,8 +4,8 @@ import traceback
 import hashlib
 import re
 # Local modules
-from parse_fortran import process_file, read_use_stmt
-from objects import find_in_scope, fortran_meth
+from fortls.parse_fortran import process_file, read_use_stmt
+from fortls.objects import find_in_scope, fortran_meth
 
 log = logging.getLogger(__name__)
 # Global regexes
@@ -36,10 +36,11 @@ def init_file(filepath):
         fixed_flag = False
         if FIXED_EXT_REGEX.match(ext):
             fixed_flag = True
-        hash_tmp = hashlib.md5(contents).hexdigest()
+        hash_tmp = hashlib.md5(contents.encode()).hexdigest()
         contents_split = contents.splitlines()
         ast_new = process_file(contents_split, True, fixed_flag)
     except:
+        raise
         return None
     else:
         # Construct new file object and add to workspace
@@ -681,7 +682,7 @@ class LangServer:
 
     def update_workspace_file(self, contents, filepath):
         # Update workspace from file contents and path
-        hash_tmp = hashlib.md5(contents).hexdigest()
+        hash_tmp = hashlib.md5(contents.encode()).hexdigest()
         if filepath in self.workspace:
             if hash_tmp == self.workspace[filepath]["hash"]:
                 return  # Same hash no updates
