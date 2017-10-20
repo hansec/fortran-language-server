@@ -17,7 +17,7 @@ setup(
 
     # The project's main homepage.
     url='https://github.com/hansec/fortran-language-server',
-    download_url = 'https://github.com/hansec/fortran-language-server/archive/0.1.tar.gz',
+    download_url = 'https://github.com/hansec/fortran-language-server/archive/v0.1.1.tar.gz',
 
     author='Chris Hansen',
     author_email = 'hansec@uw.edu',
