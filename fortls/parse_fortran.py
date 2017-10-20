@@ -1,6 +1,6 @@
 from __future__ import print_function
 import re
-from objects import parse_keywords, fortran_module, fortran_program, \
+from fortls.objects import parse_keywords, fortran_module, fortran_program, \
     fortran_subroutine, fortran_function, fortran_type, fortran_int, \
     fortran_obj, fortran_meth, fortran_file
 #

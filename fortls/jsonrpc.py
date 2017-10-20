@@ -59,7 +59,7 @@ class JSONRPC2Connection:
                 return int(value)
             except ValueError:
                 raise JSONRPC2ProtocolError(
-                    "Invalid Content-Length header: {}".format(value))
+                    "Invalid Content-Length header: {0}".format(value))
 
     def _receive(self):
         line = self.conn.readline()
@@ -99,9 +99,9 @@ class JSONRPC2Connection:
         body = json.dumps(body, separators=(",", ":"))
         content_length = len(body)
         response = (
-            "Content-Length: {}\r\n"
+            "Content-Length: {0}\r\n"
             "Content-Type: application/vscode-jsonrpc; charset=utf8\r\n\r\n"
-            "{}".format(content_length, body))
+            "{1}".format(content_length, body))
         self.conn.write(response)
         log.debug("SEND %s", body)
 
@@ -207,9 +207,9 @@ def write_rpc_request(rid, method, params):
     body = json.dumps(body, separators=(",", ":"))
     content_length = len(body)
     return (
-        "Content-Length: {}\r\n"
+        "Content-Length: {0}\r\n"
         "Content-Type: application/vscode-jsonrpc; charset=utf8\r\n\r\n"
-        "{}".format(content_length, body))
+        "{1}".format(content_length, body))
 
 
 def write_rpc_notification(method, params):
@@ -221,9 +221,9 @@ def write_rpc_notification(method, params):
     body = json.dumps(body, separators=(",", ":"))
     content_length = len(body)
     return (
-        "Content-Length: {}\r\n"
+        "Content-Length: {0}\r\n"
         "Content-Type: application/vscode-jsonrpc; charset=utf8\r\n\r\n"
-        "{}".format(content_length, body))
+        "{1}".format(content_length, body))
 
 
 def read_rpc_messages(content):
@@ -237,7 +237,7 @@ def read_rpc_messages(content):
                 return int(value)
             except ValueError:
                 raise JSONRPC2ProtocolError(
-                    "Invalid Content-Length header: {}".format(value))
+                    "Invalid Content-Length header: {0}".format(value))
 
     def receive_next():
         line = content.readline()
