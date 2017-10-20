@@ -17,8 +17,10 @@ setup(
 
     # The project's main homepage.
     url='https://github.com/hansec/fortran-language-server',
+    download_url = 'https://github.com/hansec/fortran-language-server/archive/0.1.tar.gz',
 
     author='Chris Hansen',
+    author_email = 'hansec@uw.edu',
 
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
@@ -28,7 +30,7 @@ setup(
     # your project is installed. For an analysis of "install_requires" vs pip's
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    # install_requires=['future'],
+    install_requires=['future','argparse'],
 
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow

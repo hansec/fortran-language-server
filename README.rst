@@ -1,4 +1,4 @@
-Fortran Language Server
+Fortran Language Server (beta)
 ======================
 
 .. image:: https://travis-ci.org/hansec/fortran-language-server.svg?branch=master
