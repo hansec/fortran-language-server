@@ -3,6 +3,11 @@ python:
   - "2.6"
   - "2.7"
   - "3.4"
+# Only send notifications on new failures
+notifications:
+  email:
+    on_success: never
+    on_failure: change
 # command to install dependencies
 install:
   - pip install -r test_requirements.txt

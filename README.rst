@@ -36,6 +36,26 @@ Installation
 
 ``pip install fortran-language-server``
 
+Configuration
+-------------
+
+**Setup module search paths:**
+
+By default all files with the suffix `f,F,f77,F77,for,FOR,fpp,FPP` or `f90,F90,f95,F95,f03,F03,f08,F08` in the
+``root_dir`` directory specified during initialization are parsed and included in the project. Specific folders
+containing FORTRAN source files can be set for a given project by placing a JSON file (example below) named
+`.fortls` in the ``root_dir`` directory. Folders to search are listed in the variable `mod_dirs` (relative
+to ``root_dir``). Directories are not added recursively, so any nested sub directories must be explicitly listed.
+
+    {
+      "mod_dirs": ["subdir1", "subdir2"]
+    }
+
+Bug reports
+-----------
+When [filing bugs](https://github.com/atom/fortran-language-server/issues/new) please provide example code
+to reproduce the observed issue.
+
 License
 -------
 
