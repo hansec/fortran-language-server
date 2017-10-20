@@ -14,19 +14,19 @@ Language Server Features
 
 Document Symbols:
 
-.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/images/fortls_outline.png
+.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_outline.png
 
 Auto Completion:
 
-.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/images/fortls_autocomplete.gif
+.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_autocomplete.gif
 
 Go to definition:
 
-.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/images/fortls_gotodef.gif
+.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_gotodef.gif
 
 Hover:
 
-.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/images/fortls_hover.gif
+.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_hover.gif
 
 Installation
 ------------
