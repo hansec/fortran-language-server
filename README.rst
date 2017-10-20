@@ -1,6 +1,9 @@
 Fortran Language Server
 ======================
 
+.. image:: https://travis-ci.org/hansec/fortran-language-server.svg?branch=master
+     :target: https://travis-ci.org/hansec/fortran-language-server
+
 .. image:: https://img.shields.io/github/license/hansec/fortran-language-server.svg
      :target: https://github.com/hansec/fortran-language-server/blob/master/LICENSE
 
