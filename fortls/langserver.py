@@ -187,6 +187,8 @@ class LangServer:
         self.workspace = {}
         self.obj_tree = {}
         self.mod_dirs = []
+        self.excl_paths = []
+        self.post_messages = []
         self.streaming = True
         if logLevel == 0:
             logging.basicConfig(level=logging.ERROR)
@@ -204,6 +206,13 @@ class LangServer:
             except Exception as e:
                 log.error("Unexpected error: %s", e, exc_info=True)
                 break
+            else:
+                for message in self.post_messages:
+                    self.conn.send_notification("window/showMessage", {
+                        "type": message[0],
+                        "message": message[1]
+                    })
+                self.post_messages = []
 
     def handle(self, request):
         def noop(request):
@@ -268,8 +277,12 @@ class LangServer:
             import json
             with open(config_path, 'r') as fhandle:
                 config_dict = json.load(fhandle)
-                for mod_dir in config_dict["mod_dirs"]:
-                    self.mod_dirs.append(os.path.join(self.root_path, mod_dir))
+                if "mod_dirs" in config_dict:
+                    for mod_dir in config_dict["mod_dirs"]:
+                        self.mod_dirs.append(os.path.join(self.root_path, mod_dir))
+                if "excl_paths" in config_dict:
+                    for excl_path in config_dict["excl_paths"]:
+                        self.excl_paths.append(os.path.join(self.root_path, excl_path))
         # Initialize workspace
         self.workspace_init()
         #
@@ -367,44 +380,72 @@ class LangServer:
             else:
                 return type
 
-        def get_candidates(scope_list, var_prefix, inc_globals=True):
+        def intersect_lists(l1, l2):
+            tmp_list = []
+            for val1 in l1:
+                if l2.count(val1) > 0:
+                    tmp_list.append(val1)
+            return tmp_list
+
+        def get_use_tree(scope, use_dict, only_list=[]):
+            # Add recursively
+            for use_stmnt in scope.use:
+                use_mod = use_stmnt[0]
+                if len(only_list) == 0:
+                    merged_use_list = use_stmnt[1]
+                elif len(use_stmnt[1]) == 0:
+                    merged_use_list = only_list
+                else:
+                    merged_use_list = intersect_lists(only_list, use_stmnt[1])
+                    if len(merged_use_list) == 0:
+                        continue
+                if use_mod in self.obj_tree:
+                    if use_mod in use_dict:
+                        if len(use_dict[use_mod]) > 0:
+                            for only_name in use_stmnt[1]:
+                                if use_dict[use_mod].count(only_name) == 0:
+                                    use_dict[use_mod].append(only_name)
+                    else:
+                        use_dict[use_mod] = merged_use_list
+                    use_dict = get_use_tree(self.obj_tree[use_mod][0], use_dict, merged_use_list)
+            return use_dict
+
+        def get_candidates(scope_list, var_prefix, inc_globals=True, public_only=False):
             var_list = []
-            use_list = {}
+            use_dict = {}
             for scope in scope_list:
                 # Filter children
+                def_vis = scope.def_vis
                 for child in scope.get_children():
+                    if public_only:
+                        if child.vis < 0:
+                            continue
+                        if def_vis < 0 and child.vis <= 0:
+                            continue
                     if child.name.lower().startswith(var_prefix):
                         var_list.append(child)
                 # Add to use list
-                for use_stmnt in scope.use:
-                    use_mod = use_stmnt[0]
-                    if use_mod not in self.obj_tree:
+                use_dict = get_use_tree(scope, use_dict)
+            # Look in found use modules
+            for use_mod, only_list in use_dict.items():
+                scope = self.obj_tree[use_mod][0]
+                # Filter children
+                tmp_vars = []
+                def_vis = scope.def_vis
+                for child in scope.get_children():
+                    if child.vis < 0:
                         continue
-                    only_list = use_stmnt[1]
-                    if use_mod in use_list:
-                        for only_item in only_list:
-                            if only_item not in use_list[use_stmnt[0]]:
-                                use_list[use_stmnt[0]].append(only_item)
-                    else:
-                        use_list[use_stmnt[0]] = use_stmnt[1]
-            # Look in use stmnts
-            for use_mod in use_list:
-                only_list = use_list[use_mod]
-                poss_members = []
+                    if def_vis < 0 and child.vis <= 0:
+                        continue
+                    if child.name.lower().startswith(var_prefix):
+                        tmp_vars.append(child)
+                # Filter by ONLY statement
                 if len(only_list) > 0:
-                    for only_name in only_list:
-                        if only_name.lower().startswith(var_prefix):
-                            poss_members.append(only_name)
-                    if len(poss_members) == 0:
-                        continue
-                if use_mod in self.obj_tree:
-                    tmp_vars = get_candidates([self.obj_tree[use_mod][0]],
-                                              var_prefix)
-                    # Filter by ONLY statement
-                    if len(poss_members) > 0:
-                        for poss_var in tmp_vars:
-                            if poss_var.name in poss_members:
-                                var_list.append(poss_var)
+                    for poss_var in tmp_vars:
+                        if poss_var.name in only_list:
+                            var_list.append(poss_var)
+                else:
+                    var_list.extend(tmp_vars)
             # Add globals
             if inc_globals:
                 for key in self.obj_tree:
@@ -412,6 +453,19 @@ class LangServer:
                     if global_obj.name.lower().startswith(var_prefix):
                         var_list.append(self.obj_tree[key][0])
             return var_list
+
+        def build_comp(candidate, name_only=False, name_replace=None):
+            comp_obj = {}
+            if name_only:
+                comp_obj["label"] = candidate.name
+            else:
+                comp_obj["label"] = candidate.get_snippet(name_replace)
+            comp_obj["kind"] = map_types(candidate.get_type())
+            comp_obj["detail"] = candidate.get_desc()
+            doc_str = candidate.get_documentation()
+            if doc_str is not None:
+                comp_obj["documentation"] = doc_str
+            return comp_obj
 
         def get_context(line, var_prefix):
             # tmp_prefix = var_prefix
@@ -458,9 +512,10 @@ class LangServer:
         scope_list = file_obj.get_scopes(ac_line+1)
         # Get context
         name_only = False
+        public_only = False
         line_context, var_prefix, context_info = \
             get_context(line_prefix, var_prefix)
-        if var_prefix == '' and not is_member:
+        if var_prefix == '' and not (is_member or line_context == 2):
             return {"isIncomplete": False, "items": []}
         # USE stmnt
         if line_context == 1:  # module part
@@ -470,14 +525,7 @@ class LangServer:
                 if candidate_type != 1:
                     continue
                 if candidate.name.lower().startswith(var_prefix):
-                    comp_obj = {}
-                    comp_obj["label"] = candidate.name
-                    comp_obj["kind"] = map_types(candidate_type)
-                    comp_obj["detail"] = candidate.get_desc()
-                    doc_str = candidate.get_documentation()
-                    if doc_str is not None:
-                        comp_obj["documentation"] = doc_str
-                    item_list.append(comp_obj)
+                    item_list.append(build_comp(candidate, name_only=True))
             test_output["items"] = item_list
             return test_output
         elif line_context == 2:  # only part
@@ -485,6 +533,9 @@ class LangServer:
             mod_name = context_info.lower()
             if mod_name in self.obj_tree:
                 scope_list = [self.obj_tree[mod_name][0]]
+                public_only = True
+            else:
+                return {"isIncomplete": False, "items": []}
         #
         include_globals = True
         if is_member:
@@ -497,7 +548,7 @@ class LangServer:
                 include_globals = False
                 scope_list = [type_scope]
         #
-        for candidate in get_candidates(scope_list, var_prefix, include_globals):
+        for candidate in get_candidates(scope_list, var_prefix, include_globals, public_only):
             # Skip module names (only valid in USE)
             candidate_type = candidate.get_type()
             if candidate_type == 1:
@@ -511,17 +562,12 @@ class LangServer:
                 if candidate_type == 4:
                     continue
             #
-            comp_obj = {}
-            if name_only:
-                comp_obj["label"] = candidate.name
-            else:
-                comp_obj["label"] = candidate.get_snippet()
-            comp_obj["kind"] = map_types(candidate_type)
-            comp_obj["detail"] = candidate.get_desc()
-            doc_str = candidate.get_documentation()
-            if doc_str is not None:
-                comp_obj["documentation"] = doc_str
-            item_list.append(comp_obj)
+            if candidate_type == 5:
+                for member in candidate.mems:
+                    item_list.append(build_comp(member, name_replace=candidate.name))
+                continue
+            #
+            item_list.append(build_comp(candidate, name_only=name_only))
         test_output["items"] = item_list
         return test_output
 
@@ -671,7 +717,11 @@ class LangServer:
             contents_split = contents.splitlines()
             ast_new = process_file(contents_split, True, fixed_flag)
         except:
-            return
+            self.conn.send_notification("window/showMessage", {
+                "type": 1,
+                "message": 'Parsing failed for file "{0}"'.format(filepath)
+            })
+            return # Error during parsing
         else:
             # Remove old objects from tree
             if filepath in self.workspace:
@@ -696,7 +746,10 @@ class LangServer:
             for filename in os.listdir(mod_dir):
                 basename, ext = os.path.splitext(os.path.basename(filename))
                 if FORTRAN_EXT_REGEX.match(ext):
-                    file_list.append(os.path.join(mod_dir, filename))
+                    filepath = os.path.join(mod_dir, filename)
+                    if self.excl_paths.count(filepath) > 0:
+                        continue
+                    file_list.append(filepath)
         # Process files
         from multiprocessing import Pool
         pool = Pool(processes=4)
@@ -706,7 +759,11 @@ class LangServer:
         pool.close()
         pool.join()
         for path, result in results.items():
-            self.workspace[path] = result.get()
+            result_obj = result.get()
+            if result_obj is None:
+                self.post_messages.append([1, 'Parsing failed for file "{0}"'.format(path)])
+                continue
+            self.workspace[path] = result_obj
             # Add top-level objects to object tree
             ast_new = self.workspace[path]["ast"]
             for key in ast_new.global_dict:
@@ -719,6 +776,7 @@ class LangServer:
     def serve_exit(self, request):
         # Exit server
         self.workspace = {}
+        self.obj_tree = {}
         self.running = False
 
     def serve_default(self, request):

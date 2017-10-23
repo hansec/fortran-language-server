@@ -3,9 +3,9 @@ import sys
 import os
 import argparse
 from .langserver import LangServer, FIXED_EXT_REGEX
-from .jsonrpc import JSONRPC2Connection, ReadWriter
+from .jsonrpc import JSONRPC2Connection, ReadWriter, read_rpc_messages
 from .parse_fortran import process_file
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 
 
 def main():
@@ -17,17 +17,26 @@ def main():
         help="Test source parser on specified file instead of running language server"
     )
     parser.add_argument(
+        '--debug_symbols', action="store_true",
+        help="Test symbol generation for specified file instead of running language server"
+    )
+    parser.add_argument(
         '--debug_filepath',
-        help="Path to file for parser test"
+        help="Path to file for file specific tests"
+    )
+    parser.add_argument(
+        '--debug_rootpath',
+        help="Root path for language server tests"
     )
     args = parser.parse_args()
+    debug_server = args.debug_symbols or (args.debug_rootpath is not None)
     #
     if args.debug_parser:
         if args.debug_filepath is None:
-            print("ERROR: 'debug_filepath' not specified")
+            print("  ERROR: 'debug_filepath' not specified for parsing test")
             sys.exit(-1)
-        config_exists = os.path.isfile(args.debug_filepath)
-        if config_exists is False:
+        file_exists = os.path.isfile(args.debug_filepath)
+        if file_exists is False:
             print("ERROR: Specified 'debug_filepath' does not exist")
             sys.exit(-1)
         filename, ext = os.path.splitext(os.path.basename(args.debug_filepath))
@@ -48,9 +57,61 @@ def main():
                 print("{0}: {1}".format(obj.get_type(), obj.FQSN))
                 print_children(obj)
     #
+    elif debug_server:
+        prb, pwb = os.pipe()
+        tmpin = os.fdopen(prb, 'rb')
+        tmpout = os.fdopen(pwb, 'wb')
+        s = LangServer(conn=JSONRPC2Connection(ReadWriter(tmpin, tmpout)),
+                       logLevel=0)
+        #
+        if args.debug_rootpath:
+            dir_exists = os.path.isdir(args.debug_rootpath)
+            if dir_exists is False:
+                print("ERROR: Specified 'debug_rootpath' does not exist or is not a directory")
+                sys.exit(-1)
+            print('\nTesting "initialize" request:')
+            print('  Root = "{0}"\n'.format(args.debug_rootpath))
+            init_results = s.serve_initialize({
+                "params": {
+                    "rootPath": args.debug_rootpath
+                }
+            })
+            if len(s.post_messages) == 0:
+                print("  Succesful")
+            else:
+                print("  Succesful with errors:")
+                for message in s.post_messages:
+                    print("    {0}".format(message[1]))
+        #
+        if args.debug_symbols:
+            print('\nTesting "textDocument/definition" request:')
+            if args.debug_filepath is None:
+                print("  ERROR: 'debug_filepath' not specified for document symbol test")
+                sys.exit(-1)
+            file_exists = os.path.isfile(args.debug_filepath)
+            if file_exists is False:
+                print("ERROR: Specified 'debug_filepath' does not exist")
+                sys.exit(-1)
+            print('  File = "{0}"\n'.format(args.debug_filepath))
+            symbol_results = s.serve_document_symbols({
+                "params": {
+                    "textDocument": { "uri": args.debug_filepath }
+                }
+            })
+            for symbol in symbol_results:
+                eline = symbol["location"]["range"]["start"]["line"]
+                if "containerName" in symbol:
+                    parent = symbol["containerName"]
+                else:
+                    parent = "null"
+                print('  line {2:5d}  symbol -> {1:3d}:{0:30} parent = {3}'.format(symbol["name"],
+                      symbol["kind"], eline, parent))
+        tmpout.close()
+        tmpin.close()
+    #
     else:
         stdin, stdout = _binary_stdio()
-        s = LangServer(conn=JSONRPC2Connection(ReadWriter(sys.stdin, sys.stdout)),
+        s = LangServer(conn=JSONRPC2Connection(ReadWriter(stdin, stdout)),
                        logLevel=0)
         s.run()
 
