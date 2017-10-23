@@ -3,7 +3,7 @@ import sys
 import os
 import argparse
 from .langserver import LangServer, FIXED_EXT_REGEX
-from .jsonrpc import JSONRPC2Connection, ReadWriter, read_rpc_messages
+from .jsonrpc import JSONRPC2Connection, ReadWriter
 from .parse_fortran import process_file
 __version__ = '0.1.3'
 
@@ -12,6 +12,10 @@ def main():
     #
     parser = argparse.ArgumentParser()
     parser.description = "FORTRAN Language Server (beta)"
+    parser.add_argument(
+        '--unbuffered', action="store_true",
+        help="Run language server with unbufferd I/O (for test script only)"
+    )
     parser.add_argument(
         '--debug_parser', action="store_true",
         help="Test source parser on specified file instead of running language server"
@@ -71,7 +75,7 @@ def main():
                 sys.exit(-1)
             print('\nTesting "initialize" request:')
             print('  Root = "{0}"\n'.format(args.debug_rootpath))
-            init_results = s.serve_initialize({
+            s.serve_initialize({
                 "params": {
                     "rootPath": args.debug_rootpath
                 }
@@ -95,7 +99,7 @@ def main():
             print('  File = "{0}"\n'.format(args.debug_filepath))
             symbol_results = s.serve_document_symbols({
                 "params": {
-                    "textDocument": { "uri": args.debug_filepath }
+                    "textDocument": {"uri": args.debug_filepath}
                 }
             })
             for symbol in symbol_results:
@@ -110,7 +114,10 @@ def main():
         tmpin.close()
     #
     else:
-        stdin, stdout = _binary_stdio()
+        if args.unbuffered:
+            stdin, stdout = sys.stdin, sys.stdout
+        else:
+            stdin, stdout = _binary_stdio()
         s = LangServer(conn=JSONRPC2Connection(ReadWriter(stdin, stdout)),
                        logLevel=0)
         s.run()

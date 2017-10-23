@@ -721,7 +721,7 @@ class LangServer:
                 "type": 1,
                 "message": 'Parsing failed for file "{0}"'.format(filepath)
             })
-            return # Error during parsing
+            return  # Error during parsing
         else:
             # Remove old objects from tree
             if filepath in self.workspace:
