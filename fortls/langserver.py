@@ -13,7 +13,6 @@ FORTRAN_EXT_REGEX = re.compile(r'^\.F(77|90|95|03|08|OR|PP)?$', re.I)
 FIXED_EXT_REGEX = re.compile(r'^\.F(77|OR|PP)?$', re.I)
 objBreak_REGEX = re.compile(r'[\/\-(.,+*<>=$: ]', re.I)
 word_REGEX = re.compile(r'[a-z][a-z0-9_]*', re.I)
-# objBreak2_REGEX = re.compile(r'[\/\-().,+*<>=$:% ]', re.I)
 CALL_REGEX = re.compile(r'[ \t]*CALL[ \t]*([a-z0-9_]*)$', re.I)
 TYPE_STMNT_REGEX = re.compile(r'[ \t]*(TYPE|CLASS)[ \t]*(IS)?[ \t]*\([ \t]*([a-z0-9_]*)$', re.I)
 
@@ -40,7 +39,6 @@ def init_file(filepath):
         contents_split = contents.splitlines()
         ast_new = process_file(contents_split, True, fixed_flag)
     except:
-        raise
         return None
     else:
         # Construct new file object and add to workspace
@@ -137,27 +135,6 @@ def expand_name(line, char_poss):
         if word_match.start(0) <= char_poss and word_match.end(0) >= char_poss:
             return word_match.group(0)
     return ''
-    # n = len(line)
-    # #
-    # at_end = True
-    # for i1 in range(char_poss, -1, -1):
-    #     currChar = line[i1]
-    #     if objBreak2_REGEX.match(currChar):
-    #         at_end = False
-    #         break
-    # if not at_end:
-    #     i1 = i1+1
-    # #
-    # n = len(line)
-    # at_end = True
-    # for i2 in range(char_poss, n):
-    #     currChar = line[i2]
-    #     if objBreak2_REGEX.match(currChar):
-    #         at_end = False
-    #         break
-    # if at_end:
-    #     i2 = n
-    # return line[i1:i2].strip()
 
 
 def climb_type_tree(var_stack, curr_scope, obj_tree):
