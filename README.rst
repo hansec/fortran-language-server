@@ -1,5 +1,5 @@
 Fortran Language Server (beta)
-======================
+==============================
 
 .. image:: https://travis-ci.org/hansec/fortran-language-server.svg?branch=master
      :target: https://travis-ci.org/hansec/fortran-language-server
@@ -44,7 +44,7 @@ Configuration
 By default all files with the suffix ``f,F,f77,F77,for,FOR,fpp,FPP`` or ``f90,F90,f95,F95,f03,F03,f08,F08`` in the
 ``root_dir`` directory specified during initialization are parsed and included in the project. Specific folders
 containing FORTRAN source files can be set for a given project by placing a JSON file (example below) named
-``.fortls`` in the ``root_dir`` directory. Folders to search are listed in the variable ```mod_dirs`` (relative
+``.fortls`` in the ``root_dir`` directory. Folders to search are listed in the variable ``mod_dirs`` (relative
 to ``root_dir``) and excluded files can be specified using the variable ``excl_paths``. Directories are
 not added recursively, so any nested sub directories must be explicitly listed.
 
@@ -57,8 +57,7 @@ not added recursively, so any nested sub directories must be explicitly listed.
 
 Bug reports
 -----------
-When [filing bugs](https://github.com/atom/fortran-language-server/issues/new) please provide example code
-to reproduce the observed issue.
+When `filing bugs`_ please provide example code to reproduce the observed issue.
 
 License
 -------
@@ -66,3 +65,4 @@ License
 This project is made available under the MIT License.
 
 .. _Language Server Protocol: https://github.com/Microsoft/language-server-protocol
+.. _filing bugs: https://github.com/atom/fortran-language-server/issues/new
