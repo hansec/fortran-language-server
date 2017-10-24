@@ -5,13 +5,13 @@ import argparse
 from .langserver import LangServer, FIXED_EXT_REGEX
 from .jsonrpc import JSONRPC2Connection, ReadWriter
 from .parse_fortran import process_file
-__version__ = '0.1.3'
+__version__ = '0.1.4'
 
 
 def main():
     #
     parser = argparse.ArgumentParser()
-    parser.description = "FORTRAN Language Server (beta)"
+    parser.description = "FORTRAN Language Server v{0} (beta)".format(__version__)
     parser.add_argument(
         '--unbuffered', action="store_true",
         help="Run language server with unbufferd I/O (for test script only)"
