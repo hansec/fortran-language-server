@@ -1,4 +1,5 @@
 import logging
+import sys
 import os
 import traceback
 import hashlib
@@ -7,6 +8,7 @@ import re
 from fortls.parse_fortran import process_file, read_use_stmt
 from fortls.objects import find_in_scope, fortran_meth
 
+PY3K = sys.version_info >= (3, 0)
 log = logging.getLogger(__name__)
 # Global regexes
 FORTRAN_EXT_REGEX = re.compile(r'^\.F(77|90|95|03|08|OR|PP)?$', re.I)
@@ -35,10 +37,14 @@ def init_file(filepath):
         fixed_flag = False
         if FIXED_EXT_REGEX.match(ext):
             fixed_flag = True
-        hash_tmp = hashlib.md5(contents.encode()).hexdigest()
+        if PY3K:
+            hash_tmp = hashlib.md5(contents.encode('ascii', errors='ignore')).hexdigest()
+        else:
+            hash_tmp = hashlib.md5(contents.decode('ascii', errors='ignore')).hexdigest()
         contents_split = contents.splitlines()
         ast_new = process_file(contents_split, True, fixed_flag)
     except:
+        raise
         return None
     else:
         # Construct new file object and add to workspace
@@ -705,7 +711,10 @@ class LangServer:
 
     def update_workspace_file(self, contents, filepath):
         # Update workspace from file contents and path
-        hash_tmp = hashlib.md5(contents.encode()).hexdigest()
+        if PY3K:
+            hash_tmp = hashlib.md5(contents.encode('ascii', errors='ignore')).hexdigest()
+        else:
+            hash_tmp = hashlib.md5(contents.decode('ascii', errors='ignore')).hexdigest()
         if filepath in self.workspace:
             if hash_tmp == self.workspace[filepath]["hash"]:
                 return  # Same hash no updates
