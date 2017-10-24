@@ -17,6 +17,7 @@ objBreak_REGEX = re.compile(r'[\/\-(.,+*<>=$: ]', re.I)
 word_REGEX = re.compile(r'[a-z][a-z0-9_]*', re.I)
 CALL_REGEX = re.compile(r'[ \t]*CALL[ \t]*([a-z0-9_]*)$', re.I)
 TYPE_STMNT_REGEX = re.compile(r'[ \t]*(TYPE|CLASS)[ \t]*(IS)?[ \t]*\([ \t]*([a-z0-9_]*)$', re.I)
+FIXED_CONT_REGEX = re.compile(r'(     [\S])')
 
 
 def path_from_uri(uri):
@@ -51,7 +52,8 @@ def init_file(filepath):
         tmp_obj = {
             "contents": contents_split,
             "ast": ast_new,
-            "hash": hash_tmp
+            "hash": hash_tmp,
+            "fixed": fixed_flag
         }
         return tmp_obj
 
@@ -181,6 +183,41 @@ def climb_type_tree(var_stack, curr_scope, obj_tree):
         else:
             break
     return type_scope
+
+
+def get_line(line, character, file_obj):
+    try:
+        curr_line = file_obj["contents"][line]
+    except:
+        return None, character
+    # Handle continuation lines
+    if file_obj["fixed"]:  # Fixed format file
+        tmp_line = file_obj["contents"][line]
+        char_out = character
+        prev_line = line-1
+        while(prev_line > 0):
+            if FIXED_CONT_REGEX.match(tmp_line):
+                tmp_line = file_obj["contents"][prev_line]
+                curr_line = tmp_line + curr_line[6:]
+                char_out += len(tmp_line) - 6
+            else:
+                break
+            prev_line = prev_line - 1
+        return curr_line, char_out
+    else:  # Free format file
+        char_out = character
+        prev_line = line-1
+        while(prev_line > 0):
+            tmp_line = file_obj["contents"][prev_line]
+            tmp_no_comm = tmp_line.split('!')[0]
+            cont_ind = tmp_no_comm.find('&')
+            if cont_ind >= 0:
+                curr_line = tmp_no_comm[:cont_ind] + curr_line
+                char_out += cont_ind
+            else:
+                break
+            prev_line = prev_line - 1
+        return curr_line, char_out
 
 
 class LangServer:
@@ -496,12 +533,14 @@ class LangServer:
         params = request["params"]
         uri = params["textDocument"]["uri"]
         path = path_from_uri(uri)
+        if path not in self.workspace:
+            return {"isIncomplete": False, "items": []}
         # Check line
         ac_line = params["position"]["line"]
         ac_char = params["position"]["character"]
-        try:
-            curr_line = self.workspace[path]["contents"][ac_line]
-        except:
+        # Get full line (and possible continuations) from file
+        curr_line, ac_char = get_line(ac_line, ac_char, self.workspace[path])
+        if curr_line is None:
             return {"isIncomplete": False, "items": []}
         is_member = False
         try:
@@ -580,10 +619,9 @@ class LangServer:
     def get_definition(self, filepath, def_line, def_char):
         if filepath not in self.workspace:
             return None
-        #
-        try:
-            curr_line = self.workspace[filepath]["contents"][def_line]
-        except:
+        # Get full line (and possible continuations) from file
+        curr_line, def_char = get_line(def_line, def_char, self.workspace[filepath])
+        if curr_line is None:
             return None
         #
         is_member = False
@@ -741,7 +779,8 @@ class LangServer:
             tmp_obj = {
                 "contents": contents_split,
                 "ast": ast_new,
-                "hash": hash_tmp
+                "hash": hash_tmp,
+                "fixed": fixed_flag
             }
             self.workspace[filepath] = tmp_obj
             # Add top-level objects to object tree
