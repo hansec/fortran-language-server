@@ -412,11 +412,6 @@ class fortran_obj:
             return True
         else:
             return False
-        # try:
-        #     ind = self.modifiers.index(3)
-        # except:
-        #     return False
-        # return True
 
 
 class fortran_meth(fortran_obj):
@@ -425,12 +420,6 @@ class fortran_meth(fortran_obj):
             nopass = True
         else:
             nopass = False
-        # try:
-        #     ind = self.modifiers.index(6)
-        # except:
-        #     nopass = False
-        # else:
-        #     nopass = True
         #
         name = self.name
         if name_replace is not None:
@@ -537,3 +526,29 @@ class fortran_file:
                     curr_scope = scope
                     scope_sline = scope.sline
         return curr_scope
+
+    def get_object(self, FQSN):
+        FQSN_split = FQSN.split("::")
+        curr_obj = self.global_dict[FQSN_split[0]]
+        if len(FQSN_split) > 1:
+            for name in FQSN_split[1:]:
+                next_obj = None
+                for child in curr_obj.children:
+                    if child.name == name:
+                        next_obj = child
+                        break
+                if next_obj is None:
+                    return None
+                curr_obj = next_obj
+        return curr_obj
+
+    def close_file(self):
+        # Tasks to be done when file parsing is finished
+        for private_name in self.private_list:
+            obj = self.get_object(private_name)
+            if obj is not None:
+                obj.set_visibility(-1)
+        for public_name in self.public_list:
+            obj = self.get_object(public_name)
+            if obj is not None:
+                obj.set_visibility(1)

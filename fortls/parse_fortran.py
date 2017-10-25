@@ -483,4 +483,5 @@ def process_file(file_str, close_open_scopes, fixed_format=False, debug=False):
             if(debug):
                 print('{1} !!! Visiblity statement({0})'.format(line_number, line.strip()))
             continue
+    file_obj.close_file()
     return file_obj
