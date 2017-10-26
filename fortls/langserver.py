@@ -84,11 +84,11 @@ def tokenize_line(line):
 
 
 def paren_split(line, paren_groups, level, var_groups, i1=0, i2=-1):
-    open_vars = []
     tmp_list = []
     tmp_str = ''
+    nline = len(line)
     if i2 < 0:
-        i2 = len(line)
+        i2 = nline
     i0 = i1
     for paren_group in paren_groups[level]:
         pg0 = paren_group[0]
@@ -98,31 +98,50 @@ def paren_split(line, paren_groups, level, var_groups, i1=0, i2=-1):
         tmp_str += line[i0:pg0]
         tmp_list.append([i0, pg0])
         if pg1 < 0:
-            open_vars.append([[[pg0+1, -1]], line[pg0+1:]])
-            continue
-        i0 = pg1+1
+            pg1 = nline
         if len(paren_groups) > level+1:
             var_groups, out_len = \
                 paren_split(line, paren_groups, level+1,
                             var_groups, pg0+1, pg1)
             if out_len == 0:
-                var_groups[level+1].append([[pg0+1, pg1], line[pg0+1:pg1]])
+                var_groups[level+1].append([[[pg0+1, pg1]], line[pg0+1:pg1]])
         else:
-            var_groups[level+1].append([[pg0+1, pg1], line[pg0+1:pg1]])
+            var_groups[level+1].append([[[pg0+1, pg1]], line[pg0+1:pg1]])
+        if pg1 == nline:
+            continue
+        i0 = pg1+1
     #
-    tmp_str += line[i0:i2]
-    tmp_list.append([i0, i2])
+    if level > 0:
+        tmp_str += line[i0:i2]
+        tmp_list.append([i0, i2])
     out_list = [[tmp_list, tmp_str]]
-    if len(open_vars) > 0:
-        out_list.extend(open_vars)
     var_groups[level].extend(out_list)
     return var_groups, len(out_list)
 
 
 def get_var_stack(line):
+    if len(line) == 0:
+        return None
     var_list = tokenize_line(line)
-    final_var = var_list[0][-1][1]
-    paren_groups = var_list[0][-1][0]
+    deepest_var = None
+    final_var = None
+    # final_var = var_list[0][-1][1]
+    # paren_groups = var_list[0][-1][0]
+    n = len(line)
+    for var_group in var_list:
+        for var_tmp in var_group:
+            for parens in var_tmp[0]:
+                if n >= parens[0]:
+                    if n <= parens[1]:
+                        final_var = var_tmp[1]
+                        break
+                    elif parens[1] == -1:
+                        deepest_var = var_tmp[1]
+    if final_var is None:
+        if deepest_var is not None:
+            final_var = deepest_var
+        else:
+            return None
     if final_var.find('%') < 0:
         paren_groups = var_list[0][-1][0]
         ntail = paren_groups[-1][1] - paren_groups[-1][0]
@@ -667,6 +686,7 @@ class LangServer:
             def_name = expand_name(curr_line, def_char)
         except:
             return None
+        # print var_stack
         if def_name == '':
             return None
         file_obj = self.workspace[filepath]["ast"]
