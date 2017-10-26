@@ -1,3 +1,16 @@
+## 0.2.0
+
+### Improvements
+* Add support for recursive directory inclusion from "root_path"
+* Provide option to skip type members in documentSymbol requests
+* Apply visibility statements to objects for autocomplete suggestions
+* Filter interface suggestions to only show unique signatures
+* Link imported procedures in interface definitions
+
+### Fixes
+* Fix line continuation handling for free form files with trailing and leading ampersands
+* Improve parentheses matching in line parsing
+
 ## 0.1.4
 
 ### Improvements
