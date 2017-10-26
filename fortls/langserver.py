@@ -232,7 +232,7 @@ def get_line(line, character, file_obj):
 
 
 class LangServer:
-    def __init__(self, conn, logLevel=0):
+    def __init__(self, conn, logLevel=0, settings=None):
         self.conn = conn
         self.running = True
         self.root_path = None
@@ -244,10 +244,14 @@ class LangServer:
         self.excl_paths = []
         self.post_messages = []
         self.streaming = True
+        self.symbol_include_mem = True
         if logLevel == 0:
             logging.basicConfig(level=logging.ERROR)
         elif logLevel == 1:
             logging.basicConfig(level=logging.DEBUG)
+        if settings is not None:
+            if "symbol_include_mem" in settings:
+                self.symbol_include_mem = settings["symbol_include_mem"]
 
     def run(self):
         # Run server
@@ -421,7 +425,7 @@ class LangServer:
                 tmp_out["containerName"] = tmp_list[-2]
             test_output.append(tmp_out)
             # If class add members
-            if scope.get_type() == 4:
+            if scope.get_type() == 4 and self.symbol_include_mem:
                 for child in scope.children:
                     tmp_out = {}
                     tmp_out["name"] = child.name

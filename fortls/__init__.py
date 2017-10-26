@@ -13,6 +13,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.description = "FORTRAN Language Server v{0} (beta)".format(__version__)
     parser.add_argument(
+        '--symbol_skip_mem', action="store_true",
+        help="Do not include type members in document symbol results"
+    )
+    parser.add_argument(
         '--debug_parser', action="store_true",
         help="Test source parser on specified file instead of running language server"
     )
@@ -34,6 +38,10 @@ def main():
     )
     args = parser.parse_args()
     debug_server = args.debug_symbols or (args.debug_rootpath is not None)
+    #
+    settings = {
+        "symbol_include_mem": (not args.symbol_skip_mem)
+    }
     #
     if args.debug_parser:
         if args.debug_filepath is None:
@@ -66,7 +74,7 @@ def main():
         tmpin = os.fdopen(prb, 'rb')
         tmpout = os.fdopen(pwb, 'wb')
         s = LangServer(conn=JSONRPC2Connection(ReadWriter(tmpin, tmpout)),
-                       logLevel=0)
+                       logLevel=0, settings=settings)
         #
         if args.debug_rootpath:
             dir_exists = os.path.isdir(args.debug_rootpath)
@@ -123,7 +131,7 @@ def main():
         else:
             stdin, stdout = _binary_stdio()
         s = LangServer(conn=JSONRPC2Connection(ReadWriter(stdin, stdout)),
-                       logLevel=0)
+                       logLevel=0, settings=settings)
         s.run()
 
 
