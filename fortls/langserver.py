@@ -18,6 +18,7 @@ word_REGEX = re.compile(r'[a-z][a-z0-9_]*', re.I)
 CALL_REGEX = re.compile(r'[ \t]*CALL[ \t]*([a-z0-9_]*)$', re.I)
 TYPE_STMNT_REGEX = re.compile(r'[ \t]*(TYPE|CLASS)[ \t]*(IS)?[ \t]*\([ \t]*([a-z0-9_]*)$', re.I)
 FIXED_CONT_REGEX = re.compile(r'(     [\S])')
+FREE_OPT_CONT_REGEX = re.compile(r'([ \t]*&)')
 
 
 def path_from_uri(uri):
@@ -207,10 +208,20 @@ def get_line(line, character, file_obj):
     else:  # Free format file
         char_out = character
         prev_line = line-1
+        opt_cont_match = FREE_OPT_CONT_REGEX.match(curr_line)
+        if opt_cont_match is not None:
+            curr_line = curr_line[opt_cont_match.end(0):]
+            char_out -= opt_cont_match.end(0)
         while(prev_line > 0):
             tmp_line = file_obj["contents"][prev_line]
             tmp_no_comm = tmp_line.split('!')[0]
-            cont_ind = tmp_no_comm.find('&')
+            cont_ind = tmp_no_comm.rfind('&')
+            opt_cont_match = FREE_OPT_CONT_REGEX.match(tmp_no_comm)
+            if opt_cont_match is not None:
+                if cont_ind == opt_cont_match.end(0)-1:
+                    break
+                tmp_no_comm = tmp_no_comm[opt_cont_match.end(0):]
+                cont_ind -= opt_cont_match.end(0)
             if cont_ind >= 0:
                 curr_line = tmp_no_comm[:cont_ind] + curr_line
                 char_out += cont_ind
