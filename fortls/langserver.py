@@ -608,7 +608,12 @@ class LangServer:
                     continue
             #
             if candidate_type == 5:
+                tmp_list = []
                 for member in candidate.mems:
+                    tmp_snippet = member.get_snippet(candidate.name)
+                    if tmp_list.count(tmp_snippet) > 0:
+                        continue
+                    tmp_list.append(tmp_snippet)
                     item_list.append(build_comp(member, name_replace=candidate.name))
                 continue
             #
@@ -730,7 +735,7 @@ class LangServer:
         # Update inheritance (currently only on open/save)
         # for key in self.obj_tree:
         #     self.obj_tree[key][0].resolve_inherit(self.obj_tree)
-        #     self.obj_tree[key][0].resolve_link()
+        #     self.obj_tree[key][0].resolve_link(self.obj_tree)
 
     def serve_onSave(self, request):
         # Update workspace from file on disk
@@ -740,7 +745,7 @@ class LangServer:
         # Update inheritance
         for key in self.obj_tree:
             self.obj_tree[key][0].resolve_inherit(self.obj_tree)
-            self.obj_tree[key][0].resolve_link()
+            self.obj_tree[key][0].resolve_link(self.obj_tree)
 
     def add_file(self, filepath):
         # Read and add file from disk
@@ -819,7 +824,7 @@ class LangServer:
         # Update inheritance
         for key in self.obj_tree:
             self.obj_tree[key][0].resolve_inherit(self.obj_tree)
-            self.obj_tree[key][0].resolve_link()
+            self.obj_tree[key][0].resolve_link(self.obj_tree)
 
     def serve_exit(self, request):
         # Exit server

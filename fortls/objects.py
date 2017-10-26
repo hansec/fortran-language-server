@@ -138,9 +138,9 @@ class fortran_scope:
         for child in self.children:
             child.resolve_inherit(obj_tree)
 
-    def resolve_link(self):
+    def resolve_link(self, obj_tree):
         for child in self.children:
-            child.resolve_link()
+            child.resolve_link(obj_tree)
 
     def add_parent(self, parent_obj):
         self.parent = parent_obj
@@ -194,7 +194,7 @@ class fortran_subroutine(fortran_scope):
         self.args = args
         self.arg_objs = []
 
-    def resolve_link(self):
+    def resolve_link(self, obj_tree):
         self.arg_objs = []
         arg_list = self.args.replace(' ', '').lower().split(',')
         for child in self.children:
@@ -205,7 +205,7 @@ class fortran_subroutine(fortran_scope):
                     break
             if ind >= 0:
                 self.arg_objs.append(child)
-            child.resolve_link()
+            child.resolve_link(obj_tree)
 
     def get_type(self):
         return 2
@@ -310,14 +310,14 @@ class fortran_int(fortran_scope):
     def get_desc(self):
         return 'INTERFACE'
 
-    def resolve_link(self):
+    def resolve_link(self, obj_tree):
         if self.parent is None:
             return
         self.mems = []
         for member in self.members:
-            for child in self.parent.children:
-                if child.name.lower() == member:
-                    self.mems.append(child)
+            mem_obj, _ = find_in_scope(self.parent, member, obj_tree)
+            if mem_obj is not None:
+                self.mems.append(mem_obj)
 
 
 class fortran_obj:
@@ -348,7 +348,7 @@ class fortran_obj:
     def add_parent(self, parent_obj):
         self.parent = parent_obj
 
-    def resolve_link(self):
+    def resolve_link(self, obj_tree):
         if self.link_name is None:
             return
         if self.parent is not None:
