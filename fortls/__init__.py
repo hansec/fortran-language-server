@@ -13,10 +13,6 @@ def main():
     parser = argparse.ArgumentParser()
     parser.description = "FORTRAN Language Server v{0} (beta)".format(__version__)
     parser.add_argument(
-        '--unbuffered', action="store_true",
-        help="Run language server with unbufferd I/O (for test script only)"
-    )
-    parser.add_argument(
         '--debug_parser', action="store_true",
         help="Test source parser on specified file instead of running language server"
     )
@@ -31,6 +27,10 @@ def main():
     parser.add_argument(
         '--debug_rootpath',
         help="Root path for language server tests"
+    )
+    parser.add_argument(
+        '--unbuffered', action="store_true",
+        help="Run language server with unbufferd I/O (for test script only)"
     )
     args = parser.parse_args()
     debug_server = args.debug_symbols or (args.debug_rootpath is not None)
@@ -86,6 +86,10 @@ def main():
                 print("  Succesful with errors:")
                 for message in s.post_messages:
                     print("    {0}".format(message[1]))
+            # Print module directories
+            print("  Found module directories:")
+            for mod_dir in s.mod_dirs:
+                print("    {0}".format(mod_dir))
         #
         if args.debug_symbols:
             print('\nTesting "textDocument/definition" request:')

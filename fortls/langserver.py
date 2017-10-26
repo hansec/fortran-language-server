@@ -331,12 +331,27 @@ class LangServer:
             import json
             with open(config_path, 'r') as fhandle:
                 config_dict = json.load(fhandle)
-                if "mod_dirs" in config_dict:
-                    for mod_dir in config_dict["mod_dirs"]:
-                        self.mod_dirs.append(os.path.join(self.root_path, mod_dir))
                 if "excl_paths" in config_dict:
                     for excl_path in config_dict["excl_paths"]:
                         self.excl_paths.append(os.path.join(self.root_path, excl_path))
+                if "mod_dirs" in config_dict:
+                    for mod_dir in config_dict["mod_dirs"]:
+                        self.mod_dirs.append(os.path.join(self.root_path, mod_dir))
+        if len(self.mod_dirs) == 1:  # Recursively add sub-directories
+            self.mod_dirs = []
+            for dirName, subdirList, fileList in os.walk(self.root_path):
+                if self.excl_paths.count(dirName) > 0:
+                    while(len(subdirList) > 0):
+                        del subdirList[0]
+                    continue
+                contains_source = False
+                for filename in fileList:
+                    basename, ext = os.path.splitext(os.path.basename(filename))
+                    if FORTRAN_EXT_REGEX.match(ext):
+                        contains_source = True
+                        break
+                if contains_source:
+                    self.mod_dirs.append(os.path.join(self.root_path, dirName))
         # Initialize workspace
         self.workspace_init()
         #

@@ -39,20 +39,29 @@ Installation
 Configuration
 -------------
 
+Project specific settings can be specified by placing a JSON file named ``.fortls`` (example below)
+in the ``root_dir`` directory.
+
 **Setup module search paths:**
 
 By default all files with the suffix ``f,F,f77,F77,for,FOR,fpp,FPP`` or ``f90,F90,f95,F95,f03,F03,f08,F08`` in the
-``root_dir`` directory specified during initialization are parsed and included in the project. Specific folders
-containing FORTRAN source files can be set for a given project by placing a JSON file (example below) named
-``.fortls`` in the ``root_dir`` directory. Folders to search are listed in the variable ``mod_dirs`` (relative
-to ``root_dir``) and excluded files can be specified using the variable ``excl_paths``. Directories are
-not added recursively, so any nested sub directories must be explicitly listed.
+``root_dir`` directory, specified during initialization, and all its sub-directories are parsed and included in
+the project.
+
+Directories and files can be excluded from the project by specifying their paths (relative to ``root_dir``) in
+the ``excl_paths`` variable in ``.fortls`` file. Excluded directories also exclude all sub-directories.
+
+Module directories can also be specified manually by specifying their paths (relative to ``root_dir``) in
+the ``mod_dirs`` variable in ``.fortls`` file. When ``mod_dirs`` is specified directories are not added
+recursively, so any nested sub directories must be explicitly listed. However, ``root_dir`` does not need to
+be specified manually as it is always included.
+
 
 ::
 
     {
       "mod_dirs": ["subdir1", "subdir2"],
-      "excl_paths": ["subdir1/file_to_skip.F90"]
+      "excl_paths": ["subdir3", "subdir1/file_to_skip.F90"]
     }
 
 Bug reports
