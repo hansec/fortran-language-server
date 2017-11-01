@@ -87,6 +87,8 @@ def read_var_def(line, type_word=None):
         trailing_line = line[len(type_word):]
     type_word = type_word.upper()
     trailing_line = trailing_line.split('!')[0]
+    if len(trailing_line) == 0:
+        return None
     #
     kind_match = KIND_SPEC_REGEX.match(trailing_line)
     if kind_match is not None:
