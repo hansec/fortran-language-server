@@ -111,7 +111,7 @@ def paren_split(line, paren_groups, level, var_groups, i1=0, i2=-1):
             continue
         i0 = pg1+1
     #
-    if level > 0:
+    if i0 > tmp_list[-1][1]:
         tmp_str += line[i0:i2]
         tmp_list.append([i0, i2])
     out_list = [[tmp_list, tmp_str]]
