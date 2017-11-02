@@ -1,4 +1,6 @@
 import copy
+import re
+WORD_REGEX = re.compile(r'[a-z][a-z0-9_]*', re.I)
 
 
 def parse_keywords(keywords):
@@ -125,11 +127,11 @@ class fortran_scope:
     def set_visibility(self, new_vis):
         self.vis = new_vis
 
-    def add_use(self, use_mod, only_list=[]):
+    def add_use(self, use_mod, line_number, only_list=[]):
         lower_only = []
         for only in only_list:
             lower_only.append(only.lower())
-        self.use.append([use_mod.lower(), lower_only])
+        self.use.append([use_mod.lower(), lower_only, line_number])
 
     def set_inherit(self, inherit_type):
         self.inherit = inherit_type
@@ -173,6 +175,37 @@ class fortran_scope:
 
     def end(self, line_number):
         self.eline = line_number
+
+    def check_double_def(self, file_contents):
+        FSQN_list = []
+        errors = []
+        for child in self.children:
+            if FSQN_list.count(child.FQSN) > 0:
+                line_number = child.sline - 1
+                line = file_contents[line_number].lower()
+                name_lower = child.name.lower()
+                i0 = 0
+                for poss_name in WORD_REGEX.finditer(line):
+                    if poss_name.group() == name_lower:
+                        i0 = poss_name.start()
+                        break
+                errors.append([line_number, i0, i0+len(child.name), child.name])
+            else:
+                FSQN_list.append(child.FQSN)
+        return errors
+
+    def check_use(self, obj_tree, file_contents):
+        errors = []
+        for use_line in self.use:
+            use_mod = use_line[0]
+            if use_mod not in obj_tree:
+                line_number = use_line[2] - 1
+                line = file_contents[line_number]
+                i0 = line.lower().find(use_mod)
+                if i0 == -1:
+                    i0 = 0
+                errors.append([line_number, i0, i0+len(use_mod), use_mod])
+        return errors
 
 
 class fortran_module(fortran_scope):
@@ -499,14 +532,14 @@ class fortran_file:
     def add_public(self, name):
         self.public_list.append(self.enc_scope_name+'::'+name)
 
-    def add_use(self, mod_words):
+    def add_use(self, mod_words, line_number):
         if len(mod_words) > 0:
             n = len(mod_words)
             if n > 2:
                 use_list = mod_words[2:]
-                self.current_scope.add_use(mod_words[0], use_list)
+                self.current_scope.add_use(mod_words[0], line_number, use_list)
             else:
-                self.current_scope.add_use(mod_words[0])
+                self.current_scope.add_use(mod_words[0], line_number)
 
     def get_scopes(self, line_number=None):
         if line_number is None:
@@ -552,3 +585,26 @@ class fortran_file:
             obj = self.get_object(public_name)
             if obj is not None:
                 obj.set_visibility(1)
+
+    def check_file(self, obj_tree, file_contents):
+        errors = []
+        for scope in self.scope_list:
+            for error in scope.check_double_def(file_contents):
+                errors.append({
+                    "range": {
+                        "start": {"line": error[0], "character": error[1]},
+                        "end": {"line": error[0], "character": error[2]}
+                    },
+                    "message": 'Variable "{0}" declared twice in scope'.format(error[3]),
+                    "severity": 1
+                })
+            for error in scope.check_use(obj_tree, file_contents):
+                errors.append({
+                    "range": {
+                        "start": {"line": error[0], "character": error[1]},
+                        "end": {"line": error[0], "character": error[2]}
+                    },
+                    "message": 'Module "{0}" not found in project'.format(error[3]),
+                    "severity": 2
+                })
+        return errors

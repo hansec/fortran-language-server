@@ -463,7 +463,7 @@ def process_file(file_str, close_open_scopes, fixed_format=False, debug=False):
                 if(debug):
                     print('{1} !!! INTERFACE-PRO statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'use':
-                file_obj.current_scope.add_use(obj[0], obj[1])
+                file_obj.current_scope.add_use(obj[0], line_number, obj[1])
                 if(debug):
                     print('{1} !!! USE statement({0})'.format(line_number, line.strip()))
         # Look for visiblity statement

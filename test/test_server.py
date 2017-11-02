@@ -21,6 +21,8 @@ def run_request(request):
     results = read_rpc_messages(tmp_file)
     parsed_results = []
     for result in results:
+        if "method" in result:
+            continue
         parsed_results.append(result['result'])
     errcode = pid.poll()
     return errcode, parsed_results

@@ -775,6 +775,27 @@ class LangServer:
         else:
             return None
 
+    def get_diagnostics(self, uri):
+        filepath = path_from_uri(uri)
+        if filepath in self.workspace:
+            file_obj = self.workspace[filepath]["ast"]
+            file_contents = self.workspace[filepath]["contents"]
+            try:
+                diags = file_obj.check_file(self.obj_tree, file_contents)
+            except Exception as e:
+                self.conn.write_error(
+                    -1,
+                    code=-32603,
+                    message=str(e),
+                    data={
+                        "traceback": traceback.format_exc(),
+                    })
+            else:
+                self.conn.send_notification("textDocument/publishDiagnostics", {
+                    "uri": uri,
+                    "diagnostics": diags
+                })
+
     def serve_onChange(self, request):
         # Update workspace from file sent by editor
         params = request["params"]
@@ -796,6 +817,7 @@ class LangServer:
         for key in self.obj_tree:
             self.obj_tree[key][0].resolve_inherit(self.obj_tree)
             self.obj_tree[key][0].resolve_link(self.obj_tree)
+        self.get_diagnostics(uri)
 
     def add_file(self, filepath):
         # Read and add file from disk
