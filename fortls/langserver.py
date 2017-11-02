@@ -561,7 +561,10 @@ class LangServer:
             if name_only:
                 comp_obj["label"] = candidate.name
             else:
-                comp_obj["label"] = candidate.get_snippet(name_replace)
+                comp_obj["label"], snippet = candidate.get_snippet(name_replace)
+                if snippet is not None:
+                    comp_obj["insertText"] = snippet
+                    comp_obj["insertTextFormat"] = 2
             comp_obj["kind"] = map_types(candidate.get_type())
             comp_obj["detail"] = candidate.get_desc()
             doc_str = candidate.get_documentation()
@@ -672,10 +675,10 @@ class LangServer:
             if candidate_type == 5:
                 tmp_list = []
                 for member in candidate.mems:
-                    tmp_snippet = member.get_snippet(candidate.name)
-                    if tmp_list.count(tmp_snippet) > 0:
+                    tmp_text, _ = member.get_snippet(candidate.name)
+                    if tmp_list.count(tmp_text) > 0:
                         continue
-                    tmp_list.append(tmp_snippet)
+                    tmp_list.append(tmp_text)
                     item_list.append(build_comp(member, name_replace=candidate.name))
                 continue
             #
@@ -770,7 +773,8 @@ class LangServer:
             # Currently only show for subroutines
             if var_type == 2 or var_type == 3:
                 skip_arg = False
-                hover_str = var_obj.get_snippet() + "\n"
+                hover_str, _ = var_obj.get_snippet()
+                hover_str += "\n"
                 if isinstance(var_obj, fortran_meth):
                     if var_obj.modifiers.count(6) == 0:
                         skip_arg = True

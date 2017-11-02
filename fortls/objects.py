@@ -199,7 +199,7 @@ class fortran_scope:
     def get_snippet(self, name_replace=None, drop_arg=None):
         if name_replace is not None:
             return name_replace
-        return self.name
+        return self.name, None
 
     def get_documentation(self):
         return None
@@ -298,16 +298,32 @@ class fortran_subroutine(fortran_scope):
         return 2
 
     def get_snippet(self, name_replace=None, drop_arg=None):
-        arg_str = "({0})".format(self.args)
+        arg_list = self.args.split(",")
         if drop_arg is not None:
-            first_comma = self.args.find(",")
-            if first_comma > 0:
-                arg_str = "({0})".format(self.args[first_comma+1:])
+            if len(arg_list) > 1:
+                arg_list = arg_list[1:]
             else:
-                arg_str = "()"
+                arg_list = []
+        arg_snip = None
+        if len(arg_list) > 0:
+            place_holders = []
+            for i, arg in enumerate(arg_list):
+                opt_split = arg.split("=")
+                if len(opt_split) > 1:
+                    place_holders.append("{1}=${{{0}:{2}}}".format(i+1, opt_split[0], opt_split[1]))
+                else:
+                    place_holders.append("${{{0}:{1}}}".format(i+1, arg))
+            arg_str = "({0})".format(",".join(arg_list))
+            arg_snip = "({0})".format(",".join(place_holders))
+        else:
+            arg_str = "()"
+        name = self.name
         if name_replace is not None:
-            return name_replace + arg_str
-        return self.name + arg_str
+            name = name_replace
+        snippet = None
+        if arg_snip is not None:
+            snippet = name + arg_snip
+        return name + arg_str, snippet
 
     def get_desc(self):
         return 'SUBROUTINE'
@@ -476,7 +492,7 @@ class fortran_obj:
         if self.link_obj is not None:
             return self.link_obj.get_snippet(name, drop_arg)
         # Normal variable
-        return name
+        return name, None
 
     def get_documentation(self):
         if self.link_obj is not None:
