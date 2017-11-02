@@ -43,6 +43,7 @@ def test_init():
         # }
         #
         assert "capabilities" in result_dict
+        assert result_dict["capabilities"]["textDocumentSync"] == 2
         assert result_dict["capabilities"]["definitionProvider"] is True
         assert result_dict["capabilities"]["documentSymbolProvider"] is True
         assert result_dict["capabilities"]["hoverProvider"] is True
@@ -84,12 +85,29 @@ END MODULE test_free
     file_path = os.path.join(test_dir, "subdir", "test_free.f90")
     string += write_rpc_notification("textDocument/didChange", {
         "textDocument": {"uri": file_path},
-        "contentChanges": [{"text": new_contents}]
+        "contentChanges": [{
+            "text": "",
+            "range": {
+                "start": {"line": 6, "character": 0},
+                "end": {"line": 22, "character": 0}
+            }
+        },
+        {
+            "text": "",
+            "range": {
+                "start": {"line": 7, "character": 0},
+                "end": {"line": 34, "character": 0}
+            }
+        }]
+    })
+    string += write_rpc_request(2, "textDocument/documentSymbol", {
+        "textDocument": {"uri": file_path}
     })
     errcode, results = run_request(string)
     #
     assert errcode == 0
-    assert len(results) == 1
+    assert len(results) == 2
+    assert len(results[1]) == 3
 
 
 def test_symbols():

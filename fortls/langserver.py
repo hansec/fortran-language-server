@@ -1,14 +1,11 @@
 import logging
-import sys
 import os
 import traceback
-import hashlib
 import re
 # Local modules
 from fortls.parse_fortran import process_file, read_use_stmt, detect_fixed_format
 from fortls.objects import find_in_scope, fortran_meth
 
-PY3K = sys.version_info >= (3, 0)
 log = logging.getLogger(__name__)
 # Global regexes
 FORTRAN_EXT_REGEX = re.compile(r'^\.F(77|90|95|03|08|OR|PP)?$', re.I)
@@ -31,14 +28,9 @@ def path_from_uri(uri):
 def init_file(filepath):
     #
     with open(filepath, 'r') as fhandle:
-        contents = fhandle.read()
+        contents_split = fhandle.readlines()
     #
     try:
-        if PY3K:
-            hash_tmp = hashlib.md5(contents.encode('ascii', errors='ignore')).hexdigest()
-        else:
-            hash_tmp = hashlib.md5(contents.decode('ascii', errors='ignore')).hexdigest()
-        contents_split = contents.splitlines()
         fixed_flag = detect_fixed_format(contents_split)
         ast_new = process_file(contents_split, True, fixed_flag)
     except:
@@ -48,7 +40,6 @@ def init_file(filepath):
         tmp_obj = {
             "contents": contents_split,
             "ast": ast_new,
-            "hash": hash_tmp,
             "fixed": fixed_flag
         }
         return tmp_obj
@@ -245,6 +236,53 @@ def get_line(line, character, file_obj):
         return curr_line, char_out
 
 
+def apply_change(contents_split, change):
+    """Apply a change to the document."""
+    text = change['text']
+    change_range = change.get('range')
+    if len(text) == 0:
+        text_split = [""]
+    else:
+        text_split = text.splitlines()
+
+    if not change_range:
+        # The whole file has changed
+        return text_split, -1
+
+    start_line = change_range['start']['line']
+    start_col = change_range['start']['character']
+    end_line = change_range['end']['line']
+    end_col = change_range['end']['character']
+
+    # Check for an edit occuring at the very end of the file
+    if start_line == len(contents_split):
+        return contents_split.extend(text_split), -1
+
+    # Check for single line edit
+    if start_line == end_line and len(text_split) == 1:
+        prev_line = contents_split[start_line]
+        contents_split[start_line] = prev_line[:start_col] + text + prev_line[end_col:]
+        return contents_split, start_line
+
+    # Apply standard change to document
+    new_contents = []
+    for i, line in enumerate(contents_split):
+        if i < start_line or i > end_line:
+            new_contents.append(line)
+            continue
+
+        if i == start_line:
+            for j, change_line in enumerate(text_split):
+                if j == 0:
+                    new_contents.append(line[:start_col]+change_line)
+                else:
+                    new_contents.append(change_line)
+
+        if i == end_line:
+            new_contents[-1] += line[end_col:]
+    return new_contents, -1
+
+
 class LangServer:
     def __init__(self, conn, logLevel=0, settings=None):
         self.conn = conn
@@ -382,7 +420,7 @@ class LangServer:
                 },
                 "definitionProvider": True,
                 "hoverProvider": True,
-                "textDocumentSync": 1
+                "textDocumentSync": 2
             }
         }
         #     "referencesProvider": True,
@@ -796,8 +834,25 @@ class LangServer:
         params = request["params"]
         uri = params["textDocument"]["uri"]
         path = path_from_uri(uri)
-        # Updating full file
-        self.update_workspace_file(params["contentChanges"][0]["text"], path)
+        # Update file with changes
+        if path in self.workspace:
+            new_contents = self.workspace[path]["contents"]
+            try:
+                for change in params["contentChanges"]:
+                    old_contents = new_contents
+                    new_contents, line_tmp = apply_change(old_contents, change)
+            except:
+                self.conn.send_notification("window/showMessage", {
+                    "type": 1,
+                    "message": 'Change request failed for unknown file "{0}"'.format(path)
+                })
+            else:
+                self.update_workspace_file(new_contents, path)
+        else:
+            self.conn.send_notification("window/showMessage", {
+                "type": 1,
+                "message": 'Change request failed for unknown file "{0}"'.format(path)
+            })
         # Update inheritance (currently only on open/save)
         # for key in self.obj_tree:
         #     self.obj_tree[key][0].resolve_inherit(self.obj_tree)
@@ -817,19 +872,11 @@ class LangServer:
     def add_file(self, filepath):
         # Read and add file from disk
         with open(filepath, 'r') as fhandle:
-            self.update_workspace_file(fhandle.read(), filepath)
+            self.update_workspace_file(fhandle.readlines(), filepath)
 
-    def update_workspace_file(self, contents, filepath):
+    def update_workspace_file(self, contents_split, filepath):
         # Update workspace from file contents and path
-        if PY3K:
-            hash_tmp = hashlib.md5(contents.encode('ascii', errors='ignore')).hexdigest()
-        else:
-            hash_tmp = hashlib.md5(contents.decode('ascii', errors='ignore')).hexdigest()
-        if filepath in self.workspace:
-            if hash_tmp == self.workspace[filepath]["hash"]:
-                return  # Same hash no updates
         try:
-            contents_split = contents.splitlines()
             fixed_flag = detect_fixed_format(contents_split)
             ast_new = process_file(contents_split, True, fixed_flag)
         except:
@@ -848,7 +895,6 @@ class LangServer:
             tmp_obj = {
                 "contents": contents_split,
                 "ast": ast_new,
-                "hash": hash_tmp,
                 "fixed": fixed_flag
             }
             self.workspace[filepath] = tmp_obj
