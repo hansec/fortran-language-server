@@ -31,6 +31,14 @@ Hover:
 
 .. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_hover.gif
 
+Diagnostics:
+
+ - Multiple use of the same variable name
+ - Unknown module in USE statement
+ - Variable masking definition from parent scope
+
+.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_diag.png
+
 Installation
 ------------
 
@@ -49,10 +57,10 @@ By default all files with the suffix ``f,F,f77,F77,for,FOR,fpp,FPP`` or ``f90,F9
 the project.
 
 Directories and files can be excluded from the project by specifying their paths (relative to ``root_dir``) in
-the ``excl_paths`` variable in ``.fortls`` file. Excluded directories also exclude all sub-directories.
+the ``excl_paths`` variable in the ``.fortls`` file. Excluded directories also exclude all sub-directories.
 
 Module directories can also be specified manually by specifying their paths (relative to ``root_dir``) in
-the ``mod_dirs`` variable in ``.fortls`` file. When ``mod_dirs`` is specified directories are not added
+the ``mod_dirs`` variable in the ``.fortls`` file. When ``mod_dirs`` is specified directories are not added
 recursively, so any nested sub directories must be explicitly listed. However, ``root_dir`` does not need to
 be specified manually as it is always included.
 
