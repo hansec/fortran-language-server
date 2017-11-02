@@ -238,7 +238,10 @@ class fortran_subroutine(fortran_scope):
                     break
             if ind >= 0:
                 self.arg_objs.append(child)
+                if child.is_optional():
+                    arg_list[ind] = "{0}={0}".format(arg_list[ind])
             child.resolve_link(obj_tree)
+        self.args = ",".join(arg_list)
 
     def get_type(self):
         return 2
