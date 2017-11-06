@@ -101,6 +101,15 @@ def find_in_scope(scope, var_name, obj_tree):
     return None, None
 
 
+def find_word_in_line(line, word):
+    i0 = 0
+    for poss_name in WORD_REGEX.finditer(line):
+        if poss_name.group() == word:
+            i0 = poss_name.start()
+            break
+    return i0, i0 + len(word)
+
+
 class fortran_scope:
     def __init__(self, line_number, name, enc_scope=None):
         self.base_setup(line_number, name, enc_scope)
@@ -176,22 +185,26 @@ class fortran_scope:
     def end(self, line_number):
         self.eline = line_number
 
-    def check_double_def(self, file_contents):
+    def check_double_def(self, file_contents, obj_tree):
+        """Check for double definition errors in scope"""
         FSQN_list = []
         errors = []
         for child in self.children:
+            # Check other variables in current scope
             if FSQN_list.count(child.FQSN) > 0:
                 line_number = child.sline - 1
-                line = file_contents[line_number].lower()
-                name_lower = child.name.lower()
-                i0 = 0
-                for poss_name in WORD_REGEX.finditer(line):
-                    if poss_name.group() == name_lower:
-                        i0 = poss_name.start()
-                        break
-                errors.append([line_number, i0, i0+len(child.name), child.name])
+                i0, i1 = find_word_in_line(file_contents[line_number].lower(), child.name.lower())
+                errors.append([0, line_number, i0, i1, child.name])
             else:
                 FSQN_list.append(child.FQSN)
+            # Check for masking from parent scope in subroutines and functions
+            if self.parent is not None and (self.get_type() == 2 or self.get_type() == 3):
+                parent_var, parent_scope = \
+                    find_in_scope(self.parent, child.name, obj_tree)
+                if parent_var is not None:
+                    line_number = child.sline - 1
+                    i0, i1 = find_word_in_line(file_contents[line_number].lower(), child.name.lower())
+                    errors.append([1, line_number, i0, i1, child.name])
         return errors
 
     def check_use(self, obj_tree, file_contents):
@@ -592,15 +605,25 @@ class fortran_file:
     def check_file(self, obj_tree, file_contents):
         errors = []
         for scope in self.scope_list:
-            for error in scope.check_double_def(file_contents):
-                errors.append({
-                    "range": {
-                        "start": {"line": error[0], "character": error[1]},
-                        "end": {"line": error[0], "character": error[2]}
-                    },
-                    "message": 'Variable "{0}" declared twice in scope'.format(error[3]),
-                    "severity": 1
-                })
+            for error in scope.check_double_def(file_contents, obj_tree):
+                if error[0] == 0:
+                    errors.append({
+                        "range": {
+                            "start": {"line": error[1], "character": error[2]},
+                            "end": {"line": error[1], "character": error[3]}
+                        },
+                        "message": 'Variable "{0}" declared twice in scope'.format(error[4]),
+                        "severity": 1
+                    })
+                elif error[0] == 1:
+                    errors.append({
+                        "range": {
+                            "start": {"line": error[1], "character": error[2]},
+                            "end": {"line": error[1], "character": error[3]}
+                        },
+                        "message": 'Variable "{0}" masks variable in parent scope'.format(error[4]),
+                        "severity": 2
+                    })
             for error in scope.check_use(obj_tree, file_contents):
                 errors.append({
                     "range": {
