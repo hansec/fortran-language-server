@@ -17,6 +17,10 @@ def main():
         help="Do not include type members in document symbol results"
     )
     parser.add_argument(
+        '--incrmental_sync', action="store_true",
+        help="Use incremental document syncronization (beta)"
+    )
+    parser.add_argument(
         '--debug_parser', action="store_true",
         help="Test source parser on specified file instead of running language server"
     )
@@ -40,7 +44,8 @@ def main():
     debug_server = args.debug_symbols or (args.debug_rootpath is not None)
     #
     settings = {
-        "symbol_include_mem": (not args.symbol_skip_mem)
+        "symbol_include_mem": (not args.symbol_skip_mem),
+        "sync_type": 2 if args.incrmental_sync else 1
     }
     #
     if args.debug_parser:

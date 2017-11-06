@@ -297,6 +297,7 @@ class LangServer:
         self.post_messages = []
         self.streaming = True
         self.symbol_include_mem = True
+        self.sync_type = 1
         if logLevel == 0:
             logging.basicConfig(level=logging.ERROR)
         elif logLevel == 1:
@@ -304,6 +305,8 @@ class LangServer:
         if settings is not None:
             if "symbol_include_mem" in settings:
                 self.symbol_include_mem = settings["symbol_include_mem"]
+            if "sync_type" in settings:
+                self.sync_type = settings["sync_type"]
 
     def run(self):
         # Run server
@@ -420,7 +423,7 @@ class LangServer:
                 },
                 "definitionProvider": True,
                 "hoverProvider": True,
-                "textDocumentSync": 2
+                "textDocumentSync": self.sync_type
             }
         }
         #     "referencesProvider": True,
@@ -835,24 +838,28 @@ class LangServer:
         uri = params["textDocument"]["uri"]
         path = path_from_uri(uri)
         # Update file with changes
-        if path in self.workspace:
-            new_contents = self.workspace[path]["contents"]
-            try:
-                for change in params["contentChanges"]:
-                    old_contents = new_contents
-                    new_contents, line_tmp = apply_change(old_contents, change)
-            except:
+        if self.sync_type == 1:
+            new_contents = params["contentChanges"][0]["text"].splitlines()
+            self.update_workspace_file(new_contents, path)
+        else:
+            if path in self.workspace:
+                new_contents = self.workspace[path]["contents"]
+                try:
+                    for change in params["contentChanges"]:
+                        old_contents = new_contents
+                        new_contents, line_tmp = apply_change(old_contents, change)
+                except:
+                    self.conn.send_notification("window/showMessage", {
+                        "type": 1,
+                        "message": 'Change request failed for unknown file "{0}"'.format(path)
+                    })
+                else:
+                    self.update_workspace_file(new_contents, path)
+            else:
                 self.conn.send_notification("window/showMessage", {
                     "type": 1,
                     "message": 'Change request failed for unknown file "{0}"'.format(path)
                 })
-            else:
-                self.update_workspace_file(new_contents, path)
-        else:
-            self.conn.send_notification("window/showMessage", {
-                "type": 1,
-                "message": 'Change request failed for unknown file "{0}"'.format(path)
-            })
         # Update inheritance (currently only on open/save)
         # for key in self.obj_tree:
         #     self.obj_tree[key][0].resolve_inherit(self.obj_tree)

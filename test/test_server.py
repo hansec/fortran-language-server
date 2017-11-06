@@ -9,7 +9,7 @@ root_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.insert(0, root_dir)
 from fortls.jsonrpc import write_rpc_request, write_rpc_notification, read_rpc_messages
 
-run_command = os.path.join(root_dir, "fortls.py --unbuffered")
+run_command = os.path.join(root_dir, "fortls.py --unbuffered --incrmental_sync")
 test_dir = os.path.join(root_dir, "test/test_source")
 
 

@@ -33,9 +33,9 @@ Hover:
 
 Diagnostics:
 
- - Multiple use of the same variable name
- - Unknown module in USE statement
- - Variable masking definition from parent scope
+- Multiple use of the same variable name
+- Unknown module in USE statement
+- Variable masking definition from parent scope
 
 .. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_diag.png
 
