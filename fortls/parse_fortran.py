@@ -38,6 +38,19 @@ FIXED_CONT_REGEX = re.compile(r'(     [\S])')
 #
 FREE_COMMENT_LINE_MATCH = re.compile(r'([ \t]*!)')
 FREE_CONT_REGEX = re.compile(r'([ \t]*&)')
+FREE_FORMAT_TEST = re.compile(r'[ ]{1,4}[a-z]', re.I)
+
+
+def detect_fixed_format(file_lines):
+    """Detect fixed/free format by looking for characters in label columns
+    and variable declarations before column 6."""
+    for line in file_lines:
+        if FREE_FORMAT_TEST.match(line):
+            return False
+        tmp_match = NAT_VAR_REGEX.match(line)
+        if tmp_match and tmp_match.start(1) < 6:
+            return False
+    return True
 
 
 def separate_def_list(test_str):

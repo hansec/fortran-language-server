@@ -5,14 +5,13 @@ import traceback
 import hashlib
 import re
 # Local modules
-from fortls.parse_fortran import process_file, read_use_stmt
+from fortls.parse_fortran import process_file, read_use_stmt, detect_fixed_format
 from fortls.objects import find_in_scope, fortran_meth
 
 PY3K = sys.version_info >= (3, 0)
 log = logging.getLogger(__name__)
 # Global regexes
 FORTRAN_EXT_REGEX = re.compile(r'^\.F(77|90|95|03|08|OR|PP)?$', re.I)
-FIXED_EXT_REGEX = re.compile(r'^\.F(77|OR|PP)?$', re.I)
 objBreak_REGEX = re.compile(r'[\/\-(.,+*<>=$: ]', re.I)
 word_REGEX = re.compile(r'[a-z][a-z0-9_]*', re.I)
 CALL_REGEX = re.compile(r'[ \t]*CALL[ \t]*([a-z0-9_]*)$', re.I)
@@ -35,15 +34,12 @@ def init_file(filepath):
         contents = fhandle.read()
     #
     try:
-        filename, ext = os.path.splitext(os.path.basename(filepath))
-        fixed_flag = False
-        if FIXED_EXT_REGEX.match(ext):
-            fixed_flag = True
         if PY3K:
             hash_tmp = hashlib.md5(contents.encode('ascii', errors='ignore')).hexdigest()
         else:
             hash_tmp = hashlib.md5(contents.decode('ascii', errors='ignore')).hexdigest()
         contents_split = contents.splitlines()
+        fixed_flag = detect_fixed_format(contents_split)
         ast_new = process_file(contents_split, True, fixed_flag)
     except:
         return None
@@ -833,11 +829,8 @@ class LangServer:
             if hash_tmp == self.workspace[filepath]["hash"]:
                 return  # Same hash no updates
         try:
-            filename, ext = os.path.splitext(os.path.basename(filepath))
-            fixed_flag = False
-            if FIXED_EXT_REGEX.match(ext):
-                fixed_flag = True
             contents_split = contents.splitlines()
+            fixed_flag = detect_fixed_format(contents_split)
             ast_new = process_file(contents_split, True, fixed_flag)
         except:
             self.conn.send_notification("window/showMessage", {

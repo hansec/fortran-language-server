@@ -2,9 +2,9 @@ from __future__ import print_function
 import sys
 import os
 import argparse
-from .langserver import LangServer, FIXED_EXT_REGEX
+from .langserver import LangServer
 from .jsonrpc import JSONRPC2Connection, ReadWriter
-from .parse_fortran import process_file
+from .parse_fortran import process_file, detect_fixed_format
 __version__ = '0.2.0'
 
 
@@ -52,18 +52,15 @@ def main():
             print("ERROR: Specified 'debug_filepath' does not exist")
             sys.exit(-1)
         filename, ext = os.path.splitext(os.path.basename(args.debug_filepath))
-        fixed_flag = False
-        detected_format = "free"
-        if FIXED_EXT_REGEX.match(ext):
-            fixed_flag = True
-            detected_format = "fixed"
         #
         print('\nTesting parser')
         print('  File = "{0}"'.format(args.debug_filepath))
-        print('  Detected format: {0}'.format(detected_format))
         with open(args.debug_filepath, 'r') as fhandle:
+            contents_split = fhandle.readlines()
+            fixed_flag = detect_fixed_format(contents_split)
+            print('  Detected format: {0}'.format("fixed" if fixed_flag else "free"))
             print("\n=========\nParser Output\n=========\n")
-            ast_new = process_file(fhandle.readlines(), True, fixed_flag, True)
+            ast_new = process_file(contents_split, True, fixed_flag, True)
             print("\n=========\nObject Tree\n=========\n")
             for key, obj in ast_new.global_dict.items():
                 print("{0}: {1}".format(obj.get_type(), obj.FQSN))
