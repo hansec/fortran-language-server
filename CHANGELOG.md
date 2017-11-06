@@ -1,3 +1,16 @@
+## 0.3.0
+
+### Improvements
+* Add basic file diagnostics (double declaration, variable masking, unknown USE)
+* Indicate optional arguments in autocomplete suggestions
+* Detect source code format from file contents instead of extension
+* Add support for incremental document synchronization
+
+### Fixes
+* Fix parsing error when variable definition line is incomplete
+* Fix incorrect line handling with open parentheses
+* Fix bug when file parsing/hashing fails in workspace initialization
+
 ## 0.2.0
 
 ### Improvements
