@@ -11,7 +11,11 @@ __version__ = '0.2.0'
 def main():
     #
     parser = argparse.ArgumentParser()
-    parser.description = "FORTRAN Language Server v{0} (beta)".format(__version__)
+    parser.description = "FORTRAN Language Server (beta)"
+    parser.add_argument(
+        '--version', action="store_true",
+        help="Print server version number and exit"
+    )
     parser.add_argument(
         '--symbol_skip_mem', action="store_true",
         help="Do not include type members in document symbol results"
@@ -41,6 +45,9 @@ def main():
         help="Run language server with unbufferd I/O (for test script only)"
     )
     args = parser.parse_args()
+    if args.version:
+        print("{0}".format(__version__))
+        sys.exit(0)
     debug_server = args.debug_symbols or (args.debug_rootpath is not None)
     #
     settings = {
