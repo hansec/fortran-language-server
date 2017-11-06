@@ -46,7 +46,6 @@ def init_file(filepath):
         contents_split = contents.splitlines()
         ast_new = process_file(contents_split, True, fixed_flag)
     except:
-        raise
         return None
     else:
         # Construct new file object and add to workspace
