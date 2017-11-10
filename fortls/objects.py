@@ -215,6 +215,9 @@ class fortran_scope:
 
     def check_double_def(self, file_contents, obj_tree):
         """Check for double definition errors in scope"""
+        if self.parent is not None:
+            if self.parent.get_type() == 5:
+                return []
         FSQN_list = []
         errors = []
         for child in self.children:

@@ -273,7 +273,7 @@ def read_int_def(line):
     else:
         int_name = int_match.group(1).lower()
         if int_name == '':
-            return None
+            return 'int', None
         if int_name == 'assignment' or int_name == 'operator':
             return None
         return 'int', int_match.group(1)
@@ -311,6 +311,7 @@ def process_file(file_str, close_open_scopes, fixed_format=False, debug=False):
     file_obj = fortran_file()
     line_number = 0
     next_line_num = 1
+    int_counter = 0
     # at_eof = False
     next_line = None
     line_ind = 0
@@ -467,6 +468,9 @@ def process_file(file_str, close_open_scopes, fixed_format=False, debug=False):
                 if(debug):
                     print('{1} !!! TYPE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'int':
+                if obj is None:
+                    int_counter += 1
+                    obj = 'GEN_INT{0}'.format(int_counter)
                 new_int = fortran_int(line_number, obj, file_obj.enc_scope_name)
                 file_obj.add_scope(new_int, END_INT_REGEX, True)
                 if(debug):
