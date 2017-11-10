@@ -4,7 +4,7 @@ import traceback
 import re
 # Local modules
 from fortls.parse_fortran import process_file, read_use_stmt, detect_fixed_format
-from fortls.objects import find_in_scope, fortran_meth
+from fortls.objects import find_in_scope, fortran_meth, get_use_tree
 
 log = logging.getLogger(__name__)
 # Global regexes
@@ -508,36 +508,6 @@ class LangServer:
             else:
                 return type
 
-        def intersect_lists(l1, l2):
-            tmp_list = []
-            for val1 in l1:
-                if l2.count(val1) > 0:
-                    tmp_list.append(val1)
-            return tmp_list
-
-        def get_use_tree(scope, use_dict, only_list=[]):
-            # Add recursively
-            for use_stmnt in scope.use:
-                use_mod = use_stmnt[0]
-                if len(only_list) == 0:
-                    merged_use_list = use_stmnt[1]
-                elif len(use_stmnt[1]) == 0:
-                    merged_use_list = only_list
-                else:
-                    merged_use_list = intersect_lists(only_list, use_stmnt[1])
-                    if len(merged_use_list) == 0:
-                        continue
-                if use_mod in self.obj_tree:
-                    if use_mod in use_dict:
-                        if len(use_dict[use_mod]) > 0:
-                            for only_name in use_stmnt[1]:
-                                if use_dict[use_mod].count(only_name) == 0:
-                                    use_dict[use_mod].append(only_name)
-                    else:
-                        use_dict[use_mod] = merged_use_list
-                    use_dict = get_use_tree(self.obj_tree[use_mod][0], use_dict, merged_use_list)
-            return use_dict
-
         def get_candidates(scope_list, var_prefix, inc_globals=True, public_only=False):
             var_list = []
             use_dict = {}
@@ -553,7 +523,7 @@ class LangServer:
                     if child.name.lower().startswith(var_prefix):
                         var_list.append(child)
                 # Add to use list
-                use_dict = get_use_tree(scope, use_dict)
+                use_dict = get_use_tree(scope, use_dict, self.obj_tree)
             # Look in found use modules
             for use_mod, only_list in use_dict.items():
                 scope = self.obj_tree[use_mod][0]

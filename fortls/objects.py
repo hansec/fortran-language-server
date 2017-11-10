@@ -61,6 +61,38 @@ def get_keywords(modifiers):
     return mod_strings
 
 
+def intersect_lists(l1, l2):
+    tmp_list = []
+    for val1 in l1:
+        if l2.count(val1) > 0:
+            tmp_list.append(val1)
+    return tmp_list
+
+
+def get_use_tree(scope, use_dict, obj_tree, only_list=[]):
+    # Add recursively
+    for use_stmnt in scope.use:
+        use_mod = use_stmnt[0]
+        if len(only_list) == 0:
+            merged_use_list = use_stmnt[1]
+        elif len(use_stmnt[1]) == 0:
+            merged_use_list = only_list
+        else:
+            merged_use_list = intersect_lists(only_list, use_stmnt[1])
+            if len(merged_use_list) == 0:
+                continue
+        if use_mod in obj_tree:
+            if use_mod in use_dict:
+                if len(use_dict[use_mod]) > 0:
+                    for only_name in use_stmnt[1]:
+                        if use_dict[use_mod].count(only_name) == 0:
+                            use_dict[use_mod].append(only_name)
+            else:
+                use_dict[use_mod] = merged_use_list
+            use_dict = get_use_tree(obj_tree[use_mod][0], use_dict, obj_tree, merged_use_list)
+    return use_dict
+
+
 def find_in_scope(scope, var_name, obj_tree):
     var_name_lower = var_name.lower()
     # Check local scope
@@ -68,30 +100,26 @@ def find_in_scope(scope, var_name, obj_tree):
         if child.name.lower() == var_name_lower:
             return child, scope
     # Setup USE search
-    use_list = {}
-    for use_stmnt in scope.use:
-        use_mod = use_stmnt[0]
-        if use_mod not in obj_tree:
-            continue
+    use_dict = get_use_tree(scope, {}, obj_tree)
+    # Look in found use modules
+    for use_mod, only_list in use_dict.items():
+        use_scope = obj_tree[use_mod][0]
         # Module name is request
         if use_mod.lower() == var_name_lower:
-            return obj_tree[use_mod][0], None
-        only_list = use_stmnt[1]
+            return use_scope, None
+        # Filter children by only_list
         if len(only_list) > 0:
-            if var_name not in only_list:
+            if var_name_lower not in only_list:
                 continue
-        use_list[use_mod] = 1
-    # Look in use stmnts
-    for use_mod in use_list:
-        # poss_members = []
-        # Check module
-        if use_mod in obj_tree:
-            curr_scope = obj_tree[use_mod][0]
-            tmp_var, tmp_scope = find_in_scope(curr_scope, var_name, obj_tree)
-            if tmp_var is not None:
-                if tmp_scope is not None:
-                    curr_scope = tmp_scope
-                return tmp_var, curr_scope
+        # Check for variable in public children
+        def_vis = use_scope.def_vis
+        for child in use_scope.get_children():
+            if child.vis < 0:
+                continue
+            if def_vis < 0 and child.vis <= 0:
+                continue
+            if child.name.lower() == var_name_lower:
+                return child, use_scope
     # Check parent scopes
     if scope.parent is not None:
         curr_scope = scope.parent

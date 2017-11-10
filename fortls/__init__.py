@@ -118,6 +118,11 @@ def main():
                 print("ERROR: Specified 'debug_filepath' does not exist")
                 sys.exit(-1)
             print('  File = "{0}"\n'.format(args.debug_filepath))
+            s.serve_onSave({
+                "params": {
+                    "textDocument": {"uri": args.debug_filepath}
+                }
+            })
             symbol_results = s.serve_document_symbols({
                 "params": {
                     "textDocument": {"uri": args.debug_filepath}
