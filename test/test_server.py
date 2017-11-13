@@ -71,16 +71,6 @@ def test_open():
 
 
 def test_change():
-    new_contents = """MODULE test_free
-IMPLICIT NONE
-!
-TYPE :: scale_type
-  REAL(8) :: val = 1.d0
-END TYPE scale_type
-!
-LOGICAL :: module_variable
-END MODULE test_free
-"""
     string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
     file_path = os.path.join(test_dir, "subdir", "test_free.f90")
     string += write_rpc_notification("textDocument/didChange", {

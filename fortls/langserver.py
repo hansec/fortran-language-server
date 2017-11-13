@@ -244,6 +244,9 @@ def apply_change(contents_split, change):
         text_split = [""]
     else:
         text_split = text.splitlines()
+        # Check for ending newline
+        if text[-1] == "\n" or text[-1] == "\r":
+            text_split.append("")
 
     if not change_range:
         # The whole file has changed
