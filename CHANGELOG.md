@@ -1,3 +1,12 @@
+## 0.3.1
+
+### Improvements
+* Do not show warnings for variable masking in interface definitions
+* Respect visibility statements when searching for object in scope
+
+### Fixes
+* Fix bug in incremental document sync with ending newline
+
 ## 0.3.0
 
 ### Improvements
