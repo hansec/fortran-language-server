@@ -104,22 +104,22 @@ def test_symbols():
     def check_return(result_arrary):
         # Expected objects
         objs = [
-            ["test_free", 2, 0, 50],
-            ["scale_type", 5, 3, 5],
-            ["val", 13, 4, 4],
-            ["vector", 5, 7, 13],
-            ["n", 13, 8, 8],
-            ["v", 13, 9, 9],
-            ["create", 6, 11, 11],
-            ["norm", 12, 12, 12],
-            ["scaled_vector", 5, 15, 20],
-            ["scale", 13, 16, 16],
-            ["set_scale", 6, 18, 18],
-            ["norm", 12, 19, 19],
-            ["vector_create", 6, 25, 31],
-            ["vector_norm", 12, 33, 37],
-            ["scaled_vector_set", 6, 39, 43],
-            ["scaled_vector_norm", 12, 45, 49]
+            ["test_free", 2, 0, 51],
+            ["scale_type", 5, 4, 6],
+            ["val", 13, 5, 5],
+            ["vector", 5, 8, 14],
+            ["n", 13, 9, 9],
+            ["v", 13, 10, 10],
+            ["create", 6, 12, 12],
+            ["norm", 12, 13, 13],
+            ["scaled_vector", 5, 16, 21],
+            ["scale", 13, 17, 17],
+            ["set_scale", 6, 19, 19],
+            ["norm", 12, 20, 20],
+            ["vector_create", 6, 26, 32],
+            ["vector_norm", 12, 34, 38],
+            ["scaled_vector_set", 6, 40, 44],
+            ["scaled_vector_norm", 12, 46, 50]
         ]
         assert len(result_arrary) == len(objs)
         for i, obj in enumerate(objs):
@@ -220,6 +220,6 @@ def test_def():
     check_return(results[1], [0, 0, "file://" + os.path.join(test_dir, "subdir", "test_fixed.f")])
     check_return(results[2], [20, 20, "file://" + os.path.join(test_dir, "subdir", "test_fixed.f")])
     check_return(results[3], [9, 9, "file://" + os.path.join(test_dir, "test_prog.f08")])
-    check_return(results[4], [18, 18, "file://" + os.path.join(test_dir, "subdir", "test_free.f90")])
-    check_return(results[5], [12, 12, "file://" + os.path.join(test_dir, "subdir", "test_free.f90")])
-    check_return(results[6], [4, 4, "file://" + os.path.join(test_dir, "subdir", "test_free.f90")])
+    check_return(results[4], [19, 19, "file://" + os.path.join(test_dir, "subdir", "test_free.f90")])
+    check_return(results[5], [13, 13, "file://" + os.path.join(test_dir, "subdir", "test_free.f90")])
+    check_return(results[6], [5, 5, "file://" + os.path.join(test_dir, "subdir", "test_free.f90")])

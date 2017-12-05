@@ -1,4 +1,5 @@
 MODULE test_free
+USE, INTRINSIC :: iso_fortran_env, ONLY: error_unit
 IMPLICIT NONE
 !
 TYPE :: scale_type

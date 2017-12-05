@@ -4,7 +4,7 @@ from fortls.objects import parse_keywords, fortran_module, fortran_program, \
     fortran_subroutine, fortran_function, fortran_type, fortran_int, \
     fortran_obj, fortran_meth, fortran_file
 #
-USE_REGEX = re.compile(r'[ \t]*USE[ \t:]*([a-z0-9_]*)', re.I)
+USE_REGEX = re.compile(r'[ \t]*USE([, \t]*INTRINSIC)?[ \t:]*([a-z0-9_]*)', re.I)
 SUB_REGEX = re.compile(r'[ \t]*(PURE|ELEMENTAL|RECURSIVE)*[ \t]*(SUBROUTINE)', re.I)
 END_SUB_REGEX = re.compile(r'[ \t]*END[ \t]*SUBROUTINE', re.I)
 FUN_REGEX = re.compile(r'[ \t]*(PURE|ELEMENTAL|RECURSIVE)*[ \t]*(FUNCTION)', re.I)
@@ -285,7 +285,7 @@ def read_use_stmt(line):
         return None
     else:
         trailing_line = line[use_match.end(0):].lower()
-        use_mod = use_match.group(1)
+        use_mod = use_match.group(2)
         only_ind = trailing_line.find('only:')
         only_list = []
         if only_ind > -1:

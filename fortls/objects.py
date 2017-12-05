@@ -239,10 +239,14 @@ class fortran_scope:
         return errors
 
     def check_use(self, obj_tree, file_contents):
+        intrinsic_mods = ['omp_lib', 'iso_c_binding', 'iso_fortran_env',
+                          'ieee_exceptions', 'ieee_arithmetic', 'ieee_features']
         errors = []
         for use_line in self.use:
             use_mod = use_line[0]
             if use_mod not in obj_tree:
+                if use_mod in intrinsic_mods:
+                    continue
                 line_number = use_line[2] - 1
                 line = file_contents[line_number]
                 i0 = line.lower().find(use_mod)
