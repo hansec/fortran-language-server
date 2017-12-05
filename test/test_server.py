@@ -97,14 +97,14 @@ def test_change():
     #
     assert errcode == 0
     assert len(results) == 2
-    assert len(results[1]) == 3
+    assert len(results[1]) == 4
 
 
 def test_symbols():
     def check_return(result_arrary):
         # Expected objects
         objs = [
-            ["test_free", 2, 0, 51],
+            ["test_free", 2, 0, 57],
             ["scale_type", 5, 4, 6],
             ["val", 13, 5, 5],
             ["vector", 5, 8, 14],
@@ -119,7 +119,8 @@ def test_symbols():
             ["vector_create", 6, 26, 32],
             ["vector_norm", 12, 34, 38],
             ["scaled_vector_set", 6, 40, 44],
-            ["scaled_vector_norm", 12, 46, 50]
+            ["scaled_vector_norm", 12, 46, 50],
+            ["unscaled_norm", 12, 52, 56]
         ]
         assert len(result_arrary) == len(objs)
         for i, obj in enumerate(objs):

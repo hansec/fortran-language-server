@@ -233,6 +233,9 @@ class fortran_scope:
                 parent_var, parent_scope = \
                     find_in_scope(self.parent, child.name, obj_tree)
                 if parent_var is not None:
+                    # Ignore if function return variable
+                    if self.get_type() == 3 and parent_var.FQSN == self.FQSN:
+                        continue
                     line_number = child.sline - 1
                     i0, i1 = find_word_in_line(file_contents[line_number].lower(), child.name.lower())
                     errors.append([1, line_number, i0, i1, child.name])

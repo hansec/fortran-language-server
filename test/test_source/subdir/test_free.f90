@@ -49,4 +49,10 @@ CLASS(scaled_vector), INTENT(in) :: self
 REAL(8) :: norm
 norm = self%scale%val*SQRT(DOT_PRODUCT(self%v,self%v))
 END FUNCTION scaled_vector_norm
+!
+FUNCTION unscaled_norm(self)
+CLASS(scaled_vector), INTENT(in) :: self
+REAL(8) :: unscaled_norm
+unscaled_norm = SQRT(DOT_PRODUCT(self%v,self%v))
+END FUNCTION unscaled_norm
 END MODULE test_free
