@@ -52,7 +52,7 @@ in the ``root_dir`` directory.
 
 **Setup module search paths:**
 
-By default all files with the suffix ``f,F,f77,F77,for,FOR,fpp,FPP`` or ``f90,F90,f95,F95,f03,F03,f08,F08`` in the
+By default all files with the suffix ``F,F77,F90,F95,F03,F08,FOR,FPP`` (case-insensitive) in the
 ``root_dir`` directory, specified during initialization, and all its sub-directories are parsed and included in
 the project.
 
