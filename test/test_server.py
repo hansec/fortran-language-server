@@ -150,27 +150,27 @@ def test_comp():
     file_path = os.path.join(test_dir, "test_prog.f08")
     string += write_rpc_request(2, "textDocument/completion", {
         "textDocument": {"uri": file_path},
-        "position": {"line": 11, "character": 6}
+        "position": {"line": 12, "character": 6}
     })
     string += write_rpc_request(3, "textDocument/completion", {
         "textDocument": {"uri": file_path},
-        "position": {"line": 12, "character": 6}
+        "position": {"line": 13, "character": 6}
     })
     string += write_rpc_request(4, "textDocument/completion", {
         "textDocument": {"uri": file_path},
-        "position": {"line": 17, "character": 7}
+        "position": {"line": 18, "character": 7}
     })
     string += write_rpc_request(5, "textDocument/completion", {
         "textDocument": {"uri": file_path},
-        "position": {"line": 18, "character": 20}
+        "position": {"line": 19, "character": 20}
     })
     string += write_rpc_request(6, "textDocument/completion", {
         "textDocument": {"uri": file_path},
-        "position": {"line": 18, "character": 42}
+        "position": {"line": 19, "character": 42}
     })
     string += write_rpc_request(7, "textDocument/completion", {
         "textDocument": {"uri": file_path},
-        "position": {"line": 20, "character": 26}
+        "position": {"line": 21, "character": 26}
     })
     errcode, results = run_request(string)
     #
@@ -193,34 +193,34 @@ def test_def():
     file_path = os.path.join(test_dir, "test_prog.f08")
     string += write_rpc_request(2, "textDocument/definition", {
         "textDocument": {"uri": file_path},
-        "position": {"line": 11, "character": 6}
+        "position": {"line": 12, "character": 6}
     })
     string += write_rpc_request(3, "textDocument/definition", {
         "textDocument": {"uri": file_path},
-        "position": {"line": 12, "character": 6}
+        "position": {"line": 13, "character": 6}
     })
     string += write_rpc_request(4, "textDocument/definition", {
         "textDocument": {"uri": file_path},
-        "position": {"line": 17, "character": 7}
+        "position": {"line": 18, "character": 7}
     })
     string += write_rpc_request(5, "textDocument/definition", {
         "textDocument": {"uri": file_path},
-        "position": {"line": 18, "character": 20}
+        "position": {"line": 19, "character": 20}
     })
     string += write_rpc_request(6, "textDocument/definition", {
         "textDocument": {"uri": file_path},
-        "position": {"line": 18, "character": 42}
+        "position": {"line": 19, "character": 42}
     })
     string += write_rpc_request(7, "textDocument/definition", {
         "textDocument": {"uri": file_path},
-        "position": {"line": 20, "character": 26}
+        "position": {"line": 21, "character": 26}
     })
     errcode, results = run_request(string)
     #
     assert errcode == 0
     check_return(results[1], [0, 0, "file://" + os.path.join(test_dir, "subdir", "test_fixed.f")])
     check_return(results[2], [20, 20, "file://" + os.path.join(test_dir, "subdir", "test_fixed.f")])
-    check_return(results[3], [9, 9, "file://" + os.path.join(test_dir, "test_prog.f08")])
+    check_return(results[3], [10, 10, "file://" + os.path.join(test_dir, "test_prog.f08")])
     check_return(results[4], [19, 19, "file://" + os.path.join(test_dir, "subdir", "test_free.f90")])
     check_return(results[5], [13, 13, "file://" + os.path.join(test_dir, "subdir", "test_free.f90")])
     check_return(results[6], [5, 5, "file://" + os.path.join(test_dir, "subdir", "test_free.f90")])

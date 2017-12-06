@@ -3,6 +3,7 @@ PROGRAM test_program
 USE test_free, ONLY: vector, scaled_vector, module_variable
 IMPLICIT NONE
 !
+CHARACTER(LEN=*) :: test_str1 = "i2.2,':',i2.2", test_str2 = 'i2.2,":",i2.2'
 INTEGER(4) :: n
 REAL(8) :: x,y
 COMPLEX(8) :: xc,yc

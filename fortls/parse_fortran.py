@@ -32,6 +32,8 @@ VIS_REGEX = re.compile(r'(PUBLIC|PRIVATE)', re.I)
 WORD_REGEX = re.compile(r'[a-z][a-z0-9_]*', re.I)
 SUB_PAREN_MATCH = re.compile(r'\([a-z0-9_, ]*\)', re.I)
 KIND_SPEC_MATCH = re.compile(r'\([a-z0-9_, =*]*\)', re.I)
+SQ_STRING_REGEX = re.compile(r'\'[^\']*\'', re.I)
+DQ_STRING_REGEX = re.compile(r'\"[^\"]*\"', re.I)
 #
 FIXED_COMMENT_LINE_MATCH = re.compile(r'(!|c|d|\*)')
 FIXED_CONT_REGEX = re.compile(r'(     [\S])')
@@ -58,11 +60,18 @@ def detect_fixed_format(file_lines):
     return True
 
 
+def strip_strings(in_str):
+    out_str = SQ_STRING_REGEX.sub('', in_str)
+    out_str = DQ_STRING_REGEX.sub('', out_str)
+    return out_str
+
+
 def separate_def_list(test_str):
+    stripped_str = strip_strings(test_str)
     paren_count = 0
     def_list = []
     curr_str = ''
-    for char in test_str:
+    for char in stripped_str:
         if char == '(':
             paren_count += 1
         elif char == ')':
