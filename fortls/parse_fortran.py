@@ -35,12 +35,13 @@ KIND_SPEC_MATCH = re.compile(r'\([a-z0-9_, =*]*\)', re.I)
 SQ_STRING_REGEX = re.compile(r'\'[^\']*\'', re.I)
 DQ_STRING_REGEX = re.compile(r'\"[^\"]*\"', re.I)
 #
-FIXED_COMMENT_LINE_MATCH = re.compile(r'(!|c|d|\*)')
+FIXED_COMMENT_LINE_MATCH = re.compile(r'(!|c|d|\*)', re.I)
 FIXED_CONT_REGEX = re.compile(r'(     [\S])')
 #
 FREE_COMMENT_LINE_MATCH = re.compile(r'([ \t]*!)')
 FREE_CONT_REGEX = re.compile(r'([ \t]*&)')
 FREE_FORMAT_TEST = re.compile(r'[ ]{1,4}[a-z]', re.I)
+OPENMP_LINE_MATCH = re.compile(r'[ \t]*[!|c|\*]\$OMP', re.I)
 
 
 def detect_fixed_format(file_lines):
@@ -58,6 +59,18 @@ def detect_fixed_format(file_lines):
         if len(line_end) > 0 and line_end[-1] == '&':
             return False
     return True
+
+
+def detect_comment_line(line, fixed_format=False):
+    if OPENMP_LINE_MATCH.match(line) is not None:
+        return False
+    if fixed_format:
+        if FIXED_COMMENT_LINE_MATCH.match(line) is not None:
+            return True
+    else:
+        if strip_strings(line).find('!') > -1:
+            return True
+    return False
 
 
 def strip_strings(in_str):

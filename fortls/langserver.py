@@ -3,7 +3,8 @@ import os
 import traceback
 import re
 # Local modules
-from fortls.parse_fortran import process_file, read_use_stmt, detect_fixed_format
+from fortls.parse_fortran import process_file, read_use_stmt, detect_fixed_format, \
+    detect_comment_line
 from fortls.objects import find_in_scope, fortran_meth, get_use_tree
 
 log = logging.getLogger(__name__)
@@ -588,18 +589,22 @@ class LangServer:
             # Default context
             return 0, var_prefix, None
         # Get parameters from request
+        req_dict = {"isIncomplete": False, "items": []}
         params = request["params"]
         uri = params["textDocument"]["uri"]
         path = path_from_uri(uri)
         if path not in self.workspace:
-            return {"isIncomplete": False, "items": []}
+            return req_dict
         # Check line
         ac_line = params["position"]["line"]
         ac_char = params["position"]["character"]
         # Get full line (and possible continuations) from file
         curr_line, ac_char = get_line(ac_line, ac_char, self.workspace[path])
         if curr_line is None:
-            return {"isIncomplete": False, "items": []}
+            return req_dict
+        # Ignore for comment lines
+        if detect_comment_line(curr_line):
+            return req_dict
         is_member = False
         try:
             line_prefix = curr_line[:ac_char].lower()
@@ -607,10 +612,9 @@ class LangServer:
             is_member = (len(var_stack) > 1)
             var_prefix = var_stack[-1].strip()
         except:
-            return {"isIncomplete": False, "items": []}
+            return req_dict
         # print var_stack
         file_obj = self.workspace[path]["ast"]
-        test_output = {"isIncomplete": False}
         item_list = []
         scope_list = file_obj.get_scopes(ac_line+1)
         # Get context
@@ -619,7 +623,7 @@ class LangServer:
         line_context, var_prefix, context_info = \
             get_context(line_prefix, var_prefix)
         if var_prefix == '' and not (is_member or line_context == 2):
-            return {"isIncomplete": False, "items": []}
+            return req_dict
         # USE stmnt
         if line_context == 1:  # module part
             for key in self.obj_tree:
@@ -629,8 +633,8 @@ class LangServer:
                     continue
                 if candidate.name.lower().startswith(var_prefix):
                     item_list.append(build_comp(candidate, name_only=True))
-            test_output["items"] = item_list
-            return test_output
+            req_dict["items"] = item_list
+            return req_dict
         elif line_context == 2:  # only part
             name_only = True
             mod_name = context_info.lower()
@@ -676,8 +680,8 @@ class LangServer:
                 continue
             #
             item_list.append(build_comp(candidate, name_only=name_only))
-        test_output["items"] = item_list
-        return test_output
+        req_dict["items"] = item_list
+        return req_dict
 
     def get_definition(self, filepath, def_line, def_char):
         if filepath not in self.workspace:
@@ -685,6 +689,9 @@ class LangServer:
         # Get full line (and possible continuations) from file
         curr_line, def_char = get_line(def_line, def_char, self.workspace[filepath])
         if curr_line is None:
+            return None
+        # Ignore for comment lines
+        if detect_comment_line(curr_line):
             return None
         #
         is_member = False
