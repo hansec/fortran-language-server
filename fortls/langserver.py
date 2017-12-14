@@ -605,12 +605,12 @@ class LangServer:
         curr_line, ac_char = get_line(ac_line, ac_char, self.workspace[path])
         if curr_line is None:
             return req_dict
-        # Ignore for comment lines
-        if detect_comment_line(curr_line):
-            return req_dict
         is_member = False
         try:
             line_prefix = curr_line[:ac_char].lower()
+            # Ignore for comment lines
+            if detect_comment_line(line_prefix):
+                return req_dict
             var_stack = get_var_stack(line_prefix)
             is_member = (len(var_stack) > 1)
             var_prefix = var_stack[-1].strip()
@@ -693,13 +693,13 @@ class LangServer:
         curr_line, def_char = get_line(def_line, def_char, self.workspace[filepath])
         if curr_line is None:
             return None
-        # Ignore for comment lines
-        if detect_comment_line(curr_line):
-            return None
         #
         is_member = False
         try:
             line_prefix = curr_line[:def_char].lower()
+            # Ignore for comment lines
+            if detect_comment_line(line_prefix):
+                return None
             var_stack = get_var_stack(line_prefix)
             is_member = (len(var_stack) > 1)
             def_name = expand_name(curr_line, def_char)
