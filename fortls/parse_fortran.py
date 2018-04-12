@@ -29,7 +29,7 @@ KEYWORD_LIST_REGEX = re.compile(r'[ \t]*,[ \t]*(PUBLIC|PRIVATE|ALLOCATABLE|'
                                 r'SAVE|PARAMETER)', re.I)
 TATTR_LIST_REGEX = re.compile(r'[ \t]*,[ \t]*(PUBLIC|PRIVATE|ABSTRACT|EXTENDS\([a-z0-9_]*\))', re.I)
 VIS_REGEX = re.compile(r'(PUBLIC|PRIVATE)', re.I)
-WORD_REGEX = re.compile(r'[a-z][a-z0-9_]*', re.I)
+WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
 SUB_PAREN_MATCH = re.compile(r'\([a-z0-9_, ]*\)', re.I)
 KIND_SPEC_MATCH = re.compile(r'\([a-z0-9_, =*]*\)', re.I)
 SQ_STRING_REGEX = re.compile(r'\'[^\']*\'', re.I)

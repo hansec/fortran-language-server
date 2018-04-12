@@ -1,6 +1,6 @@
 import copy
 import re
-WORD_REGEX = re.compile(r'[a-z][a-z0-9_]*', re.I)
+WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
 
 
 def parse_keywords(keywords):

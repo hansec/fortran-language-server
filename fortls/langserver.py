@@ -10,8 +10,8 @@ from fortls.objects import find_in_scope, fortran_meth, get_use_tree
 log = logging.getLogger(__name__)
 # Global regexes
 FORTRAN_EXT_REGEX = re.compile(r'^\.F(77|90|95|03|08|OR|PP)?$', re.I)
-objBreak_REGEX = re.compile(r'[\/\-(.,+*<>=$: ]', re.I)
-word_REGEX = re.compile(r'[a-z][a-z0-9_]*', re.I)
+OBJBREAK_REGEX = re.compile(r'[\/\-(.,+*<>=$: ]', re.I)
+WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
 CALL_REGEX = re.compile(r'[ \t]*CALL[ \t]*([a-z0-9_]*)$', re.I)
 TYPE_STMNT_REGEX = re.compile(r'[ \t]*(TYPE|CLASS)[ \t]*(IS)?[ \t]*\([ \t]*([a-z0-9_]*)$', re.I)
 FIXED_CONT_REGEX = re.compile(r'(     [\S])')
@@ -150,14 +150,14 @@ def get_var_stack(line):
             final_var = final_var[len(final_var)-ntail:]
     #
     if final_var is not None:
-        final_op_split = objBreak_REGEX.split(final_var)
+        final_op_split = OBJBREAK_REGEX.split(final_var)
         return final_op_split[-1].split('%')
     else:
         return None
 
 
 def expand_name(line, char_poss):
-    for word_match in word_REGEX.finditer(line):
+    for word_match in WORD_REGEX.finditer(line):
         if word_match.start(0) <= char_poss and word_match.end(0) >= char_poss:
             return word_match.group(0)
     return ''
