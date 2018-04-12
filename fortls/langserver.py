@@ -22,8 +22,19 @@ def path_from_uri(uri):
     # Convert file uri to path (strip html like head part)
     if not uri.startswith("file://"):
         return uri
-    _, path = uri.split("file://", 1)
+    if os.name == "nt":
+        _, path = uri.split("file:///", 1)
+    else:
+        _, path = uri.split("file://", 1)
     return path
+
+
+def path_to_uri(path):
+    # Convert path to file uri (add html like head part)
+    if os.name == "nt":
+        return "file:///"+path
+    else:
+        return "file://"+path
 
 
 def init_file(filepath):
@@ -749,7 +760,7 @@ class LangServer:
                 var_path = self.obj_tree[var_top_scope][1]
                 sline = var_obj.sline-1
                 return {
-                    "uri": "file://"+var_path,
+                    "uri": path_to_uri(var_path),
                     "range": {
                         "start": {"line": sline, "character": 0},
                         "end": {"line": sline, "character": 1}

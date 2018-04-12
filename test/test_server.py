@@ -8,9 +8,10 @@ import os
 root_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.insert(0, root_dir)
 from fortls.jsonrpc import write_rpc_request, write_rpc_notification, read_rpc_messages
+from fortls.langserver import path_to_uri
 
 run_command = os.path.join(root_dir, "fortls.py --incrmental_sync")
-test_dir = os.path.join(root_dir, "test/test_source")
+test_dir = os.path.join(root_dir, "test", "test_source")
 
 
 def run_request(request):
@@ -218,9 +219,9 @@ def test_def():
     errcode, results = run_request(string)
     #
     assert errcode == 0
-    check_return(results[1], [0, 0, "file://" + os.path.join(test_dir, "subdir", "test_fixed.f")])
-    check_return(results[2], [20, 20, "file://" + os.path.join(test_dir, "subdir", "test_fixed.f")])
-    check_return(results[3], [10, 10, "file://" + os.path.join(test_dir, "test_prog.f08")])
-    check_return(results[4], [19, 19, "file://" + os.path.join(test_dir, "subdir", "test_free.f90")])
-    check_return(results[5], [13, 13, "file://" + os.path.join(test_dir, "subdir", "test_free.f90")])
-    check_return(results[6], [5, 5, "file://" + os.path.join(test_dir, "subdir", "test_free.f90")])
+    check_return(results[1], [0, 0, path_to_uri(os.path.join(test_dir, "subdir", "test_fixed.f"))])
+    check_return(results[2], [20, 20, path_to_uri(os.path.join(test_dir, "subdir", "test_fixed.f"))])
+    check_return(results[3], [10, 10, path_to_uri(os.path.join(test_dir, "test_prog.f08"))])
+    check_return(results[4], [19, 19, path_to_uri(os.path.join(test_dir, "subdir", "test_free.f90"))])
+    check_return(results[5], [13, 13, path_to_uri(os.path.join(test_dir, "subdir", "test_free.f90"))])
+    check_return(results[6], [5, 5, path_to_uri(os.path.join(test_dir, "subdir", "test_free.f90"))])
