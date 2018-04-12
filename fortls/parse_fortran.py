@@ -42,6 +42,9 @@ FREE_COMMENT_LINE_MATCH = re.compile(r'([ \t]*!)')
 FREE_CONT_REGEX = re.compile(r'([ \t]*&)')
 FREE_FORMAT_TEST = re.compile(r'[ ]{1,4}[a-z]', re.I)
 OPENMP_LINE_MATCH = re.compile(r'[ \t]*[!|c|\*]\$OMP', re.I)
+#
+PPIF_START_TEST = re.compile(r'#if')
+PPIF_END_TEST = re.compile(r'#endif')
 
 
 def detect_fixed_format(file_lines):
@@ -352,6 +355,16 @@ def process_file(file_str, close_open_scopes, fixed_format=False, debug=False):
         # Skip comment lines
         match = COMMENT_LINE_MATCH.match(line)
         if (match is not None):
+            continue
+        # Start preproccesor if stmt
+        match = PPIF_START_TEST.match(line)
+        if (match is not None):
+            file_obj.start_ppif(line_number)
+            continue
+        # End preproccesor if stmt
+        match = PPIF_END_TEST.match(line)
+        if (match is not None):
+            file_obj.end_ppif(line_number)
             continue
         # Merge lines with continuations
         if fixed_format:

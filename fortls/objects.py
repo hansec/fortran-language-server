@@ -546,6 +546,7 @@ class fortran_file:
         self.private_list = []
         self.scope_stack = []
         self.end_stack = []
+        self.pp_if = []
         self.current_scope = None
         self.END_REGEX = None
         self.enc_scope_name = None
@@ -611,6 +612,19 @@ class fortran_file:
             else:
                 self.current_scope.add_use(mod_words[0], line_number)
 
+    def start_ppif(self, line_number):
+        self.pp_if.append([line_number-1, -1])
+
+    def end_ppif(self, line_number):
+        if len(self.pp_if) > 0:
+            self.pp_if[-1][1] = line_number-1
+
+    def check_ppif(self, line_number):
+        for pp_if in self.pp_if:
+            if line_number >= pp_if[0] and line_number <= pp_if[1]:
+                return True
+        return False
+
     def get_scopes(self, line_number=None):
         if line_number is None:
             return self.scope_list
@@ -660,6 +674,9 @@ class fortran_file:
         errors = []
         for scope in self.scope_list:
             for error in scope.check_double_def(file_contents, obj_tree):
+                # Check preproc if
+                if self.check_ppif(error[1]):
+                    continue
                 if error[0] == 0:
                     errors.append({
                         "range": {
@@ -679,6 +696,9 @@ class fortran_file:
                         "severity": 2
                     })
             for error in scope.check_use(obj_tree, file_contents):
+                # Check preproc if
+                if self.check_ppif(error[0]):
+                    continue
                 errors.append({
                     "range": {
                         "start": {"line": error[0], "character": error[1]},
