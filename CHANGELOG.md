@@ -1,3 +1,15 @@
+## 0.3.3
+
+### Improvements
+* Improved Windows support and added AppVeyor CI testing
+* Add support for snippets in autocompletion
+* Ignore requests in comment sections
+
+### Fixes
+* Fix bug with string/byte handling in Python 3
+* Fix bug with multiprocess support on Windows
+* Fix bug with URI formatting and paths on Windows, fixes [#8](https://github.com/hansec/fortran-language-server/issues/8)
+
 ## 0.3.2
 
 ### Fixes
