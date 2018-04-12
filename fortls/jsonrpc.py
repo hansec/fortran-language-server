@@ -20,13 +20,15 @@ class ReadWriter:
         self.writer = writer
 
     def readline(self, *args):
-        return self.reader.readline(*args)
+        data = self.reader.readline(*args)
+        return data.decode("utf-8")
 
     def read(self, *args):
-        return self.reader.read(*args)
+        data = self.reader.read(*args)
+        return data.decode("utf-8")
 
     def write(self, out):
-        self.writer.write(out)
+        self.writer.write(out.encode())
         self.writer.flush()
 
 
