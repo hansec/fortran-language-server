@@ -1,13 +1,13 @@
 Fortran Language Server (beta)
 ==============================
 
-.. |Travis Build Status| image:: https://travis-ci.org/hansec/fortran-language-server.svg?branch=master
+.. image:: https://travis-ci.org/hansec/fortran-language-server.svg?branch=master
      :target: https://travis-ci.org/hansec/fortran-language-server
 
-.. |Windows Build Status| image:: https://ci.appveyor.com/api/projects/status/github/hansec/fortran-language-server?branch=master&svg=true
+.. image:: https://ci.appveyor.com/api/projects/status/github/hansec/fortran-language-server?branch=master&svg=true
    :target: https://ci.appveyor.com/project/hansec/fortran-language-server
 
-.. |Atom Package Status| image:: https://img.shields.io/github/license/hansec/fortran-language-server.svg
+.. image:: https://img.shields.io/github/license/hansec/fortran-language-server.svg
      :target: https://github.com/hansec/fortran-language-server/blob/master/LICENSE
 
 A FORTRAN implementation of the `Language Server Protocol`_ using Python (2.7+).
