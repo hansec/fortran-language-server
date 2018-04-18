@@ -554,11 +554,7 @@ class fortran_file:
     def get_enc_scope_name(self):
         if self.current_scope is None:
             return None
-        name_str = self.current_scope.name
-        if len(self.scope_stack) > 0:
-            for scope in reversed(self.scope_stack):
-                name_str = scope.name + '::' + name_str
-        return name_str
+        return self.current_scope.FQSN
 
     def add_scope(self, new_scope, END_SCOPE_REGEX, hidden=False):
         if hidden:
