@@ -1,3 +1,10 @@
+## 0.3.4
+
+### Fixes
+* Fix parser error with uppercase characters in scope names, fixes [#11](https://github.com/hansec/fortran-language-server/issues/11)
+* Add support for object names with a leading underscore, fixes [#9](https://github.com/hansec/fortran-language-server/issues/9)
+* Do not report diagnostics inside preprocessor if statements, fixes [#7](https://github.com/hansec/fortran-language-server/issues/7)
+
 ## 0.3.3
 
 ### Improvements
