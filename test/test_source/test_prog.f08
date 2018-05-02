@@ -1,5 +1,5 @@
 PROGRAM test_program
-!
+! Here is a commonly included unicode character "–"
 USE test_free, ONLY: vector, scaled_vector, module_variable
 IMPLICIT NONE
 !

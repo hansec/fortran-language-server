@@ -1,4 +1,5 @@
 import logging
+import sys
 import os
 import traceback
 import re
@@ -8,6 +9,7 @@ from fortls.parse_fortran import process_file, read_use_stmt, detect_fixed_forma
 from fortls.objects import find_in_scope, fortran_meth, get_use_tree
 
 log = logging.getLogger(__name__)
+PY3K = sys.version_info >= (3, 0)
 # Global regexes
 FORTRAN_EXT_REGEX = re.compile(r'^\.F(77|90|95|03|08|OR|PP)?$', re.I)
 OBJBREAK_REGEX = re.compile(r'[\/\-(.,+*<>=$: ]', re.I)
@@ -39,8 +41,12 @@ def path_to_uri(path):
 
 def init_file(filepath):
     #
-    with open(filepath, 'r') as fhandle:
-        contents_split = fhandle.readlines()
+    if PY3K:
+        with open(filepath, 'r', encoding="utf-8") as fhandle:
+            contents_split = fhandle.readlines()
+    else:
+        with open(filepath, 'r') as fhandle:
+            contents_split = fhandle.readlines()
     #
     try:
         fixed_flag = detect_fixed_format(contents_split)
@@ -871,8 +877,12 @@ class LangServer:
 
     def add_file(self, filepath):
         # Read and add file from disk
-        with open(filepath, 'r') as fhandle:
-            self.update_workspace_file(fhandle.readlines(), filepath)
+        if PY3K:
+            with open(filepath, 'r', encoding="utf-8") as fhandle:
+                self.update_workspace_file(fhandle.readlines(), filepath)
+        else:
+            with open(filepath, 'r') as fhandle:
+                self.update_workspace_file(fhandle.readlines(), filepath)
 
     def update_workspace_file(self, contents_split, filepath):
         # Update workspace from file contents and path
