@@ -324,7 +324,7 @@ def_tests = [read_var_def, read_sub_def, read_fun_def, read_type_def,
              read_use_stmt, read_int_def, read_mod_def, read_prog_def]
 
 
-def process_file(file_str, close_open_scopes, fixed_format=False, debug=False):
+def process_file(file_str, close_open_scopes, path=None, fixed_format=False, debug=False):
     #
     if fixed_format:
         COMMENT_LINE_MATCH = FIXED_COMMENT_LINE_MATCH
@@ -333,7 +333,7 @@ def process_file(file_str, close_open_scopes, fixed_format=False, debug=False):
         COMMENT_LINE_MATCH = FREE_COMMENT_LINE_MATCH
         CONT_REGEX = FREE_CONT_REGEX
     #
-    file_obj = fortran_file()
+    file_obj = fortran_file(path)
     line_number = 0
     next_line_num = 1
     int_counter = 0
@@ -459,10 +459,10 @@ def process_file(file_str, close_open_scopes, fixed_format=False, debug=False):
                     name_stripped = name_stripped.split('(')[0].strip()
                     modifiers = parse_keywords(obj[1])
                     if obj[0][:3] == 'PRO':
-                        new_var = fortran_meth(line_number, name_stripped, obj[0],
+                        new_var = fortran_meth(file_obj, line_number, name_stripped, obj[0],
                                                modifiers, file_obj.enc_scope_name, link_name)
                     else:
-                        new_var = fortran_obj(line_number, name_stripped, obj[0],
+                        new_var = fortran_obj(file_obj, line_number, name_stripped, obj[0],
                                               modifiers, file_obj.enc_scope_name, link_name)
                     if var_dim > 0:
                         new_var.set_dim(var_dim)
@@ -470,33 +470,33 @@ def process_file(file_str, close_open_scopes, fixed_format=False, debug=False):
                 if(debug):
                     print('{1} !!! VARIABLE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'mod':
-                new_mod = fortran_module(line_number, obj, file_obj.enc_scope_name)
+                new_mod = fortran_module(file_obj, line_number, obj, file_obj.enc_scope_name)
                 file_obj.add_scope(new_mod, END_MOD_REGEX)
                 if(debug):
                     print('{1} !!! MODULE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'prog':
-                new_prog = fortran_program(line_number, obj, file_obj.enc_scope_name)
+                new_prog = fortran_program(file_obj, line_number, obj, file_obj.enc_scope_name)
                 file_obj.add_scope(new_prog, END_PROG_REGEX)
                 if(debug):
                     print('{1} !!! PROGRAM statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'sub':
-                new_sub = fortran_subroutine(line_number, obj[0], file_obj.enc_scope_name, obj[1])
+                new_sub = fortran_subroutine(file_obj, line_number, obj[0], file_obj.enc_scope_name, obj[1])
                 file_obj.add_scope(new_sub, END_SUB_REGEX)
                 if(debug):
                     print('{1} !!! SUBROUTINE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'fun':
-                new_fun = fortran_function(line_number, obj[0], file_obj.enc_scope_name,
+                new_fun = fortran_function(file_obj, line_number, obj[0], file_obj.enc_scope_name,
                                            obj[1], return_type=obj[2][0], result_var=obj[2][1])
                 file_obj.add_scope(new_fun, END_FUN_REGEX)
                 if obj[2][0] is not None:
-                    new_obj = fortran_obj(line_number, obj[0], obj[2][0][0], obj[2][0][1],
+                    new_obj = fortran_obj(file_obj, line_number, obj[0], obj[2][0][0], obj[2][0][1],
                                           file_obj.enc_scope_name, None)
                     file_obj.add_variable(new_obj)
                 if(debug):
                     print('{1} !!! FUNCTION statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'typ':
                 modifiers = parse_keywords(obj[2])
-                new_type = fortran_type(line_number, obj[0], modifiers, file_obj.enc_scope_name)
+                new_type = fortran_type(file_obj, line_number, obj[0], modifiers, file_obj.enc_scope_name)
                 if obj[1] is not None:
                     new_type.set_inherit(obj[1])
                 file_obj.add_scope(new_type, END_TYPED_REGEX)
@@ -506,7 +506,7 @@ def process_file(file_str, close_open_scopes, fixed_format=False, debug=False):
                 if obj is None:
                     int_counter += 1
                     obj = 'GEN_INT{0}'.format(int_counter)
-                new_int = fortran_int(line_number, obj, file_obj.enc_scope_name)
+                new_int = fortran_int(file_obj, line_number, obj, file_obj.enc_scope_name)
                 file_obj.add_scope(new_int, END_INT_REGEX, True)
                 if(debug):
                     print('{1} !!! INTERFACE statement({0})'.format(line_number, line.strip()))

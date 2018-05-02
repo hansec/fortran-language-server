@@ -76,9 +76,12 @@ def main():
             print("\n=========\nParser Output\n=========\n")
             ast_new = process_file(contents_split, True, fixed_flag, True)
             print("\n=========\nObject Tree\n=========\n")
-            for key, obj in ast_new.global_dict.items():
+            for obj in ast_new.get_scopes():
                 print("{0}: {1}".format(obj.get_type(), obj.FQSN))
                 print_children(obj)
+            print("\n=========\nExportable Objects\n=========\n")
+            for key, obj in ast_new.global_dict.items():
+                print("{0}: {1}".format(obj.get_type(), obj.FQSN))
     #
     elif debug_server:
         prb, pwb = os.pipe()

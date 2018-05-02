@@ -44,7 +44,7 @@ def init_file(filepath):
     #
     try:
         fixed_flag = detect_fixed_format(contents_split)
-        ast_new = process_file(contents_split, True, fixed_flag)
+        ast_new = process_file(contents_split, True, filepath, fixed_flag)
     except:
         return None
     else:
@@ -755,12 +755,10 @@ class LangServer:
         var_obj = self.get_definition(path, def_line, def_char)
         # Construct link reference
         if var_obj is not None:
-            var_top_scope = var_obj.FQSN.split("::")[0]
-            if var_top_scope in self.obj_tree:
-                var_path = self.obj_tree[var_top_scope][1]
+            if var_obj.file.path is not None:
                 sline = var_obj.sline-1
                 return {
-                    "uri": path_to_uri(var_path),
+                    "uri": path_to_uri(var_obj.file.path),
                     "range": {
                         "start": {"line": sline, "character": 0},
                         "end": {"line": sline, "character": 1}
@@ -880,7 +878,7 @@ class LangServer:
         # Update workspace from file contents and path
         try:
             fixed_flag = detect_fixed_format(contents_split)
-            ast_new = process_file(contents_split, True, fixed_flag)
+            ast_new = process_file(contents_split, True, filepath, fixed_flag)
         except:
             self.conn.send_notification("window/showMessage", {
                 "type": 1,

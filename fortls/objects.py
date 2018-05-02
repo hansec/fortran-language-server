@@ -139,10 +139,11 @@ def find_word_in_line(line, word):
 
 
 class fortran_scope:
-    def __init__(self, line_number, name, enc_scope=None):
-        self.base_setup(line_number, name, enc_scope)
+    def __init__(self, file_obj, line_number, name, enc_scope=None):
+        self.base_setup(file_obj, line_number, name, enc_scope)
 
-    def base_setup(self, sline, name, enc_scope=None):
+    def base_setup(self, file_obj, sline, name, enc_scope=None):
+        self.file = file_obj
         self.sline = sline
         self.eline = None
         self.name = name
@@ -273,8 +274,8 @@ class fortran_program(fortran_module):
 
 
 class fortran_subroutine(fortran_scope):
-    def __init__(self, line_number, name, enc_scope=None, args=None):
-        self.base_setup(line_number, name, enc_scope)
+    def __init__(self, file_obj, line_number, name, enc_scope=None, args=None):
+        self.base_setup(file_obj, line_number, name, enc_scope)
         self.args = args
         self.arg_objs = []
 
@@ -330,9 +331,9 @@ class fortran_subroutine(fortran_scope):
 
 
 class fortran_function(fortran_subroutine):
-    def __init__(self, line_number, name, enc_scope=None, args=None,
+    def __init__(self, file_obj, line_number, name, enc_scope=None, args=None,
                  return_type=None, result_var=None):
-        self.base_setup(line_number, name, enc_scope)
+        self.base_setup(file_obj, line_number, name, enc_scope)
         self.args = args
         self.arg_objs = []
         self.result_var = result_var
@@ -359,8 +360,8 @@ class fortran_function(fortran_subroutine):
 
 
 class fortran_type(fortran_scope):
-    def __init__(self, line_number, name, modifiers, enc_scope=None):
-        self.base_setup(line_number, name, enc_scope)
+    def __init__(self, file_obj, line_number, name, modifiers, enc_scope=None):
+        self.base_setup(file_obj, line_number, name, enc_scope)
         #
         self.in_children = []
         self.modifiers = modifiers
@@ -403,8 +404,8 @@ class fortran_type(fortran_scope):
 
 
 class fortran_int(fortran_scope):
-    def __init__(self, line_number, name, enc_scope=None):
-        self.base_setup(line_number, name, enc_scope)
+    def __init__(self, file_obj, line_number, name, enc_scope=None):
+        self.base_setup(file_obj, line_number, name, enc_scope)
         self.mems = []
 
     def get_type(self):
@@ -424,8 +425,9 @@ class fortran_int(fortran_scope):
 
 
 class fortran_obj:
-    def __init__(self, line_number, name, var_desc, modifiers,
+    def __init__(self, file_obj, line_number, name, var_desc, modifiers,
                  enc_scope=None, link_obj=None):
+        self.file = file_obj
         self.sline = line_number
         self.name = name
         self.desc = var_desc
@@ -538,7 +540,8 @@ class fortran_meth(fortran_obj):
 
 
 class fortran_file:
-    def __init__(self):
+    def __init__(self, path=None):
+        self.path = path
         self.global_dict = {}
         self.scope_list = []
         self.variable_list = []
@@ -547,6 +550,7 @@ class fortran_file:
         self.scope_stack = []
         self.end_stack = []
         self.pp_if = []
+        self.none_scope = None
         self.current_scope = None
         self.END_REGEX = None
         self.enc_scope_name = None
@@ -556,13 +560,14 @@ class fortran_file:
             return None
         return self.current_scope.FQSN
 
-    def add_scope(self, new_scope, END_SCOPE_REGEX, hidden=False):
+    def add_scope(self, new_scope, END_SCOPE_REGEX, hidden=False, exportable=True):
         if hidden:
             self.variable_list.append(new_scope)
         else:
             self.scope_list.append(new_scope)
         if self.current_scope is None:
-            self.global_dict[new_scope.FQSN] = new_scope
+            if exportable:
+                self.global_dict[new_scope.FQSN] = new_scope
         else:
             self.current_scope.add_child(new_scope)
             new_scope.add_parent(self.current_scope)
@@ -586,6 +591,12 @@ class fortran_file:
         self.enc_scope_name = self.get_enc_scope_name()
 
     def add_variable(self, new_var):
+        if self.current_scope is None:
+            if self.none_scope is not None:
+                raise ValueError
+            self.none_scope = fortran_program(self, 1, "main")
+            self.add_scope(self.none_scope, re.compile(r'[ \t]*END[ \t]*PROGRAM', re.I), exportable=False)
+            new_var.FQSN = "main::" + new_var.name.lower()
         self.current_scope.add_child(new_var)
         new_var.add_parent(self.current_scope)
         self.variable_list.append(new_var)
