@@ -1,3 +1,9 @@
+## 0.3.5
+
+### Fixes
+* Improve unicode file handling with Python 3.x
+* Add support for unnamed programs, fixes [#13](https://github.com/hansec/fortran-language-server/issues/13)
+
 ## 0.3.4
 
 ### Fixes
