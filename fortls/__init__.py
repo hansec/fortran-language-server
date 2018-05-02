@@ -13,7 +13,7 @@ def main():
     #
     freeze_support()
     parser = argparse.ArgumentParser()
-    parser.description = "FORTRAN Language Server (beta)"
+    parser.description = "FORTRAN Language Server ({0})".format(__version__)
     parser.add_argument(
         '--version', action="store_true",
         help="Print server version number and exit"
