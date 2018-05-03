@@ -74,7 +74,7 @@ def main():
             fixed_flag = detect_fixed_format(contents_split)
             print('  Detected format: {0}'.format("fixed" if fixed_flag else "free"))
             print("\n=========\nParser Output\n=========\n")
-            ast_new = process_file(contents_split, True, fixed_flag, True)
+            ast_new = process_file(contents_split, True, fixed_format=fixed_flag, debug=True)
             print("\n=========\nObject Tree\n=========\n")
             for obj in ast_new.get_scopes():
                 print("{0}: {1}".format(obj.get_type(), obj.FQSN))
@@ -114,7 +114,7 @@ def main():
                 print("    {0}".format(mod_dir))
         #
         if args.debug_symbols:
-            print('\nTesting "textDocument/definition" request:')
+            print('\nTesting "textDocument/documentSymbol" request:')
             if args.debug_filepath is None:
                 print("  ERROR: 'debug_filepath' not specified for document symbol test")
                 sys.exit(-1)
@@ -134,13 +134,13 @@ def main():
                 }
             })
             for symbol in symbol_results:
-                eline = symbol["location"]["range"]["start"]["line"]
+                sline = symbol["location"]["range"]["start"]["line"]
                 if "containerName" in symbol:
                     parent = symbol["containerName"]
                 else:
                     parent = "null"
-                print('  line {2:5d}  symbol -> {1:3d}:{0:30} parent = {3}'.format(symbol["name"],
-                      symbol["kind"], eline, parent))
+                print('  line {2:5d}  symbol -> {1:3d}:{0:30} parent = {4}'.format(symbol["name"],
+                      symbol["kind"], sline, parent))
         tmpout.close()
         tmpin.close()
     #
