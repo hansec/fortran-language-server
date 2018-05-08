@@ -1,8 +1,8 @@
 from __future__ import print_function
 import re
 from fortls.objects import parse_keywords, fortran_module, fortran_program, \
-    fortran_subroutine, fortran_function, fortran_type, fortran_int, \
-    fortran_obj, fortran_meth, fortran_file
+    fortran_submodule, fortran_subroutine, fortran_function, fortran_type, \
+    fortran_int, fortran_obj, fortran_meth, fortran_file
 #
 USE_REGEX = re.compile(r'[ \t]*USE([, \t]*INTRINSIC)?[ \t:]*([a-z0-9_]*)', re.I)
 SUB_REGEX = re.compile(r'[ \t]*(PURE|ELEMENTAL|RECURSIVE)*[ \t]*(SUBROUTINE)', re.I)
@@ -12,6 +12,8 @@ RESULT_REGEX = re.compile(r'RESULT[ ]*\(([a-z0-9_]*)\)', re.I)
 END_FUN_REGEX = re.compile(r'[ \t]*END[ \t]*FUNCTION', re.I)
 MOD_REGEX = re.compile(r'[ \t]*MODULE[ \t]*([a-z0-9_]*)', re.I)
 END_MOD_REGEX = re.compile(r'[ \t]*END[ \t]*MODULE', re.I)
+SUBMOD_REGEX = re.compile(r'[ \t]*SUBMODULE[ \t]*\(', re.I)
+END_SMOD_REGEX = re.compile(r'[ \t]*END[ \t]*SUBMODULE', re.I)
 PROG_REGEX = re.compile(r'[ \t]*PROGRAM[ \t]*([a-z0-9_]*)', re.I)
 END_PROG_REGEX = re.compile(r'[ \t]*END[ \t]*PROGRAM', re.I)
 INT_REGEX = re.compile(r'[ \t]*(?:ABSTRACT)?[ \t]*INTERFACE[ \t]*([a-z0-9_]*)', re.I)
@@ -280,7 +282,38 @@ def read_mod_def(line):
             for name in line_split:
                 pro_names.append(name.strip().lower())
             return 'int_pro', pro_names
+        # Check for submodule definition
+        trailing_line = line[mod_match.start(1):]
+        sub_res = read_sub_def(trailing_line)
+        if sub_res is not None:
+            return sub_res
+        fun_res = read_fun_def(trailing_line)
+        if fun_res is not None:
+            return fun_res
         return 'mod', name
+
+
+def read_submod_def(line):
+    submod_match = SUBMOD_REGEX.match(line)
+    if submod_match is None:
+        return None
+    else:
+        parent_name = None
+        name = None
+        trailing_line = line[submod_match.end(0):].strip()
+        trailing_line = trailing_line.split('!')[0]
+        parent_match = WORD_REGEX.match(trailing_line)
+        if parent_match is not None:
+            parent_name = parent_match.group(0).lower()
+            if len(trailing_line) > parent_match.end(0)+1:
+                trailing_line = trailing_line[parent_match.end(0)+1:].strip()
+            else:
+                trailing_line = ''
+        #
+        name_match = WORD_REGEX.match(trailing_line)
+        if name_match is not None:
+            name = name_match.group(0).lower()
+        return 'smod', [name, parent_name]
 
 
 def read_prog_def(line):
@@ -321,7 +354,7 @@ def read_use_stmt(line):
 
 
 def_tests = [read_var_def, read_sub_def, read_fun_def, read_type_def,
-             read_use_stmt, read_int_def, read_mod_def, read_prog_def]
+             read_use_stmt, read_int_def, read_mod_def, read_prog_def, read_submod_def]
 
 
 def process_file(file_str, close_open_scopes, path=None, fixed_format=False, debug=False):
@@ -474,6 +507,11 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 file_obj.add_scope(new_mod, END_MOD_REGEX)
                 if(debug):
                     print('{1} !!! MODULE statement({0})'.format(line_number, line.strip()))
+            elif obj_type == 'smod':
+                new_smod = fortran_submodule(file_obj, line_number, obj[0], file_obj.enc_scope_name, obj[1])
+                file_obj.add_scope(new_smod, END_SMOD_REGEX)
+                if(debug):
+                    print('{1} !!! SUBMODULE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'prog':
                 new_prog = fortran_program(file_obj, line_number, obj, file_obj.enc_scope_name)
                 file_obj.add_scope(new_prog, END_PROG_REGEX)

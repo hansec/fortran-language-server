@@ -273,6 +273,15 @@ class fortran_program(fortran_module):
         return 'PROGRAM'
 
 
+class fortran_submodule(fortran_module):
+    def __init__(self, file_obj, line_number, name, enc_scope=None, parent_name=None):
+        self.base_setup(file_obj, line_number, name, enc_scope)
+        self.parent_name = parent_name
+
+    def get_desc(self):
+        return 'SUBMODULE'
+
+
 class fortran_subroutine(fortran_scope):
     def __init__(self, file_obj, line_number, name, enc_scope=None, args=None):
         self.base_setup(file_obj, line_number, name, enc_scope)
