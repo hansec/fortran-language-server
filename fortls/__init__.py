@@ -139,7 +139,7 @@ def main():
                     parent = symbol["containerName"]
                 else:
                     parent = "null"
-                print('  line {2:5d}  symbol -> {1:3d}:{0:30} parent = {4}'.format(symbol["name"],
+                print('  line {2:5d}  symbol -> {1:3d}:{0:30} parent = {3}'.format(symbol["name"],
                       symbol["kind"], sline, parent))
         tmpout.close()
         tmpin.close()
