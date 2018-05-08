@@ -187,6 +187,7 @@ def read_fun_def(line, return_type=None):
         return None
     #
     paren_match = SUB_PAREN_MATCH.match(trailing_line)
+    args = ''
     if paren_match is not None:
         word_match = WORD_REGEX.findall(paren_match.group(0))
         if word_match is not None:
