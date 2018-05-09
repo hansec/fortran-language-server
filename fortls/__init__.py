@@ -6,7 +6,7 @@ from multiprocessing import freeze_support
 from .langserver import LangServer
 from .jsonrpc import JSONRPC2Connection, ReadWriter
 from .parse_fortran import process_file, detect_fixed_format
-__version__ = '0.3.5'
+__version__ = '0.3.6'
 
 
 def main():

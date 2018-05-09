@@ -1,3 +1,13 @@
+## 0.3.6
+
+### Improvements
+* Add support for fortran submodules, fixes [#14](https://github.com/hansec/fortran-language-server/issues/14) and [#15](https://github.com/hansec/fortran-language-server/issues/15)
+* Improve line tokenization and parsing
+
+### Fixes
+* Fix parsing errors with incomplete function definitions
+* Fix bugs in symbol and parser debugging
+
 ## 0.3.5
 
 ### Fixes
