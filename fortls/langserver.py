@@ -129,8 +129,8 @@ def get_var_stack(line):
     var_list = tokenize_line(line)
     deepest_var = None
     final_var = None
-    # final_var = var_list[0][-1][1]
-    # paren_groups = var_list[0][-1][0]
+    final_paren = None
+    deepest_paren = None
     n = len(line)
     for var_group in var_list:
         for var_tmp in var_group:
@@ -138,17 +138,19 @@ def get_var_stack(line):
                 if n >= parens[0]:
                     if n <= parens[1]:
                         final_var = var_tmp[1]
+                        final_paren = parens
                         break
                     elif parens[1] == -1:
                         deepest_var = var_tmp[1]
+                        deepest_paren = parens
     if final_var is None:
         if deepest_var is not None:
             final_var = deepest_var
+            final_paren = deepest_paren
         else:
             return None
     if final_var.find('%') < 0:
-        paren_groups = var_list[0][-1][0]
-        ntail = paren_groups[-1][1] - paren_groups[-1][0]
+        ntail = final_paren[1] - final_paren[0]
         #
         if ntail == 0:
             final_var = ''
@@ -633,7 +635,7 @@ class LangServer:
             var_prefix = var_stack[-1].strip()
         except:
             return req_dict
-        # print var_stack
+        # print(var_stack)
         file_obj = self.workspace[path]["ast"]
         item_list = []
         scope_list = file_obj.get_scopes(ac_line+1)

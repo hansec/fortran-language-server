@@ -102,7 +102,7 @@ def test_change():
 
 
 def test_symbols():
-    def check_return(result_arrary):
+    def check_return(result_array):
         # Expected objects
         objs = [
             ["test_free", 2, 0, 57],
@@ -123,12 +123,12 @@ def test_symbols():
             ["scaled_vector_norm", 12, 46, 50],
             ["unscaled_norm", 12, 52, 56]
         ]
-        assert len(result_arrary) == len(objs)
+        assert len(result_array) == len(objs)
         for i, obj in enumerate(objs):
-            assert result_arrary[i]["name"] == obj[0]
-            assert result_arrary[i]["kind"] == obj[1]
-            assert result_arrary[i]["location"]["range"]["start"]["line"] == obj[2]
-            assert result_arrary[i]["location"]["range"]["end"]["line"] == obj[3]
+            assert result_array[i]["name"] == obj[0]
+            assert result_array[i]["kind"] == obj[1]
+            assert result_array[i]["location"]["range"]["start"]["line"] == obj[2]
+            assert result_array[i]["location"]["range"]["end"]["line"] == obj[3]
     #
     string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
     file_path = os.path.join(test_dir, "subdir", "test_free.f90")
@@ -142,10 +142,10 @@ def test_symbols():
 
 
 def test_comp():
-    def check_return(result_arrary, checks):
-        assert len(result_arrary["items"]) == checks[0]
+    def check_return(result_array, checks):
+        assert len(result_array["items"]) == checks[0]
         if checks[0] > 0:
-            assert result_arrary["items"][0]["label"] == checks[1]
+            assert result_array["items"][0]["label"] == checks[1]
     #
     string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
     file_path = os.path.join(test_dir, "test_prog.f08")
@@ -185,10 +185,10 @@ def test_comp():
 
 
 def test_def():
-    def check_return(result_arrary, checks):
-        assert result_arrary["uri"] == checks[2]
-        assert result_arrary["range"]["start"]["line"] == checks[0]
-        assert result_arrary["range"]["start"]["line"] == checks[1]
+    def check_return(result_array, checks):
+        assert result_array["uri"] == checks[2]
+        assert result_array["range"]["start"]["line"] == checks[0]
+        assert result_array["range"]["start"]["line"] == checks[1]
     #
     string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
     file_path = os.path.join(test_dir, "test_prog.f08")
