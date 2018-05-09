@@ -724,7 +724,7 @@ class LangServer:
             def_name = expand_name(curr_line, def_char)
         except:
             return None
-        # print var_stack
+        # print(var_stack)
         if def_name == '':
             return None
         file_obj = self.workspace[filepath]["ast"]
@@ -841,7 +841,7 @@ class LangServer:
         # Update file with changes
         if self.sync_type == 1:
             new_contents = params["contentChanges"][0]["text"].splitlines()
-            self.update_workspace_file(new_contents, path)
+            self.update_workspace_file(new_contents, path, update_links=True)
         else:
             if path in self.workspace:
                 new_contents = self.workspace[path]["contents"]
@@ -855,7 +855,7 @@ class LangServer:
                         "message": 'Change request failed for unknown file "{0}"'.format(path)
                     })
                 else:
-                    self.update_workspace_file(new_contents, path)
+                    self.update_workspace_file(new_contents, path, update_links=True)
             else:
                 self.conn.send_notification("window/showMessage", {
                     "type": 1,
@@ -886,7 +886,7 @@ class LangServer:
             with open(filepath, 'r') as fhandle:
                 self.update_workspace_file(fhandle.readlines(), filepath)
 
-    def update_workspace_file(self, contents_split, filepath):
+    def update_workspace_file(self, contents_split, filepath, update_links=False):
         # Update workspace from file contents and path
         try:
             fixed_flag = detect_fixed_format(contents_split)
@@ -911,8 +911,13 @@ class LangServer:
             }
             self.workspace[filepath] = tmp_obj
             # Add top-level objects to object tree
-            for key in ast_new.global_dict:
-                self.obj_tree[key] = [ast_new.global_dict[key], filepath]
+            for key, obj in ast_new.global_dict.items():
+                self.obj_tree[key] = [obj, filepath]
+            # Update local links/inheritance if necessary
+            if update_links:
+                for key, obj in ast_new.global_dict.items():
+                    obj.resolve_inherit(self.obj_tree)
+                    obj.resolve_link(self.obj_tree)
 
     def workspace_init(self):
         # Get filenames

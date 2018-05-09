@@ -173,6 +173,19 @@ def test_comp():
         "textDocument": {"uri": file_path},
         "position": {"line": 21, "character": 26}
     })
+    file_path = os.path.join(test_dir, "subdir", "test_submod.F90")
+    string += write_rpc_request(8, "textDocument/completion", {
+        "textDocument": {"uri": file_path},
+        "position": {"line": 16, "character": 12}
+    })
+    string += write_rpc_request(9, "textDocument/completion", {
+        "textDocument": {"uri": file_path},
+        "position": {"line": 17, "character": 8}
+    })
+    string += write_rpc_request(10, "textDocument/completion", {
+        "textDocument": {"uri": file_path},
+        "position": {"line": 17, "character": 23}
+    })
     errcode, results = run_request(string)
     #
     assert errcode == 0
@@ -182,6 +195,9 @@ def test_comp():
     check_return(results[4], [6, "scale"])
     check_return(results[5], [2, "n"])
     check_return(results[6], [1, "val"])
+    check_return(results[7], [1, "point"])
+    check_return(results[8], [1, "distance"])
+    check_return(results[9], [2, "x"])
 
 
 def test_def():
@@ -216,6 +232,11 @@ def test_def():
         "textDocument": {"uri": file_path},
         "position": {"line": 21, "character": 26}
     })
+    file_path = os.path.join(test_dir, "subdir", "test_submod.F90")
+    string += write_rpc_request(8, "textDocument/definition", {
+        "textDocument": {"uri": file_path},
+        "position": {"line": 16, "character": 12}
+    })
     errcode, results = run_request(string)
     #
     assert errcode == 0
@@ -225,3 +246,4 @@ def test_def():
     check_return(results[4], [19, 19, path_to_uri(os.path.join(test_dir, "subdir", "test_free.f90"))])
     check_return(results[5], [13, 13, path_to_uri(os.path.join(test_dir, "subdir", "test_free.f90"))])
     check_return(results[6], [5, 5, path_to_uri(os.path.join(test_dir, "subdir", "test_free.f90"))])
+    check_return(results[7], [1, 1, path_to_uri(os.path.join(test_dir, "subdir", "test_submod.F90"))])

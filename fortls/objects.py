@@ -126,6 +126,11 @@ def find_in_scope(scope, var_name, obj_tree):
         tmp_var, tmp_scope = find_in_scope(curr_scope, var_name, obj_tree)
         if tmp_var is not None:
             return tmp_var, tmp_scope
+    # Check ancestor scopes
+    for ancestor in scope.get_ancestors():
+        tmp_var, tmp_scope = find_in_scope(ancestor, var_name, obj_tree)
+        if tmp_var is not None:
+            return tmp_var, tmp_scope
     return None, None
 
 
@@ -208,7 +213,13 @@ class fortran_scope:
     def get_children(self):
         return self.children
 
+    def get_ancestors(self):
+        return []
+
     def is_optional(self):
+        return False
+
+    def is_mod_scope(self):
         return False
 
     def end(self, line_number):
@@ -274,21 +285,81 @@ class fortran_program(fortran_module):
 
 
 class fortran_submodule(fortran_module):
-    def __init__(self, file_obj, line_number, name, enc_scope=None, parent_name=None):
+    def __init__(self, file_obj, line_number, name, enc_scope=None, ancestor_name=None):
         self.base_setup(file_obj, line_number, name, enc_scope)
-        self.parent_name = parent_name
+        self.ancestor_name = ancestor_name
+        self.ancestor_obj = None
 
     def get_desc(self):
         return 'SUBMODULE'
 
+    def get_ancestors(self):
+        if self.ancestor_obj is not None:
+            great_ancestors = self.ancestor_obj.get_ancestors()
+            if great_ancestors is not None:
+                return [self.ancestor_obj] + great_ancestors
+            return [self.ancestor_obj]
+        return []
+
+    def resolve_inherit(self, obj_tree):
+        if self.ancestor_name is None:
+            return
+        if self.ancestor_name in obj_tree:
+            self.ancestor_obj = obj_tree[self.ancestor_name][0]
+
+    def resolve_link(self, obj_tree):
+        # Link subroutine/function implementations to prototypes
+        if self.ancestor_obj is None:
+            return
+        # Grab ancestor interface definitions (function/subroutine only)
+        ancestor_interfaces = []
+        for child in self.ancestor_obj.children:
+            if child.get_type() == 5:
+                for prototype in child.children:
+                    prototype_type = prototype.get_type()
+                    if (prototype_type == 2 or prototype_type == 3) and prototype.is_mod_scope():
+                        ancestor_interfaces.append(prototype)
+        # Match interface definitions to implementations
+        for prototype in ancestor_interfaces:
+            for child in self.children:
+                if (child.name.lower() == prototype.name.lower()) and (child.get_type() == prototype.get_type()):
+                    prototype.resolve_link(obj_tree)
+                    child.copy_interface(prototype)
+                    break
+
 
 class fortran_subroutine(fortran_scope):
-    def __init__(self, file_obj, line_number, name, enc_scope=None, args=None):
+    def __init__(self, file_obj, line_number, name, enc_scope=None, args=None, mod_sub=False):
         self.base_setup(file_obj, line_number, name, enc_scope)
         self.args = args
         self.arg_objs = []
+        self.in_children = []
+        self.mod_scope = mod_sub
 
-    def resolve_link(self, obj_tree):
+    def is_mod_scope(self):
+        return self.mod_scope
+
+    def copy_interface(self, copy_source):
+        # Copy arguments
+        self.args = copy_source.args
+        self.arg_objs = copy_source.arg_objs
+        # Get current fields
+        child_names = []
+        for child in self.children:
+            child_names.append(child.name.lower())
+        # Import arg_objs from copy object
+        self.in_children = []
+        for child in copy_source.arg_objs:
+            if child.name.lower() not in child_names:
+                print(self.FSQN, child.FQSN)
+                self.in_children.append(child)
+
+    def get_children(self):
+        tmp_list = copy.copy(self.children)
+        tmp_list.extend(self.in_children)
+        return tmp_list
+
+    def resolve_arg_link(self, obj_tree):
         self.arg_objs = []
         arg_list = self.args.replace(' ', '').lower().split(',')
         for child in self.children:
@@ -303,6 +374,9 @@ class fortran_subroutine(fortran_scope):
                     arg_list[ind] = "{0}={0}".format(arg_list[ind])
             child.resolve_link(obj_tree)
         self.args = ",".join(arg_list)
+
+    def resolve_link(self, obj_tree):
+        self.resolve_arg_link(obj_tree)
 
     def get_type(self):
         return 2
@@ -341,11 +415,14 @@ class fortran_subroutine(fortran_scope):
 
 class fortran_function(fortran_subroutine):
     def __init__(self, file_obj, line_number, name, enc_scope=None, args=None,
-                 return_type=None, result_var=None):
+                 mod_fun=False, return_type=None, result_var=None):
         self.base_setup(file_obj, line_number, name, enc_scope)
         self.args = args
         self.arg_objs = []
+        self.in_children = []
+        self.mod_scope = mod_fun
         self.result_var = result_var
+        self.result_obj = None
         if return_type is not None:
             self.return_type = return_type[0]
             self.modifiers = parse_keywords(return_type[1])
@@ -353,16 +430,40 @@ class fortran_function(fortran_subroutine):
             self.return_type = None
             self.modifiers = []
 
+    def copy_interface(self, copy_source):
+        # Copy arguments and returns
+        self.args = copy_source.args
+        self.arg_objs = copy_source.arg_objs
+        self.result_var = copy_source.result_var
+        self.result_obj = copy_source.result_obj
+        # Get current fields
+        child_names = []
+        for child in self.children:
+            child_names.append(child.name.lower())
+        # Import arg_objs from copy object
+        self.in_children = []
+        for child in copy_source.arg_objs:
+            if child.name.lower() not in child_names:
+                self.in_children.append(child)
+        if copy_source.result_obj is not None:
+            if copy_source.result_obj.name.lower() not in child_names:
+                self.in_children.append(copy_source.result_obj)
+
+    def resolve_link(self, obj_tree):
+        self.resolve_arg_link(obj_tree)
+        if self.result_var is not None:
+            result_var_lower = self.result_var.lower()
+            for child in self.children:
+                if child.name.lower() == result_var_lower:
+                    self.result_obj = child
+
     def get_type(self):
         return 3
 
     def get_desc(self):
         # desc = None
-        if self.result_var is not None:
-            result_var_lower = self.result_var.lower()
-            for child in self.children:
-                if child.name == result_var_lower:
-                    return child.get_desc()
+        if self.result_obj is not None:
+            return self.result_obj.get_desc()
         if self.return_type is not None:
             return self.return_type
         return 'FUNCTION'
@@ -648,6 +749,8 @@ class fortran_file:
         for scope in self.scope_list:
             if line_number >= scope.sline and line_number <= scope.eline:
                 scope_list.append(scope)
+                for ancestor in scope.get_ancestors():
+                    scope_list.append(ancestor)
         return scope_list
 
     def get_inner_scope(self, line_number):

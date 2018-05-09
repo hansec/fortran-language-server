@@ -172,7 +172,7 @@ def read_var_def(line, type_word=None):
     return 'var', [type_word, keywords, var_words]
 
 
-def read_fun_def(line, return_type=None):
+def read_fun_def(line, return_type=None, mod_fun=False):
     fun_match = FUN_REGEX.match(line)
     if fun_match is None:
         return None
@@ -201,10 +201,10 @@ def read_fun_def(line, return_type=None):
         results_match = RESULT_REGEX.match(trailing_line)
         if results_match is not None:
             return_var = results_match.group(1).strip().lower()
-    return 'fun', [name, args, [return_type, return_var]]
+    return 'fun', [name, args, [return_type, return_var], mod_fun]
 
 
-def read_sub_def(line):
+def read_sub_def(line, mod_sub=False):
     sub_match = SUB_REGEX.match(line)
     if sub_match is None:
         return None
@@ -226,7 +226,7 @@ def read_sub_def(line):
             word_match = [word for word in word_match]
             args = ','.join(word_match)
         trailing_line = trailing_line[paren_match.end(0):]
-    return 'sub', [name, args]
+    return 'sub', [name, args, mod_sub]
 
 
 def read_type_def(line):
@@ -285,10 +285,10 @@ def read_mod_def(line):
             return 'int_pro', pro_names
         # Check for submodule definition
         trailing_line = line[mod_match.start(1):]
-        sub_res = read_sub_def(trailing_line)
+        sub_res = read_sub_def(trailing_line, mod_sub=True)
         if sub_res is not None:
             return sub_res
-        fun_res = read_fun_def(trailing_line)
+        fun_res = read_fun_def(trailing_line, mod_fun=True)
         if fun_res is not None:
             return fun_res
         return 'mod', name
@@ -519,13 +519,13 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 if(debug):
                     print('{1} !!! PROGRAM statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'sub':
-                new_sub = fortran_subroutine(file_obj, line_number, obj[0], file_obj.enc_scope_name, obj[1])
+                new_sub = fortran_subroutine(file_obj, line_number, obj[0], file_obj.enc_scope_name, obj[1], obj[2])
                 file_obj.add_scope(new_sub, END_SUB_REGEX)
                 if(debug):
                     print('{1} !!! SUBROUTINE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'fun':
                 new_fun = fortran_function(file_obj, line_number, obj[0], file_obj.enc_scope_name,
-                                           obj[1], return_type=obj[2][0], result_var=obj[2][1])
+                                           obj[1], obj[3], return_type=obj[2][0], result_var=obj[2][1])
                 file_obj.add_scope(new_fun, END_FUN_REGEX)
                 if obj[2][0] is not None:
                     new_obj = fortran_obj(file_obj, line_number, obj[0], obj[2][0][0], obj[2][0][1],
