@@ -204,7 +204,7 @@ class fortran_scope:
 
     def get_snippet(self, name_replace=None, drop_arg=None):
         if name_replace is not None:
-            return name_replace
+            return name_replace, None
         return self.name, None
 
     def get_documentation(self):
@@ -641,6 +641,7 @@ class fortran_meth(fortran_obj):
             name = name_replace
         if self.link_obj is not None:
             return self.link_obj.get_snippet(name, nopass)
+        return name, None
 
     def get_type(self):
         if self.link_obj is not None:
