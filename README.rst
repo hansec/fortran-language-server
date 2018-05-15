@@ -47,6 +47,23 @@ Installation
 
 ``pip install fortran-language-server``
 
+Language server settings
+------------------------
+
+The following global settings can be used when launching the language server.
+
+* `--symbol_skip_mem`  Do not include type members in document symbol results
+* `--incrmental_sync`  Use incremental document synchronization (beta)
+
+**Debug settings:**
+
+The following settings can be used to perform `standalone debug tests`_ on the language server.
+
+* `--debug_filepath=DEBUG_FILEPATH` Path to file for file specific tests
+* `--debug_rootpath=DEBUG_ROOTPATH` Root path for language server tests
+* `--debug_parser`     Test source parser on specified file instead of running language server
+* `--debug_symbols`    Test symbol generation for specified file instead of running language server
+
 Configuration
 -------------
 
@@ -85,4 +102,5 @@ License
 This project is made available under the MIT License.
 
 .. _Language Server Protocol: https://github.com/Microsoft/language-server-protocol
-.. _filing bugs: https://github.com/atom/fortran-language-server/issues/new
+.. _standalone debug tests: https://github.com/hansec/fortran-language-server/wiki
+.. _filing bugs: https://github.com/hansec/fortran-language-server/issues/new

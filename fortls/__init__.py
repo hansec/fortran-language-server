@@ -24,7 +24,7 @@ def main():
     )
     parser.add_argument(
         '--incrmental_sync', action="store_true",
-        help="Use incremental document syncronization (beta)"
+        help="Use incremental document synchronization (beta)"
     )
     parser.add_argument(
         '--debug_parser', action="store_true",
