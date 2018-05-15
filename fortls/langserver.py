@@ -442,7 +442,7 @@ class LangServer:
                 "documentSymbolProvider": True,
                 "completionProvider": {
                     "resolveProvider": False,
-                    "triggerCharacters": ["."]
+                    "triggerCharacters": ["%"]
                 },
                 "definitionProvider": True,
                 "hoverProvider": True,

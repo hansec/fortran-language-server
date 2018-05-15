@@ -35,7 +35,7 @@ def test_init():
         # {
         #     "completionProvider": {
         #         "resolveProvider": false,
-        #         "triggerCharacters": ["."]
+        #         "triggerCharacters": ["%"]
         #     },
         #     "definitionProvider": true,
         #     "documentSymbolProvider": true,
@@ -50,7 +50,7 @@ def test_init():
         assert result_dict["capabilities"]["hoverProvider"] is True
         assert result_dict["capabilities"]["hoverProvider"] == 1
         assert result_dict["capabilities"]["completionProvider"]["resolveProvider"] is False
-        assert result_dict["capabilities"]["completionProvider"]["triggerCharacters"][0] == "."
+        assert result_dict["capabilities"]["completionProvider"]["triggerCharacters"][0] == "%"
     #
     string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
     errcode, results = run_request(string)
