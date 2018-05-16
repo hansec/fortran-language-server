@@ -42,10 +42,6 @@ def main():
         '--debug_rootpath',
         help="Root path for language server tests"
     )
-    parser.add_argument(
-        '--unbuffered', action="store_true",
-        help="Run language server with unbufferd I/O (for test script only)"
-    )
     args = parser.parse_args()
     if args.version:
         print("{0}".format(__version__))
@@ -145,10 +141,7 @@ def main():
         tmpin.close()
     #
     else:
-        if args.unbuffered:
-            stdin, stdout = sys.stdin, sys.stdout
-        else:
-            stdin, stdout = _binary_stdio()
+        stdin, stdout = _binary_stdio()
         s = LangServer(conn=JSONRPC2Connection(ReadWriter(stdin, stdout)),
                        logLevel=0, settings=settings)
         s.run()
