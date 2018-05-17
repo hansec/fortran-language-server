@@ -52,17 +52,17 @@ Language server settings
 
 The following global settings can be used when launching the language server.
 
-* `--symbol_skip_mem`  Do not include type members in document symbol results
-* `--incrmental_sync`  Use incremental document synchronization (beta)
+* ``--symbol_skip_mem`` Do not include type members in document symbol results
+* ``--incrmental_sync`` Use incremental document synchronization (beta)
 
 **Debug settings:**
 
 The following settings can be used to perform `standalone debug tests <https://github.com/hansec/fortran-language-server/wiki>`_ on the language server.
 
-* `--debug_filepath=DEBUG_FILEPATH` Path to file for file specific tests
-* `--debug_rootpath=DEBUG_ROOTPATH` Root path for language server tests
-* `--debug_parser`     Test source parser on specified file instead of running language server
-* `--debug_symbols`    Test symbol generation for specified file instead of running language server
+* ``--debug_filepath=DEBUG_FILEPATH`` Path to file for file specific tests
+* ``--debug_rootpath=DEBUG_ROOTPATH`` Root path for language server tests
+* ``--debug_parser`` Test source parser on specified file instead of running language server
+* ``--debug_symbols`` Test symbol generation for specified file instead of running language server
 
 Configuration
 -------------
