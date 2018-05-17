@@ -10,7 +10,7 @@ Fortran Language Server (beta)
 .. image:: https://img.shields.io/github/license/hansec/fortran-language-server.svg
      :target: https://github.com/hansec/fortran-language-server/blob/master/LICENSE
 
-A FORTRAN implementation of the `Language Server Protocol`_ using Python (2.7+).
+A FORTRAN implementation of the `Language Server Protocol <https://github.com/Microsoft/language-server-protocol>`_ using Python (2.7+).
 
 **Note: This language server is currently in the early stages of development.
 Not all features are supported or planned.**
@@ -57,7 +57,7 @@ The following global settings can be used when launching the language server.
 
 **Debug settings:**
 
-The following settings can be used to perform `standalone debug tests`_ on the language server.
+The following settings can be used to perform `standalone debug tests <https://github.com/hansec/fortran-language-server/wiki>`_ on the language server.
 
 * `--debug_filepath=DEBUG_FILEPATH` Path to file for file specific tests
 * `--debug_rootpath=DEBUG_ROOTPATH` Root path for language server tests
@@ -94,13 +94,14 @@ be specified manually as it is always included.
 
 Bug reports
 -----------
-When `filing bugs`_ please provide example code to reproduce the observed issue.
+When `filing bugs <https://github.com/hansec/fortran-language-server/issues/new>`_ please provide example code to reproduce the observed issue.
 
 License
 -------
 
 This project is made available under the MIT License.
 
-.. _Language Server Protocol: https://github.com/Microsoft/language-server-protocol
-.. _standalone debug tests: https://github.com/hansec/fortran-language-server/wiki
-.. _filing bugs: https://github.com/hansec/fortran-language-server/issues/new
+Support
+-------
+
+If you *really* like `this package <https://github.com/hansec/fortran-language-server>`_ you can `buy me a coffee <https://paypal.me/hansec>`_ to say thanks.
