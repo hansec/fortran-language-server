@@ -12,6 +12,8 @@ Fortran Language Server (beta)
 
 A FORTRAN implementation of the `Language Server Protocol <https://github.com/Microsoft/language-server-protocol>`_ using Python (2.7+).
 
+Editor extensions using this language server to provide autocomplete and other IDE-like functionality are available for `Atom <https://atom.io/packages/ide-fortran>`_ and `Visual Studio Code <https://marketplace.visualstudio.com/items?itemName=hansec.fortran-ls>`_.
+
 **Note: This language server is currently in the early stages of development.
 Not all features are supported or planned.**
 
