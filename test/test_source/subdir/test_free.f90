@@ -21,6 +21,13 @@ CONTAINS
   PROCEDURE :: norm => scaled_vector_norm
 END TYPE scaled_vector
 !
+INTERFACE
+  SUBROUTINE fort_wrap(a,b)
+  INTEGER(4), INTENT(in) :: a
+  REAL(8), INTENT(out) :: b
+  END SUBROUTINE fort_wrap
+END INTERFACE
+!
 LOGICAL :: module_variable
 CONTAINS
 !

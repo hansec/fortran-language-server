@@ -80,7 +80,7 @@ def test_change():
             "text": "",
             "range": {
                 "start": {"line": 6, "character": 0},
-                "end": {"line": 22, "character": 0}
+                "end": {"line": 29, "character": 0}
             }
         },
         {
@@ -105,7 +105,7 @@ def test_symbols():
     def check_return(result_array):
         # Expected objects
         objs = [
-            ["test_free", 2, 0, 57],
+            ["test_free", 2, 0, 64],
             ["scale_type", 5, 4, 6],
             ["val", 13, 5, 5],
             ["vector", 5, 8, 14],
@@ -117,11 +117,12 @@ def test_symbols():
             ["scale", 13, 17, 17],
             ["set_scale", 6, 19, 19],
             ["norm", 12, 20, 20],
-            ["vector_create", 6, 26, 32],
-            ["vector_norm", 12, 34, 38],
-            ["scaled_vector_set", 6, 40, 44],
-            ["scaled_vector_norm", 12, 46, 50],
-            ["unscaled_norm", 12, 52, 56]
+            ["fort_wrap", 11, 24, 27],
+            ["vector_create", 6, 33, 39],
+            ["vector_norm", 12, 41, 45],
+            ["scaled_vector_set", 6, 47, 51],
+            ["scaled_vector_norm", 12, 53, 57],
+            ["unscaled_norm", 12, 59, 63]
         ]
         assert len(result_array) == len(objs)
         for i, obj in enumerate(objs):

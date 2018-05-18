@@ -467,6 +467,8 @@ class LangServer:
                 return 12
             elif type == 4:
                 return 5
+            elif type == 5:
+                return 11
             elif type == 6:
                 return 13
             elif type == 7:
@@ -484,11 +486,17 @@ class LangServer:
         # Add scopes to outline view
         test_output = []
         for scope in file_obj.get_scopes():
-            if scope.FQSN.count(":") > 2:
-                continue
+            scope_tree = scope.FQSN.split("::")
+            if len(scope_tree) > 2:
+                if scope_tree[1].startswith("gen_int"):
+                    scope_type = 11
+                else:
+                    continue
+            else:
+                scope_type = map_types(scope.get_type())
             tmp_out = {}
             tmp_out["name"] = scope.name
-            tmp_out["kind"] = map_types(scope.get_type())
+            tmp_out["kind"] = scope_type
             sline = scope.sline-1
             eline = sline
             if scope.eline is not None:
@@ -503,7 +511,7 @@ class LangServer:
             # Set containing scope
             if scope.FQSN.find('::') > 0:
                 tmp_list = scope.FQSN.split("::")
-                tmp_out["containerName"] = tmp_list[-2]
+                tmp_out["containerName"] = tmp_list[0]
             test_output.append(tmp_out)
             # If class add members
             if scope.get_type() == 4 and self.symbol_include_mem:

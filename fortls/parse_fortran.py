@@ -542,11 +542,13 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 if(debug):
                     print('{1} !!! TYPE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'int':
+                hidden = False
                 if obj is None:
                     int_counter += 1
                     obj = 'GEN_INT{0}'.format(int_counter)
+                    hidden = True
                 new_int = fortran_int(file_obj, line_number, obj, file_obj.enc_scope_name)
-                file_obj.add_scope(new_int, END_INT_REGEX, True)
+                file_obj.add_scope(new_int, END_INT_REGEX, hidden)
                 if(debug):
                     print('{1} !!! INTERFACE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'int_pro':
