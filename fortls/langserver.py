@@ -320,6 +320,7 @@ class LangServer:
         self.post_messages = []
         self.streaming = True
         self.symbol_include_mem = True
+        self.autocomplete_no_prefix = False
         self.sync_type = 1
         if logLevel == 0:
             logging.basicConfig(level=logging.ERROR)
@@ -330,6 +331,8 @@ class LangServer:
                 self.symbol_include_mem = settings["symbol_include_mem"]
             if "sync_type" in settings:
                 self.sync_type = settings["sync_type"]
+            if "autocomplete_no_prefix" in settings:
+                self.autocomplete_no_prefix = settings["autocomplete_no_prefix"]
 
     def run(self):
         # Run server
@@ -646,6 +649,8 @@ class LangServer:
             get_context(line_prefix, var_prefix)
         if var_prefix == '' and not (is_member or line_context == 2):
             return req_dict
+        if self.autocomplete_no_prefix:
+            var_prefix = ''
         # USE stmnt
         if line_context == 1:  # module part
             for key in self.obj_tree:
