@@ -1,3 +1,13 @@
+## 0.3.7
+
+### Improvements
+* Automatically trigger autocomplete on `%` character
+* Show named interfaces and prototypes in document outline
+* Add support for autocomplete without prefix filtering
+
+### Fixes
+* Fix occasional language server error in autocompletion with class methods
+
 ## 0.3.6
 
 ### Improvements
