@@ -28,7 +28,7 @@ def main():
     )
     parser.add_argument(
         '--autocomplete_no_prefix', action="store_true",
-        help="Do not filter autocomplete requests by variable prefix"
+        help="Do not filter autocomplete results by variable prefix"
     )
     parser.add_argument(
         '--debug_parser', action="store_true",

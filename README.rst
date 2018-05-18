@@ -54,6 +54,7 @@ The following global settings can be used when launching the language server.
 
 * ``--symbol_skip_mem`` Do not include type members in document symbol results
 * ``--incrmental_sync`` Use incremental document synchronization (beta)
+* ``--autocomplete_no_prefix`` Do not filter autocomplete results by variable prefix
 
 **Debug settings:**
 
