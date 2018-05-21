@@ -248,3 +248,32 @@ def test_def():
     check_return(results[5], [13, 13, path_to_uri(os.path.join(test_dir, "subdir", "test_free.f90"))])
     check_return(results[6], [5, 5, path_to_uri(os.path.join(test_dir, "subdir", "test_free.f90"))])
     check_return(results[7], [1, 1, path_to_uri(os.path.join(test_dir, "subdir", "test_submod.F90"))])
+
+
+def test_refs():
+    def check_return(result_array, checks):
+        assert len(result_array) == len(checks)
+        for (i,check) in enumerate(checks):
+            assert result_array[i]["uri"] == check[2]
+            assert result_array[i]["range"]["start"]["character"] == check[0]
+            assert result_array[i]["range"]["end"]["character"] == check[1]
+    #
+    string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
+    file_path = os.path.join(test_dir, "test_prog.f08")
+    string += write_rpc_request(2, "textDocument/references", {
+        "textDocument": {"uri": file_path},
+        "position": {"line": 9, "character": 8}
+    })
+    errcode, results = run_request(string)
+    #
+    assert errcode == 0
+    check_return(results[1], [
+        [8,  14, path_to_uri(os.path.join(test_dir, "subdir", "test_free.f90"))],
+        [9,  15, path_to_uri(os.path.join(test_dir, "subdir", "test_free.f90"))],
+        [14, 20, path_to_uri(os.path.join(test_dir, "subdir", "test_free.f90"))],
+        [6,  12, path_to_uri(os.path.join(test_dir, "subdir", "test_free.f90"))],
+        [6,  12, path_to_uri(os.path.join(test_dir, "subdir", "test_free.f90"))],
+        [6,  12, path_to_uri(os.path.join(test_dir, "subdir", "test_free.f90"))],
+        [21, 27, path_to_uri(os.path.join(test_dir, "test_prog.f08"))],
+        [5,  11, path_to_uri(os.path.join(test_dir, "test_prog.f08"))]
+    ])

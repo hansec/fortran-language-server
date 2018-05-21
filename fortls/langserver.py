@@ -363,6 +363,7 @@ class LangServer:
             "textDocument/documentSymbol": self.serve_document_symbols,
             "textDocument/completion": self.serve_autocomplete,
             "textDocument/definition": self.serve_definition,
+            "textDocument/references": self.serve_references,
             "textDocument/hover": self.serve_hover,
             "textDocument/didOpen": self.serve_onSave,
             "textDocument/didSave": self.serve_onSave,
@@ -373,14 +374,13 @@ class LangServer:
             "exit": self.serve_exit,
         }.get(request["method"], self.serve_default)
         # handler = {
-        #     "textDocument/references": self.serve_references,
         #     "workspace/symbol": self.serve_symbols,
         # }.get(request["method"], self.serve_default)
         # We handle notifications differently since we can't respond
         if "id" not in request:
             try:
                 handler(request)
-            except Exception as e:
+            except:
                 log.warning(
                     "error handling notification %s", request, exc_info=True)
             return
@@ -448,11 +448,11 @@ class LangServer:
                     "triggerCharacters": ["%"]
                 },
                 "definitionProvider": True,
+                "referencesProvider": True,
                 "hoverProvider": True,
                 "textDocumentSync": self.sync_type
             }
         }
-        #     "referencesProvider": True,
         #     "workspaceSymbolProvider": True,
         #     "streaming": False,
         # }
@@ -639,8 +639,12 @@ class LangServer:
         try:
             line_prefix = curr_line[:ac_char].lower()
             # Ignore for comment lines
-            if detect_comment_line(line_prefix):
+            if detect_comment_line(line_prefix, self.workspace[path]["fixed"]):
                 return req_dict
+            # Ignore string literals
+            if (line_prefix.count("'") % 2 == 1) or \
+               (line_prefix.count('"') % 2 == 1):
+                return None
             var_stack = get_var_stack(line_prefix)
             is_member = (len(var_stack) > 1)
             var_prefix = var_stack[-1].strip()
@@ -718,11 +722,9 @@ class LangServer:
         req_dict["items"] = item_list
         return req_dict
 
-    def get_definition(self, filepath, def_line, def_char):
-        if filepath not in self.workspace:
-            return None
+    def get_definition(self, def_file, def_line, def_char):
         # Get full line (and possible continuations) from file
-        curr_line, def_char = get_line(def_line, def_char, self.workspace[filepath])
+        curr_line, def_char = get_line(def_line, def_char, def_file)
         if curr_line is None:
             return None
         #
@@ -730,7 +732,11 @@ class LangServer:
         try:
             line_prefix = curr_line[:def_char].lower()
             # Ignore for comment lines
-            if detect_comment_line(line_prefix):
+            if detect_comment_line(line_prefix, def_file["fixed"]):
+                return None
+            # Ignore string literals
+            if (line_prefix.count("'") % 2 == 1) or \
+               (line_prefix.count('"') % 2 == 1):
                 return None
             var_stack = get_var_stack(line_prefix)
             is_member = (len(var_stack) > 1)
@@ -740,30 +746,68 @@ class LangServer:
         # print(var_stack)
         if def_name == '':
             return None
-        file_obj = self.workspace[filepath]["ast"]
-        # item_list = []
-        scope_list = file_obj.get_scopes(def_line+1)
+        file_obj = def_file["ast"]
+        curr_scope = file_obj.get_inner_scope(def_line+1)
         # Traverse type tree if necessary
         if is_member:
-            curr_scope = file_obj.get_inner_scope(def_line+1)
             type_scope = climb_type_tree(var_stack, curr_scope, self.obj_tree)
             # Set enclosing type as scope
             if type_scope is None:
-                scope_list = []
+                curr_scope = None
             else:
-                scope_list = [type_scope]
+                curr_scope = type_scope
         # Find in available scopes
         var_obj = None
-        for scope in scope_list:
-            var_obj, enc_scope = find_in_scope(scope, def_name, self.obj_tree)
-            if var_obj is not None:
-                return var_obj
+        if curr_scope is not None:
+            var_obj, enc_scope = find_in_scope(curr_scope, def_name, self.obj_tree)
         # Search in global scope
         if var_obj is None:
             key = def_name.lower()
             if key in self.obj_tree:
                 return self.obj_tree[key][0]
+        else:
+            return var_obj
         return None
+
+    def serve_references(self, request):
+        # Get parameters from request
+        params = request["params"]
+        uri = params["textDocument"]["uri"]
+        def_line = params["position"]["line"]
+        def_char = params["position"]["character"]
+        path = path_from_uri(uri)
+        refs = []
+        # Find object
+        if path in self.workspace:
+            def_obj = self.get_definition(self.workspace[path], def_line, def_char)
+        else:
+            return []
+        # Currently only support global and top level module objects
+        if def_obj.FQSN.count(":") > 2:
+            return refs
+        # Search through all files
+        if def_obj is not None:
+            def_name = def_obj.name.lower()
+            def_fqsn = def_obj.FQSN
+            NAME_REGEX = re.compile(r'(?:\W|^)({0})(?:\W|$)'.format(def_name), re.I)
+            for filename, file_obj in sorted(self.workspace.items()):
+                # Search through file line by line
+                for (i, line) in enumerate(file_obj["contents"]):
+                    # Skip comment lines
+                    if detect_comment_line(line, file_obj["fixed"]):
+                        continue
+                    for match in NAME_REGEX.finditer(line):
+                        var_def = self.get_definition(file_obj, i, match.start(1))
+                        if var_def is not None:
+                            if def_fqsn == var_def.FQSN:
+                                refs.append({
+                                    "uri": path_to_uri(filename),
+                                    "range": {
+                                        "start": {"line": i, "character": match.start(1)},
+                                        "end": {"line": i, "character": match.end(1)}
+                                    }
+                                })
+        return refs
 
     def serve_definition(self, request):
         # Get parameters from request
@@ -773,7 +817,10 @@ class LangServer:
         def_char = params["position"]["character"]
         path = path_from_uri(uri)
         # Find object
-        var_obj = self.get_definition(path, def_line, def_char)
+        if path in self.workspace:
+            var_obj = self.get_definition(self.workspace[path], def_line, def_char)
+        else:
+            return None
         # Construct link reference
         if var_obj is not None:
             if var_obj.file.path is not None:
@@ -796,7 +843,10 @@ class LangServer:
         def_char = params["position"]["character"]
         path = path_from_uri(uri)
         # Find object
-        var_obj = self.get_definition(path, def_line, def_char)
+        if path in self.workspace:
+            var_obj = self.get_definition(self.workspace[path], def_line, def_char)
+        else:
+            return None
         # Construct hover information
         if var_obj is not None:
             var_type = var_obj.get_type()
