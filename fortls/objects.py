@@ -731,16 +731,10 @@ class fortran_file:
     def add_public(self, name):
         self.public_list.append(self.enc_scope_name+'::'+name)
 
-    def add_use(self, mod_words, line_number):
+    def add_use(self, mod_word, line_number, only_list):
         if self.current_scope is None:
             self.create_none_scope()
-        if len(mod_words) > 0:
-            n = len(mod_words)
-            if n > 2:
-                use_list = mod_words[2:]
-                self.current_scope.add_use(mod_words[0], line_number, use_list)
-            else:
-                self.current_scope.add_use(mod_words[0], line_number)
+        self.current_scope.add_use(mod_word, line_number, only_list)
 
     def start_ppif(self, line_number):
         self.pp_if.append([line_number-1, -1])
