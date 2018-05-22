@@ -666,19 +666,32 @@ class fortran_file:
         self.END_REGEX = None
         self.enc_scope_name = None
 
+    def create_none_scope(self):
+        if self.none_scope is not None:
+            raise ValueError
+        self.none_scope = fortran_program(self, 1, "main")
+        self.add_scope(self.none_scope, re.compile(r'[ \t]*END[ \t]*PROGRAM', re.I), exportable=False)
+
     def get_enc_scope_name(self):
         if self.current_scope is None:
             return None
         return self.current_scope.FQSN
 
-    def add_scope(self, new_scope, END_SCOPE_REGEX, hidden=False, exportable=True):
+    def add_scope(self, new_scope, END_SCOPE_REGEX, hidden=False, exportable=True, req_container=False):
         if hidden:
             self.variable_list.append(new_scope)
         else:
             self.scope_list.append(new_scope)
         if self.current_scope is None:
-            if exportable:
-                self.global_dict[new_scope.FQSN] = new_scope
+            if req_container:
+                self.create_none_scope()
+                new_scope.FQSN = self.none_scope.FQSN + "::" + new_scope.name.lower()
+                self.current_scope.add_child(new_scope)
+                new_scope.add_parent(self.current_scope)
+                self.scope_stack.append(self.current_scope)
+            else:
+                if exportable:
+                    self.global_dict[new_scope.FQSN] = new_scope
         else:
             self.current_scope.add_child(new_scope)
             new_scope.add_parent(self.current_scope)
@@ -703,11 +716,8 @@ class fortran_file:
 
     def add_variable(self, new_var):
         if self.current_scope is None:
-            if self.none_scope is not None:
-                raise ValueError
-            self.none_scope = fortran_program(self, 1, "main")
-            self.add_scope(self.none_scope, re.compile(r'[ \t]*END[ \t]*PROGRAM', re.I), exportable=False)
-            new_var.FQSN = "main::" + new_var.name.lower()
+            self.create_none_scope()
+            new_var.FQSN = self.none_scope.FQSN + "::" + new_var.name.lower()
         self.current_scope.add_child(new_var)
         new_var.add_parent(self.current_scope)
         self.variable_list.append(new_var)
@@ -722,6 +732,8 @@ class fortran_file:
         self.public_list.append(self.enc_scope_name+'::'+name)
 
     def add_use(self, mod_words, line_number):
+        if self.current_scope is None:
+            self.create_none_scope()
         if len(mod_words) > 0:
             n = len(mod_words)
             if n > 2:

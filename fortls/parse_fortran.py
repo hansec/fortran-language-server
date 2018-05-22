@@ -537,7 +537,7 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 new_type = fortran_type(file_obj, line_number, obj[0], modifiers, file_obj.enc_scope_name)
                 if obj[1] is not None:
                     new_type.set_inherit(obj[1])
-                file_obj.add_scope(new_type, END_TYPED_REGEX)
+                file_obj.add_scope(new_type, END_TYPED_REGEX, req_container=True)
                 if(debug):
                     print('{1} !!! TYPE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'int':
@@ -547,7 +547,7 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                     obj = 'GEN_INT{0}'.format(int_counter)
                     hidden = True
                 new_int = fortran_int(file_obj, line_number, obj, file_obj.enc_scope_name)
-                file_obj.add_scope(new_int, END_INT_REGEX, hidden)
+                file_obj.add_scope(new_int, END_INT_REGEX, hidden=hidden, req_container=True)
                 if(debug):
                     print('{1} !!! INTERFACE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'int_pro':
@@ -560,7 +560,7 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 if(debug):
                     print('{1} !!! INTERFACE-PRO statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'use':
-                file_obj.current_scope.add_use(obj[0], line_number, obj[1])
+                file_obj.add_use(obj, line_number)
                 if(debug):
                     print('{1} !!! USE statement({0})'.format(line_number, line.strip()))
         # Look for visiblity statement
