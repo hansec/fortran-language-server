@@ -5,7 +5,7 @@ import traceback
 import re
 # Local modules
 from fortls.parse_fortran import process_file, read_use_stmt, detect_fixed_format, \
-    detect_comment_line
+    detect_comment_start
 from fortls.objects import find_in_scope, fortran_meth, get_use_tree
 
 log = logging.getLogger(__name__)
@@ -639,7 +639,7 @@ class LangServer:
         try:
             line_prefix = curr_line[:ac_char].lower()
             # Ignore for comment lines
-            if detect_comment_line(line_prefix, self.workspace[path]["fixed"]):
+            if detect_comment_start(line_prefix, self.workspace[path]["fixed"]) >= 0:
                 return req_dict
             # Ignore string literals
             if (line_prefix.count("'") % 2 == 1) or \
@@ -732,7 +732,7 @@ class LangServer:
         try:
             line_prefix = curr_line[:def_char].lower()
             # Ignore for comment lines
-            if detect_comment_line(line_prefix, def_file["fixed"]):
+            if detect_comment_start(line_prefix, def_file["fixed"]) >= 0:
                 return None
             # Ignore string literals
             if (line_prefix.count("'") % 2 == 1) or \
@@ -794,8 +794,11 @@ class LangServer:
                 # Search through file line by line
                 for (i, line) in enumerate(file_obj["contents"]):
                     # Skip comment lines
-                    if detect_comment_line(line, file_obj["fixed"]):
+                    comm_start = detect_comment_start(line, file_obj["fixed"])
+                    if comm_start == 0:
                         continue
+                    elif comm_start > 0:
+                        line = line[:comm_start]
                     for match in NAME_REGEX.finditer(line):
                         var_def = self.get_definition(file_obj, i, match.start(1))
                         if var_def is not None:

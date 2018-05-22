@@ -66,16 +66,15 @@ def detect_fixed_format(file_lines):
     return True
 
 
-def detect_comment_line(line, fixed_format=False):
+def detect_comment_start(line, fixed_format=False):
     if OPENMP_LINE_MATCH.match(line) is not None:
-        return False
+        return -1
     if fixed_format:
         if FIXED_COMMENT_LINE_MATCH.match(line) is not None:
-            return True
+            return 0
     else:
-        if strip_strings(line).find('!') > -1:
-            return True
-    return False
+        return strip_strings(line).find('!')
+    return -1
 
 
 def strip_strings(in_str):
