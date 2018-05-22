@@ -1,6 +1,7 @@
 import copy
 import re
 WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
+CLASS_VAR_REGEX = re.compile(r'(TYPE|CLASS)[ \t]*\(', re.I)
 
 
 def parse_keywords(keywords):
@@ -222,6 +223,9 @@ class fortran_scope:
     def is_mod_scope(self):
         return False
 
+    def is_callable(self):
+        return False
+
     def end(self, line_number):
         self.eline = line_number
 
@@ -338,6 +342,9 @@ class fortran_subroutine(fortran_scope):
 
     def is_mod_scope(self):
         return self.mod_scope
+
+    def is_callable(self):
+        return True
 
     def copy_interface(self, copy_source):
         # Copy arguments
@@ -468,6 +475,9 @@ class fortran_function(fortran_subroutine):
             return self.return_type
         return 'FUNCTION'
 
+    def is_callable(self):
+        return False
+
 
 class fortran_type(fortran_scope):
     def __init__(self, file_obj, line_number, name, modifiers, enc_scope=None):
@@ -524,6 +534,9 @@ class fortran_int(fortran_scope):
     def get_desc(self):
         return 'INTERFACE'
 
+    def is_callable(self):
+        return True
+
     def resolve_link(self, obj_tree):
         if self.parent is None:
             return
@@ -542,6 +555,7 @@ class fortran_obj:
         self.name = name
         self.desc = var_desc
         self.modifiers = modifiers
+        self.callable = (CLASS_VAR_REGEX.match(var_desc) is not None)
         self.children = []
         self.vis = 0
         self.parent = None
@@ -628,6 +642,9 @@ class fortran_obj:
         else:
             return False
 
+    def is_callable(self):
+        return self.callable
+
 
 class fortran_meth(fortran_obj):
     def get_snippet(self, name_replace=None, drop_arg=None):
@@ -648,6 +665,9 @@ class fortran_meth(fortran_obj):
             return self.link_obj.get_type()
         # Generic
         return 7
+
+    def is_callable(self):
+        return True
 
 
 class fortran_file:

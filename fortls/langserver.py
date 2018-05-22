@@ -14,8 +14,8 @@ PY3K = sys.version_info >= (3, 0)
 FORTRAN_EXT_REGEX = re.compile(r'^\.F(77|90|95|03|08|OR|PP)?$', re.I)
 OBJBREAK_REGEX = re.compile(r'[\/\-(.,+*<>=$: ]', re.I)
 WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
-CALL_REGEX = re.compile(r'[ \t]*CALL[ \t]*([a-z0-9_]*)$', re.I)
-TYPE_STMNT_REGEX = re.compile(r'[ \t]*(TYPE|CLASS)[ \t]*(IS)?[ \t]*\([ \t]*([a-z0-9_]*)$', re.I)
+CALL_REGEX = re.compile(r'[ \t]*CALL[ \t]+[a-z0-9_%]*$', re.I)
+TYPE_STMNT_REGEX = re.compile(r'[ \t]*(TYPE|CLASS)[ \t]*(IS)?[ \t]*[a-z0-9_]*$', re.I)
 FIXED_CONT_REGEX = re.compile(r'(     [\S])')
 FREE_OPT_CONT_REGEX = re.compile(r'([ \t]*&)')
 
@@ -604,14 +604,25 @@ class LangServer:
 
         def get_context(line, var_prefix):
             # tmp_prefix = var_prefix
+            line_grouped = tokenize_line(line)
             # Test if in call statement
-            # test_match = CALL_REGEX.match(line)
-            # if test_match is not None:
-            #     return 3, var_prefix, None
+            lev1_end = line_grouped[0][0][0][-1][1]
+            if lev1_end < 0:
+                lev1_end = len(line)
+            if lev1_end == len(line):
+                test_match = CALL_REGEX.match(line_grouped[0][0][1])
+                if test_match is not None:
+                    return 3, var_prefix, None
             # Test if variable definition using type/class
-            test_match = TYPE_STMNT_REGEX.match(line)
-            if test_match is not None:
-                return 4, var_prefix, None
+            if len(line_grouped) >= 2:
+                lev2_end = line_grouped[1][0][0][-1][1]
+                if lev2_end < 0:
+                    lev2_end = len(line)
+                if lev2_end == len(line) and \
+                   line_grouped[1][0][0][-1][0] == lev1_end + 1:
+                    test_match = TYPE_STMNT_REGEX.match(line_grouped[0][0][1])
+                    if test_match is not None:
+                        return 4, var_prefix, None
             # Test if in USE statement
             test_match = read_use_stmt(line)
             if test_match is not None:
@@ -707,6 +718,9 @@ class LangServer:
             elif line_context != 2:
                 if candidate_type == 4:
                     continue
+            # Filter callables for call statements
+            if line_context == 3 and (not candidate.is_callable()):
+                continue
             #
             if candidate_type == 5:
                 tmp_list = []

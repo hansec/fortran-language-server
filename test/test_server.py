@@ -193,7 +193,7 @@ def test_comp():
     check_return(results[1], [1, "myfun(n,xval)"])
     check_return(results[2], [1, "glob_sub(n,xval,yval)"])
     check_return(results[3], [1, "stretch_vector"])
-    check_return(results[4], [6, "scale"])
+    check_return(results[4], [4, "scale"])
     check_return(results[5], [2, "n"])
     check_return(results[6], [1, "val"])
     check_return(results[7], [1, "point"])
