@@ -766,7 +766,15 @@ class fortran_file:
 
     def get_object(self, FQSN):
         FQSN_split = FQSN.split("::")
-        curr_obj = self.global_dict[FQSN_split[0]]
+        curr_obj = self.global_dict.get(FQSN_split[0])
+        if curr_obj is None:
+            # Look for non-exportable scopes
+            for scope in self.scope_list:
+                if FQSN_split[0] == scope.FQSN:
+                    curr_obj = scope
+                    break
+        if curr_obj is None:
+            return None
         if len(FQSN_split) > 1:
             for name in FQSN_split[1:]:
                 next_obj = None
