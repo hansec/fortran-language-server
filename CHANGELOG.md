@@ -1,3 +1,15 @@
+## 0.4.0
+
+### Improvements
+* Add support for find_references, global and top-level module objects only
+* Filter autocomplete suggestions for callable objects in call statements
+* Speedup initialization and updates on large projects by accelerating construction of USE tree
+
+### Fixes
+* Fix parser error with definitions requiring enclosing scopes in #include files and unnamed programs, fixes [#17](https://github.com/hansec/fortran-language-server/issues/17)
+* Fix parser failure with visibility statements in included fortran files, fixes [#16](https://github.com/hansec/fortran-language-server/issues/16)
+* Fix detection of lines with trailing comments
+
 ## 0.3.7
 
 ### Improvements
