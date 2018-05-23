@@ -84,10 +84,14 @@ def get_use_tree(scope, use_dict, obj_tree, only_list=[]):
                 continue
         if use_mod in obj_tree:
             if use_mod in use_dict:
-                if len(use_dict[use_mod]) > 0:
+                old_len = len(use_dict[use_mod])
+                if old_len > 0:
                     for only_name in use_stmnt[1]:
                         if use_dict[use_mod].count(only_name) == 0:
                             use_dict[use_mod].append(only_name)
+                # Skip if we have already visited module with the same only list
+                if old_len == len(use_dict[use_mod]):
+                    continue
             else:
                 use_dict[use_mod] = merged_use_list
             use_dict = get_use_tree(obj_tree[use_mod][0], use_dict, obj_tree, merged_use_list)
