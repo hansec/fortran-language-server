@@ -658,6 +658,7 @@ class LangServer:
         # Get context
         name_only = False
         public_only = False
+        include_globals = True
         line_context, var_prefix, context_info = \
             get_context(line_prefix, var_prefix)
         if var_prefix == '' and not (is_member or line_context == 2):
@@ -681,10 +682,10 @@ class LangServer:
             if mod_name in self.obj_tree:
                 scope_list = [self.obj_tree[mod_name][0]]
                 public_only = True
+                include_globals = False
             else:
                 return {"isIncomplete": False, "items": []}
         #
-        include_globals = True
         if is_member:
             curr_scope = file_obj.get_inner_scope(ac_line+1)
             type_scope = climb_type_tree(var_stack, curr_scope, self.obj_tree)
