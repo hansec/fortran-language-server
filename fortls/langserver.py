@@ -64,63 +64,53 @@ def init_file(filepath):
 
 
 def tokenize_line(line):
-    var_list = []
-    paren_stack = [[]]
-    paren_count = [0]
-    iCurr = -1
-    for (i, character) in enumerate(line):
-        if character == "(":
-            iCurr += 1
-            if len(paren_stack) < iCurr+1:
-                paren_stack.append([])
-                paren_count.append(0)
-            paren_stack[iCurr].append([i, -1])
-        elif character == ")":
-            paren_stack[iCurr][-1][1] = i
-            iCurr -= 1
-    #
-    if len(paren_stack[0]) == 0:
-        var_list.append([[[[0, -1]], line]])
-    else:
-        var_groups = [[] for i in range(len(paren_stack)+1)]
-        var_list, out_len = paren_split(line, paren_stack, 0, var_groups)
-    return var_list
+    paren_list = [[[-1, len(line)]], []]
+    level = 1
+    in_string = False
+    string_char = ""
+    for i, char in enumerate(line):
+        if in_string:
+            if char == string_char:
+                in_string = False
+            continue
+        if char == '(':
+            paren_list[level].append([i, len(line)])
+            level += 1
+            if len(paren_list) < level+1:
+                paren_list.append([])
+        elif char == ')':
+            paren_list[level-1][-1][1] = i
+            level -= 1
+        elif char == "'" or char == '"':
+            in_string = True
+            string_char = char
+    return paren_split(line, paren_list[:-1])
 
 
-def paren_split(line, paren_groups, level, var_groups, i1=0, i2=-1):
-    tmp_list = []
-    tmp_str = ''
-    nline = len(line)
-    if i2 < 0:
-        i2 = nline
-    i0 = i1
-    for paren_group in paren_groups[level]:
-        pg0 = paren_group[0]
-        pg1 = paren_group[1]
-        if pg0 < i1 or pg1 > i2:
-            continue
-        tmp_str += line[i0:pg0]
-        tmp_list.append([i0, pg0])
-        if pg1 < 0:
-            pg1 = nline
-        if len(paren_groups) > level+1:
-            var_groups, out_len = \
-                paren_split(line, paren_groups, level+1,
-                            var_groups, pg0+1, pg1)
-            if out_len == 0:
-                var_groups[level+1].append([[[pg0+1, pg1]], line[pg0+1:pg1]])
-        else:
-            var_groups[level+1].append([[[pg0+1, pg1]], line[pg0+1:pg1]])
-        if pg1 == nline:
-            continue
-        i0 = pg1+1
-    #
-    if i0 > tmp_list[-1][1]:
-        tmp_str += line[i0:i2]
-        tmp_list.append([i0, i2])
-    out_list = [[tmp_list, tmp_str]]
-    var_groups[level].extend(out_list)
-    return var_groups, len(out_list)
+def paren_split(line, paren_list):
+    sections = []
+    for ilev, level in enumerate(paren_list):
+        sections.append([])
+        for igroup, group in enumerate(level):
+            i1 = group[0]
+            i2 = group[1]
+            tmp_str = ""
+            i3 = i1 + 1
+            ranges = []
+            if len(paren_list) > ilev+1:
+                for lower_group in paren_list[ilev+1]:
+                    if lower_group[0] > i1 and lower_group[1] <= i2:
+                        tmp_str += line[i3:lower_group[0]]
+                        ranges.append([i3, lower_group[0]])
+                        i3 = lower_group[1] + 1
+            if i3 < i2:
+                tmp_str += line[i3:i2]
+                ranges.append([i3, i2])
+            if i3 == len(line):
+                tmp_str += line[i3:i2]
+                ranges.append([i3, i2])
+            sections[ilev].append([ranges, tmp_str])
+    return sections
 
 
 def get_var_stack(line):
