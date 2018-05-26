@@ -526,7 +526,7 @@ class LangServer:
             if type == 1:
                 return 9
             elif type == 4:
-                return 5
+                return 7
             elif type == 6:
                 return 6
             else:
