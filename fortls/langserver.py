@@ -6,7 +6,8 @@ import re
 # Local modules
 from fortls.parse_fortran import process_file, read_use_stmt, detect_fixed_format, \
     detect_comment_start
-from fortls.objects import find_in_scope, fortran_meth, get_use_tree
+from fortls.objects import find_in_scope, get_use_tree
+from fortls.intrinsics import get_intrinsics, get_intrinsic_modules
 
 log = logging.getLogger(__name__)
 PY3K = sys.version_info >= (3, 0)
@@ -323,6 +324,9 @@ class LangServer:
                 self.sync_type = settings["sync_type"]
             if "autocomplete_no_prefix" in settings:
                 self.autocomplete_no_prefix = settings["autocomplete_no_prefix"]
+        self.intrinsics = get_intrinsics()
+        for module in get_intrinsic_modules():
+            self.obj_tree[module.FQSN] = [module, None]
 
     def run(self):
         # Run server
@@ -432,12 +436,12 @@ class LangServer:
         #
         return {
             "capabilities": {
-                "documentSymbolProvider": True,
                 "completionProvider": {
                     "resolveProvider": False,
                     "triggerCharacters": ["%"]
                 },
                 "definitionProvider": True,
+                "documentSymbolProvider": True,
                 "referencesProvider": True,
                 "hoverProvider": True,
                 "textDocumentSync": self.sync_type
@@ -570,10 +574,13 @@ class LangServer:
                     var_list.extend(tmp_vars)
             # Add globals
             if inc_globals:
-                for key in self.obj_tree:
-                    global_obj = self.obj_tree[key][0]
+                for key, obj in self.obj_tree.items():
+                    global_obj = obj[0]
                     if global_obj.name.lower().startswith(var_prefix):
-                        var_list.append(self.obj_tree[key][0])
+                        var_list.append(global_obj)
+                for obj in self.intrinsics:
+                    if obj.name.lower().startswith(var_prefix):
+                        var_list.append(obj)
             return var_list
 
         def build_comp(candidate, name_only=False, name_replace=None):
@@ -587,7 +594,7 @@ class LangServer:
                     comp_obj["insertTextFormat"] = 2
             comp_obj["kind"] = map_types(candidate.get_type())
             comp_obj["detail"] = candidate.get_desc()
-            doc_str = candidate.get_documentation()
+            doc_str, _ = candidate.get_documentation()
             if doc_str is not None:
                 comp_obj["documentation"] = doc_str
             return comp_obj
@@ -770,6 +777,9 @@ class LangServer:
             key = def_name.lower()
             if key in self.obj_tree:
                 return self.obj_tree[key][0]
+            for obj in self.intrinsics:
+                if obj.name.lower() == key:
+                    return obj
         else:
             return var_obj
         return None
@@ -860,26 +870,19 @@ class LangServer:
             var_type = var_obj.get_type()
             # Currently only show for subroutines
             if var_type == 2 or var_type == 3:
-                skip_arg = False
-                hover_str, _ = var_obj.get_snippet()
-                hover_str += "\n"
-                if isinstance(var_obj, fortran_meth):
-                    if var_obj.modifiers.count(6) == 0:
-                        skip_arg = True
-                    var_obj = var_obj.link_obj
-                for arg_obj in var_obj.arg_objs:
-                    if skip_arg:
-                        skip_arg = False
-                        continue
-                    tmp_str = "  " + arg_obj.get_documentation()
-                    tmp_str += " :: {0}".format(arg_obj.name)
-                    hover_str = hover_str + tmp_str + "\n"
-                return {
-                    "contents": {
-                        "language": "fortran",
-                        "value": hover_str
-                    }
-                }
+                hover_str, highlight = var_obj.get_documentation(long=True)
+                if hover_str is not None:
+                    if highlight:
+                        return {
+                            "contents": {
+                                "language": "fortran",
+                                "value": hover_str
+                            }
+                        }
+                    else:
+                        return {
+                            "contents": hover_str
+                        }
         else:
             return None
 

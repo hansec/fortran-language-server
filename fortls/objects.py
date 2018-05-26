@@ -197,6 +197,7 @@ class fortran_scope:
 
     def add_child(self, child):
         self.children.append(child)
+        child.add_parent(self)
 
     def add_member(self, member):
         self.members.append(member)
@@ -212,8 +213,8 @@ class fortran_scope:
             return name_replace, None
         return self.name, None
 
-    def get_documentation(self):
-        return None
+    def get_documentation(self, long=False):
+        return None, False
 
     def get_children(self):
         return self.children
@@ -238,16 +239,16 @@ class fortran_scope:
         if self.parent is not None:
             if self.parent.get_type() == 5:
                 return []
-        FSQN_list = []
+        FQSN_list = []
         errors = []
         for child in self.children:
             # Check other variables in current scope
-            if FSQN_list.count(child.FQSN) > 0:
+            if FQSN_list.count(child.FQSN) > 0:
                 line_number = child.sline - 1
                 i0, i1 = find_word_in_line(file_contents[line_number].lower(), child.name.lower())
                 errors.append([0, line_number, i0, i1, child.name])
             else:
-                FSQN_list.append(child.FQSN)
+                FQSN_list.append(child.FQSN)
             # Check for masking from parent scope in subroutines and functions
             if self.parent is not None and (self.get_type() == 2 or self.get_type() == 3):
                 parent_var, parent_scope = \
@@ -262,14 +263,10 @@ class fortran_scope:
         return errors
 
     def check_use(self, obj_tree, file_contents):
-        intrinsic_mods = ['omp_lib', 'iso_c_binding', 'iso_fortran_env',
-                          'ieee_exceptions', 'ieee_arithmetic', 'ieee_features']
         errors = []
         for use_line in self.use:
             use_mod = use_line[0]
             if use_mod not in obj_tree:
-                if use_mod in intrinsic_mods:
-                    continue
                 line_number = use_line[2] - 1
                 line = file_contents[line_number]
                 i0 = line.lower().find(use_mod)
@@ -337,7 +334,7 @@ class fortran_submodule(fortran_module):
 
 
 class fortran_subroutine(fortran_scope):
-    def __init__(self, file_obj, line_number, name, enc_scope=None, args=None, mod_sub=False):
+    def __init__(self, file_obj, line_number, name, enc_scope=None, args="", mod_sub=False):
         self.base_setup(file_obj, line_number, name, enc_scope)
         self.args = args
         self.arg_objs = []
@@ -362,7 +359,6 @@ class fortran_subroutine(fortran_scope):
         self.in_children = []
         for child in copy_source.arg_objs:
             if child.name.lower() not in child_names:
-                print(self.FSQN, child.FQSN)
                 self.in_children.append(child)
 
     def get_children(self):
@@ -423,9 +419,26 @@ class fortran_subroutine(fortran_scope):
     def get_desc(self):
         return 'SUBROUTINE'
 
+    def get_documentation(self, long=False):
+        if long:
+            skip_arg = False
+            hover_str, _ = self.get_snippet()
+            hover_str += "\n"
+            for arg_obj in self.arg_objs:
+                if skip_arg:
+                    skip_arg = False
+                    continue
+                arg_doc, _ = arg_obj.get_documentation()
+                tmp_str = "  " + arg_doc
+                tmp_str += " :: {0}".format(arg_obj.name)
+                hover_str = hover_str + tmp_str + "\n"
+            return hover_str, True
+        else:
+            return None, False
+
 
 class fortran_function(fortran_subroutine):
-    def __init__(self, file_obj, line_number, name, enc_scope=None, args=None,
+    def __init__(self, file_obj, line_number, name, enc_scope=None, args="",
                  mod_fun=False, return_type=None, result_var=None):
         self.base_setup(file_obj, line_number, name, enc_scope)
         self.args = args
@@ -624,7 +637,7 @@ class fortran_obj:
         # Normal variable
         return name, None
 
-    def get_documentation(self):
+    def get_documentation(self, long=False):
         if self.link_obj is not None:
             return self.link_obj.get_documentation()
         #
@@ -632,7 +645,7 @@ class fortran_obj:
         if len(self.modifiers) > 0:
             doc_str += ", "
             doc_str += ", ".join(get_keywords(self.modifiers))
-        return doc_str
+        return doc_str, True
 
     def get_children(self):
         return []
@@ -669,6 +682,33 @@ class fortran_meth(fortran_obj):
             return self.link_obj.get_type()
         # Generic
         return 7
+
+    def get_documentation(self, long=False):
+        if long:
+            skip_arg = False
+            hover_str, _ = self.get_snippet()
+            hover_str += "\n"
+            if self.modifiers.count(6) == 0:
+                skip_arg = True
+            var_obj = self.link_obj
+            for arg_obj in var_obj.arg_objs:
+                if skip_arg:
+                    skip_arg = False
+                    continue
+                arg_doc, _ = arg_obj.get_documentation()
+                tmp_str = "  " + arg_doc
+                tmp_str += " :: {0}".format(arg_obj.name)
+                hover_str = hover_str + tmp_str + "\n"
+            return hover_str, True
+        else:
+            if self.link_obj is not None:
+                return self.link_obj.get_documentation()
+            #
+            doc_str = self.desc
+            if len(self.modifiers) > 0:
+                doc_str += ", "
+                doc_str += ", ".join(get_keywords(self.modifiers))
+            return doc_str, True
 
     def is_callable(self):
         return True
@@ -711,14 +751,12 @@ class fortran_file:
                 self.create_none_scope()
                 new_scope.FQSN = self.none_scope.FQSN + "::" + new_scope.name.lower()
                 self.current_scope.add_child(new_scope)
-                new_scope.add_parent(self.current_scope)
                 self.scope_stack.append(self.current_scope)
             else:
                 if exportable:
                     self.global_dict[new_scope.FQSN] = new_scope
         else:
             self.current_scope.add_child(new_scope)
-            new_scope.add_parent(self.current_scope)
             self.scope_stack.append(self.current_scope)
         if self.END_REGEX is not None:
             self.end_stack.append(self.END_REGEX)
@@ -743,7 +781,6 @@ class fortran_file:
             self.create_none_scope()
             new_var.FQSN = self.none_scope.FQSN + "::" + new_var.name.lower()
         self.current_scope.add_child(new_var)
-        new_var.add_parent(self.current_scope)
         self.variable_list.append(new_var)
 
     def add_int_member(self, key):

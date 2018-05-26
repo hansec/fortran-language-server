@@ -39,8 +39,9 @@ def test_init():
         #     },
         #     "definitionProvider": true,
         #     "documentSymbolProvider": true,
+        #     "referencesProvider": True,
         #     "hoverProvider": true,
-        #     "textDocumentSync": 1
+        #     "textDocumentSync": 2
         # }
         #
         assert "capabilities" in result_dict
@@ -48,7 +49,7 @@ def test_init():
         assert result_dict["capabilities"]["definitionProvider"] is True
         assert result_dict["capabilities"]["documentSymbolProvider"] is True
         assert result_dict["capabilities"]["hoverProvider"] is True
-        assert result_dict["capabilities"]["hoverProvider"] == 1
+        assert result_dict["capabilities"]["referencesProvider"] is True
         assert result_dict["capabilities"]["completionProvider"]["resolveProvider"] is False
         assert result_dict["capabilities"]["completionProvider"]["triggerCharacters"][0] == "%"
     #
@@ -191,7 +192,7 @@ def test_comp():
     #
     assert errcode == 0
     check_return(results[1], [1, "myfun(n,xval)"])
-    check_return(results[2], [1, "glob_sub(n,xval,yval)"])
+    check_return(results[2], [4, "glob_sub(n,xval,yval)"])
     check_return(results[3], [1, "stretch_vector"])
     check_return(results[4], [4, "scale"])
     check_return(results[5], [2, "n"])
