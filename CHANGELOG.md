@@ -1,3 +1,13 @@
+## 0.5.0
+
+### Improvements
+* Add intrinsic functions and modules to autocomplete suggestions
+* Add support for include statements
+
+### Fixes
+* Remove erroneously included global objects from autocomplete results in USE ONLY statements
+* Fix displayed type for derived type objects in autocomplete requests
+
 ## 0.4.0
 
 ### Improvements
