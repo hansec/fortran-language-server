@@ -1,5 +1,6 @@
 import copy
 import re
+import os
 WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
 CLASS_VAR_REGEX = re.compile(r'(TYPE|CLASS)[ \t]*\(', re.I)
 
@@ -192,12 +193,20 @@ class fortran_scope:
         for child in self.children:
             child.resolve_link(obj_tree)
 
-    def add_parent(self, parent_obj):
+    def set_parent(self, parent_obj):
         self.parent = parent_obj
 
     def add_child(self, child):
         self.children.append(child)
-        child.add_parent(self)
+        child.set_parent(self)
+
+    def update_fqsn(self, enc_scope=None):
+        if enc_scope is not None:
+            self.FQSN = enc_scope.lower() + "::" + self.name.lower()
+        else:
+            self.FQSN = self.name.lower()
+        for child in self.children:
+            child.update_fqsn(self.FQSN)
 
     def add_member(self, member):
         self.members.append(member)
@@ -591,8 +600,16 @@ class fortran_obj:
             elif modifier == 5:
                 self.vis = -1
 
-    def add_parent(self, parent_obj):
+    def set_parent(self, parent_obj):
         self.parent = parent_obj
+
+    def update_fqsn(self, enc_scope=None):
+        if enc_scope is not None:
+            self.FQSN = enc_scope.lower() + "::" + self.name.lower()
+        else:
+            self.FQSN = self.name.lower()
+        for child in self.children:
+            child.update_fqsn(self.FQSN)
 
     def resolve_link(self, obj_tree):
         if self.link_name is None:
@@ -725,6 +742,7 @@ class fortran_file:
         self.scope_stack = []
         self.end_stack = []
         self.pp_if = []
+        self.include_stmnts = []
         self.none_scope = None
         self.current_scope = None
         self.END_REGEX = None
@@ -797,6 +815,11 @@ class fortran_file:
             self.create_none_scope()
         self.current_scope.add_use(mod_word, line_number, only_list)
 
+    def add_include(self, path, line_number):
+        if os.name == "nt":
+            path = path.replace("/", "\\")
+        self.include_stmnts.append([line_number, path, []])
+
     def start_ppif(self, line_number):
         self.pp_if.append([line_number-1, -1])
 
@@ -819,6 +842,8 @@ class fortran_file:
                 scope_list.append(scope)
                 for ancestor in scope.get_ancestors():
                     scope_list.append(ancestor)
+        if len(scope_list) == 0 and self.none_scope is not None:
+            return [self.none_scope]
         return scope_list
 
     def get_inner_scope(self, line_number):
@@ -829,6 +854,8 @@ class fortran_file:
                 if line_number >= scope.sline and line_number <= scope.eline:
                     curr_scope = scope
                     scope_sline = scope.sline
+        if curr_scope is None and self.none_scope is not None:
+            return self.none_scope
         return curr_scope
 
     def get_object(self, FQSN):
@@ -854,7 +881,30 @@ class fortran_file:
                 curr_obj = next_obj
         return curr_obj
 
-    def close_file(self):
+    def resolve_includes(self, workspace, path=None):
+        file_dir = os.path.dirname(self.path)
+        for include_path in self.include_stmnts:
+            file_path = os.path.join(file_dir, include_path[1])
+            if path is not None:
+                if not (path == file_path):
+                    continue
+            parent_scope = self.get_inner_scope(include_path[0])
+            added_entities = include_path[2]
+            if file_path in workspace:
+                include_obj = workspace[file_path]["ast"]
+                if (include_obj.none_scope is not None) and (include_obj.none_scope is not parent_scope):
+                    # Remove old objects
+                    for obj in added_entities:
+                        parent_scope.children.remove(obj)
+                    added_entities = []
+                    for child in include_obj.none_scope.children:
+                        added_entities.append(child)
+                        parent_scope.add_child(child)
+                        child.update_fqsn(parent_scope.FQSN)
+                    include_obj.none_scope = parent_scope
+                    include_path[2] = added_entities
+
+    def close_file(self, line_number):
         # Tasks to be done when file parsing is finished
         for private_name in self.private_list:
             obj = self.get_object(private_name)
@@ -864,10 +914,16 @@ class fortran_file:
             obj = self.get_object(public_name)
             if obj is not None:
                 obj.set_visibility(1)
+        if self.none_scope is not None:
+            self.none_scope.end(line_number)
+            self.scope_list.remove(self.none_scope)
 
     def check_file(self, obj_tree, file_contents):
         errors = []
-        for scope in self.scope_list:
+        tmp_list = self.scope_list
+        if self.none_scope is not None:
+            tmp_list += [self.none_scope]
+        for scope in tmp_list:
             for error in scope.check_double_def(file_contents, obj_tree):
                 # Check preproc if
                 if self.check_ppif(error[1]):

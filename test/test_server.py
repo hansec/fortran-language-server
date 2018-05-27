@@ -188,6 +188,16 @@ def test_comp():
         "textDocument": {"uri": file_path},
         "position": {"line": 17, "character": 23}
     })
+    file_path = os.path.join(test_dir, "test_inc.f90")
+    string += write_rpc_request(11, "textDocument/completion", {
+        "textDocument": {"uri": file_path},
+        "position": {"line": 10, "character": 2}
+    })
+    file_path = os.path.join(test_dir, "subdir", "test_inc2.f90")
+    string += write_rpc_request(12, "textDocument/completion", {
+        "textDocument": {"uri": file_path},
+        "position": {"line": 3, "character": 2}
+    })
     errcode, results = run_request(string)
     #
     assert errcode == 0
@@ -200,6 +210,8 @@ def test_comp():
     check_return(results[7], [1, "point"])
     check_return(results[8], [1, "distance"])
     check_return(results[9], [2, "x"])
+    check_return(results[10], [2, "val1"])
+    check_return(results[11], [2, "val1"])
 
 
 def test_def():
@@ -239,6 +251,16 @@ def test_def():
         "textDocument": {"uri": file_path},
         "position": {"line": 16, "character": 12}
     })
+    file_path = os.path.join(test_dir, "test_inc.f90")
+    string += write_rpc_request(9, "textDocument/definition", {
+        "textDocument": {"uri": file_path},
+        "position": {"line": 10, "character": 2}
+    })
+    file_path = os.path.join(test_dir, "subdir", "test_inc2.f90")
+    string += write_rpc_request(10, "textDocument/definition", {
+        "textDocument": {"uri": file_path},
+        "position": {"line": 3, "character": 2}
+    })
     errcode, results = run_request(string)
     #
     assert errcode == 0
@@ -249,6 +271,8 @@ def test_def():
     check_return(results[5], [13, 13, path_to_uri(os.path.join(test_dir, "subdir", "test_free.f90"))])
     check_return(results[6], [5, 5, path_to_uri(os.path.join(test_dir, "subdir", "test_free.f90"))])
     check_return(results[7], [1, 1, path_to_uri(os.path.join(test_dir, "subdir", "test_submod.F90"))])
+    check_return(results[8], [0, 0, path_to_uri(os.path.join(test_dir, "subdir", "test_inc2.f90"))])
+    check_return(results[9], [4, 4, path_to_uri(os.path.join(test_dir, "test_inc.f90"))])
 
 
 def test_refs():

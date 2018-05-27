@@ -5,6 +5,7 @@ from fortls.objects import parse_keywords, fortran_module, fortran_program, \
     fortran_int, fortran_obj, fortran_meth, fortran_file
 #
 USE_REGEX = re.compile(r'[ \t]*USE([, \t]*INTRINSIC)?[ \t:]*([a-z0-9_]*)', re.I)
+INCLUDE_REGEX = re.compile(r'[ \t]*INCLUDE[ \t:]*[\'\"]([^\'\"]*)', re.I)
 SUB_REGEX = re.compile(r'[ \t]*(PURE|ELEMENTAL|RECURSIVE)*[ \t]*(SUBROUTINE)', re.I)
 END_SUB_REGEX = re.compile(r'[ \t]*END[ \t]*SUBROUTINE', re.I)
 FUN_REGEX = re.compile(r'[ \t]*(PURE|ELEMENTAL|RECURSIVE)*[ \t]*(FUNCTION)', re.I)
@@ -353,8 +354,18 @@ def read_use_stmt(line):
         return 'use', [use_mod, only_list]
 
 
+def read_inc_stmt(line):
+    inc_match = INCLUDE_REGEX.match(line)
+    if inc_match is None:
+        return None
+    else:
+        inc_path = inc_match.group(1)
+        return 'inc', [inc_path]
+
+
 def_tests = [read_var_def, read_sub_def, read_fun_def, read_type_def,
-             read_use_stmt, read_int_def, read_mod_def, read_prog_def, read_submod_def]
+             read_use_stmt, read_int_def, read_mod_def, read_prog_def,
+             read_submod_def, read_inc_stmt]
 
 
 def process_file(file_str, close_open_scopes, path=None, fixed_format=False, debug=False):
@@ -563,6 +574,10 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 file_obj.add_use(obj[0], line_number, obj[1])
                 if(debug):
                     print('{1} !!! USE statement({0})'.format(line_number, line.strip()))
+            elif obj_type == 'inc':
+                file_obj.add_include(obj[0], line_number)
+                if(debug):
+                    print('{1} !!! INCLUDE statement({0})'.format(line_number, line.strip()))
         # Look for visiblity statement
         match = VIS_REGEX.match(line)
         if (match is not None):
@@ -582,5 +597,5 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
             if(debug):
                 print('{1} !!! Visiblity statement({0})'.format(line_number, line.strip()))
             continue
-    file_obj.close_file()
+    file_obj.close_file(line_number)
     return file_obj

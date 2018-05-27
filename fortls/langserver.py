@@ -270,7 +270,7 @@ def apply_change(contents_split, change):
 
     # Check for an edit occuring at the very end of the file
     if start_line == len(contents_split):
-        return contents_split.extend(text_split), -1
+        return contents_split + text_split, -1
 
     # Check for single line edit
     if start_line == end_line and len(text_split) == 1:
@@ -935,6 +935,10 @@ class LangServer:
                     "type": 1,
                     "message": 'Change request failed for unknown file "{0}"'.format(path)
                 })
+        # Update include statements linking to this file
+        for tmp_path, file_obj in self.workspace.items():
+            file_obj["ast"].resolve_includes(self.workspace, path=path)
+        self.workspace[path]["ast"].resolve_includes(self.workspace)
         # Update inheritance (currently only on open/save)
         # for key in self.obj_tree:
         #     self.obj_tree[key][0].resolve_inherit(self.obj_tree)
@@ -944,7 +948,11 @@ class LangServer:
         # Update workspace from file on disk
         params = request["params"]
         uri = params["textDocument"]["uri"]
-        self.add_file(path_from_uri(uri))
+        filepath = path_from_uri(uri)
+        self.add_file(filepath)
+        # Update include statements
+        for path, file_obj in self.workspace.items():
+            file_obj["ast"].resolve_includes(self.workspace)
         # Update inheritance
         for key in self.obj_tree:
             self.obj_tree[key][0].resolve_inherit(self.obj_tree)
@@ -1022,6 +1030,9 @@ class LangServer:
             ast_new = self.workspace[path]["ast"]
             for key in ast_new.global_dict:
                 self.obj_tree[key] = [ast_new.global_dict[key], path]
+        # Update include statements
+        for path, file_obj in self.workspace.items():
+            file_obj["ast"].resolve_includes(self.workspace)
         # Update inheritance
         for key in self.obj_tree:
             self.obj_tree[key][0].resolve_inherit(self.obj_tree)
