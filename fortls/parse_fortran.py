@@ -384,7 +384,7 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
     # at_eof = False
     next_line = None
     line_ind = 0
-    while(line_ind < len(file_str)):
+    while((line_ind < len(file_str)) or (next_line is not None)):
         # Get next line
         if next_line is None:
             line = file_str[line_ind]
