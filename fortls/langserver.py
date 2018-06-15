@@ -647,7 +647,8 @@ class LangServer:
         try:
             line_prefix = curr_line[:ac_char].lower()
             # Ignore for comment lines
-            if detect_comment_start(line_prefix, self.workspace[path]["fixed"]) >= 0:
+            comm_start = detect_comment_start(line_prefix, self.workspace[path]["fixed"])
+            if (comm_start >= 0) or (line_prefix[0] == '#'):
                 return req_dict
             # Ignore string literals
             if (line_prefix.count("'") % 2 == 1) or \
@@ -744,7 +745,8 @@ class LangServer:
         try:
             line_prefix = curr_line[:def_char].lower()
             # Ignore for comment lines
-            if detect_comment_start(line_prefix, def_file["fixed"]) >= 0:
+            comm_start = detect_comment_start(line_prefix, def_file["fixed"])
+            if (comm_start >= 0) or (line_prefix[0] == '#'):
                 return None
             # Ignore string literals
             if (line_prefix.count("'") % 2 == 1) or \
@@ -810,7 +812,7 @@ class LangServer:
                 for (i, line) in enumerate(file_obj["contents"]):
                     # Skip comment lines
                     comm_start = detect_comment_start(line, file_obj["fixed"])
-                    if comm_start == 0:
+                    if (comm_start == 0) or (line[0] == '#'):
                         continue
                     elif comm_start > 0:
                         line = line[:comm_start]
