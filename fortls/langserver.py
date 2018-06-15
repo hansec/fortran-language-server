@@ -755,7 +755,7 @@ class LangServer:
             def_name = expand_name(curr_line, def_char)
         except:
             return None
-        # print(var_stack)
+        # print(var_stack, def_name)
         if def_name == '':
             return None
         file_obj = def_file["ast"]
