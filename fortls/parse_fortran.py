@@ -17,7 +17,7 @@ SUBMOD_REGEX = re.compile(r'[ \t]*SUBMODULE[ \t]*\(', re.I)
 END_SMOD_REGEX = re.compile(r'[ \t]*END[ \t]*SUBMODULE', re.I)
 PROG_REGEX = re.compile(r'[ \t]*PROGRAM[ \t]*([a-z0-9_]*)', re.I)
 END_PROG_REGEX = re.compile(r'[ \t]*END[ \t]*PROGRAM', re.I)
-INT_REGEX = re.compile(r'[ \t]*(?:ABSTRACT)?[ \t]*INTERFACE[ \t]*([a-z0-9_]*)', re.I)
+INT_REGEX = re.compile(r'[ \t]*(ABSTRACT)?[ \t]*INTERFACE[ \t]*([a-z0-9_]*)', re.I)
 END_INT_REGEX = re.compile(r'[ \t]*END[ \t]*INTERFACE', re.I)
 END_GEN_REGEX = re.compile(r'[ \t]*END[ \t]*$', re.I)
 TYPE_DEF_REGEX = re.compile(r'[ \t]*TYPE', re.I)
@@ -330,12 +330,13 @@ def read_int_def(line):
     if int_match is None:
         return None
     else:
-        int_name = int_match.group(1).lower()
+        int_name = int_match.group(2).lower()
+        is_abstract = int_match.group(1) is not None
         if int_name == '':
-            return 'int', None
+            return 'int', [None, is_abstract]
         if int_name == 'assignment' or int_name == 'operator':
             return None
-        return 'int', int_match.group(1)
+        return 'int', [int_match.group(2), is_abstract]
 
 
 def read_use_stmt(line):
@@ -553,11 +554,13 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                     print('{1} !!! TYPE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'int':
                 hidden = False
-                if obj is None:
+                abstract = obj[1]
+                name = obj[0]
+                if name is None:
                     int_counter += 1
-                    obj = 'GEN_INT{0}'.format(int_counter)
+                    name = '#GEN_INT{0}'.format(int_counter)
                     hidden = True
-                new_int = fortran_int(file_obj, line_number, obj, file_obj.enc_scope_name)
+                new_int = fortran_int(file_obj, line_number, name, file_obj.enc_scope_name, abstract)
                 file_obj.add_scope(new_int, END_INT_REGEX, hidden=hidden, req_container=True)
                 if(debug):
                     print('{1} !!! INTERFACE statement({0})'.format(line_number, line.strip()))

@@ -483,7 +483,7 @@ class LangServer:
         for scope in file_obj.get_scopes():
             scope_tree = scope.FQSN.split("::")
             if len(scope_tree) > 2:
-                if scope_tree[1].startswith("gen_int"):
+                if scope_tree[1].startswith("#gen_int"):
                     scope_type = 11
                 else:
                     continue
@@ -551,6 +551,10 @@ class LangServer:
                             continue
                     if child.name.lower().startswith(var_prefix):
                         var_list.append(child)
+                    if child.is_external_int():
+                        for int_child in child.get_children():
+                            if int_child.name.lower().startswith(var_prefix):
+                                var_list.append(int_child)
                 # Add to use list
                 use_dict = get_use_tree(scope, use_dict, self.obj_tree)
             # Look in found use modules

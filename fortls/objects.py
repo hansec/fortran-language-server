@@ -105,8 +105,13 @@ def find_in_scope(scope, var_name, obj_tree):
     var_name_lower = var_name.lower()
     # Check local scope
     for child in scope.get_children():
-        if child.name.lower() == var_name_lower:
+        name_lower = child.name.lower()
+        if name_lower == var_name_lower:
             return child, scope
+        if name_lower.startswith("#gen_int"):
+            for int_child in child.get_children():
+                if int_child.name.lower() == var_name_lower:
+                    return int_child, child
     # Setup USE search
     use_dict = get_use_tree(scope, {}, obj_tree)
     # Look in found use modules
@@ -240,6 +245,9 @@ class fortran_scope:
         return False
 
     def is_callable(self):
+        return False
+
+    def is_external_int(self):
         return False
 
     def end(self, line_number):
@@ -552,9 +560,11 @@ class fortran_type(fortran_scope):
 
 
 class fortran_int(fortran_scope):
-    def __init__(self, file_obj, line_number, name, enc_scope=None):
+    def __init__(self, file_obj, line_number, name, enc_scope=None, abstract=False):
         self.base_setup(file_obj, line_number, name, enc_scope)
         self.mems = []
+        self.abstract = abstract
+        self.external = name.startswith('#GEN_INT') and (not abstract)
 
     def get_type(self):
         return 5
@@ -565,6 +575,9 @@ class fortran_int(fortran_scope):
     def is_callable(self):
         return True
 
+    def is_external_int(self):
+        return self.external
+
     def resolve_link(self, obj_tree):
         if self.parent is None:
             return
@@ -573,6 +586,8 @@ class fortran_int(fortran_scope):
             mem_obj, _ = find_in_scope(self.parent, member, obj_tree)
             if mem_obj is not None:
                 self.mems.append(mem_obj)
+        for child in self.children:
+            child.resolve_link(obj_tree)
 
 
 class fortran_obj:
@@ -680,6 +695,9 @@ class fortran_obj:
 
     def is_callable(self):
         return self.callable
+
+    def is_external_int(self):
+        return False
 
 
 class fortran_meth(fortran_obj):
