@@ -17,6 +17,7 @@ OBJBREAK_REGEX = re.compile(r'[\/\-(.,+*<>=$: ]', re.I)
 WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
 CALL_REGEX = re.compile(r'[ \t]*CALL[ \t]+[a-z0-9_%]*$', re.I)
 TYPE_STMNT_REGEX = re.compile(r'[ \t]*(TYPE|CLASS)[ \t]*(IS)?[ \t]*[a-z0-9_]*$', re.I)
+IMPORT_REGEX = re.compile(r'[ \t]*IMPORT[ \t]*', re.I)
 FIXED_CONT_REGEX = re.compile(r'(     [\S])')
 FREE_OPT_CONT_REGEX = re.compile(r'([ \t]*&)')
 
@@ -600,6 +601,16 @@ class LangServer:
             return comp_obj
 
         def get_context(line, var_prefix):
+            # Test if in USE statement
+            test_match = read_use_stmt(line)
+            if test_match is not None:
+                if len(test_match[1][1]) > 0:
+                    return 2, var_prefix, test_match[1][0]
+                else:
+                    return 1, var_prefix, None
+            # Test if import statement
+            if IMPORT_REGEX.match(line):
+                return 5, var_prefix, None
             # tmp_prefix = var_prefix
             line_grouped = tokenize_line(line)
             # Test if in call statement
@@ -620,13 +631,6 @@ class LangServer:
                     test_match = TYPE_STMNT_REGEX.match(line_grouped[0][0][1])
                     if test_match is not None:
                         return 4, var_prefix, None
-            # Test if in USE statement
-            test_match = read_use_stmt(line)
-            if test_match is not None:
-                if len(test_match[1][1]) > 0:
-                    return 2, var_prefix, test_match[1][0]
-                else:
-                    return 1, var_prefix, None
             # Default context
             return 0, var_prefix, None
         # Get parameters from request
@@ -673,27 +677,7 @@ class LangServer:
             return req_dict
         if self.autocomplete_no_prefix:
             var_prefix = ''
-        # USE stmnt
-        if line_context == 1:  # module part
-            for key in self.obj_tree:
-                candidate = self.obj_tree[key][0]
-                candidate_type = candidate.get_type()
-                if candidate_type != 1:
-                    continue
-                if candidate.name.lower().startswith(var_prefix):
-                    item_list.append(build_comp(candidate, name_only=True))
-            req_dict["items"] = item_list
-            return req_dict
-        elif line_context == 2:  # only part
-            name_only = True
-            mod_name = context_info.lower()
-            if mod_name in self.obj_tree:
-                scope_list = [self.obj_tree[mod_name][0]]
-                public_only = True
-                include_globals = False
-            else:
-                return {"isIncomplete": False, "items": []}
-        #
+        # Suggestions for user-defined type members
         if is_member:
             curr_scope = file_obj.get_inner_scope(ac_line+1)
             type_scope = climb_type_tree(var_stack, curr_scope, self.obj_tree)
@@ -703,22 +687,53 @@ class LangServer:
             else:
                 include_globals = False
                 scope_list = [type_scope]
-        #
+        # Setup based on context
+        req_callable = False
+        type_mask = [False for i in range(8)]
+        type_mask[1] = True
+        type_mask[4] = True
+        if line_context == 1:
+            # Use statement module part (modules only)
+            for key in self.obj_tree:
+                candidate = self.obj_tree[key][0]
+                candidate_type = candidate.get_type()
+                if candidate_type != 1:
+                    continue
+                if candidate.name.lower().startswith(var_prefix):
+                    item_list.append(build_comp(candidate, name_only=True))
+            req_dict["items"] = item_list
+            return req_dict
+        elif line_context == 2:
+            # Use statement only part (module public members only)
+            name_only = True
+            mod_name = context_info.lower()
+            if mod_name in self.obj_tree:
+                scope_list = [self.obj_tree[mod_name][0]]
+                public_only = True
+                include_globals = False
+                type_mask[4] = False
+            else:
+                return {"isIncomplete": False, "items": []}
+        elif line_context == 4:
+            # Variable definition statement for user-defined type
+            # (user-defined types only)
+            type_mask = [True for i in range(8)]
+            type_mask[4] = False
+        elif line_context == 5:
+            # Include statement (variables and user-defined types only)
+            name_only = True
+            type_mask = [True for i in range(8)]
+            type_mask[4] = False
+            type_mask[6] = False
+        # Filter callables for call statements
+        if line_context == 3:
+            req_callable = True
         for candidate in get_candidates(scope_list, var_prefix, include_globals, public_only):
             # Skip module names (only valid in USE)
             candidate_type = candidate.get_type()
-            if candidate_type == 1:
+            if type_mask[candidate_type]:
                 continue
-            # Only include types during variable definitions
-            # or select statements
-            if line_context == 4:
-                if candidate_type != 4:
-                    continue
-            elif line_context != 2:
-                if candidate_type == 4:
-                    continue
-            # Filter callables for call statements
-            if line_context == 3 and (not candidate.is_callable()):
+            if req_callable and (not candidate.is_callable()):
                 continue
             #
             if candidate_type == 5:
