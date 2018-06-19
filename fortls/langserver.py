@@ -4,8 +4,8 @@ import os
 import traceback
 import re
 # Local modules
-from fortls.parse_fortran import process_file, read_use_stmt, detect_fixed_format, \
-    detect_comment_start
+from fortls.parse_fortran import process_file, read_use_stmt, read_var_def, \
+    detect_fixed_format, detect_comment_start
 from fortls.objects import find_in_scope, get_use_tree
 from fortls.intrinsics import get_intrinsics, get_intrinsic_modules
 
@@ -598,6 +598,11 @@ class LangServer:
             return comp_obj
 
         def get_context(line, var_prefix):
+            # Test if variable definition statement
+            test_match = read_var_def(line)
+            if test_match is not None:
+                if test_match[0] == 'var':
+                    return 7, var_prefix, None
             # Test if in USE statement
             test_match = read_use_stmt(line)
             if test_match is not None:
@@ -715,6 +720,9 @@ class LangServer:
                 type_mask[4] = False
             else:
                 return {"isIncomplete": False, "items": []}
+        elif line_context == 3:
+            # Filter callables for call statements
+            req_callable = True
         elif line_context == 4:
             # Variable definition statement for user-defined type
             # (user-defined types only)
@@ -735,9 +743,11 @@ class LangServer:
             type_mask = [True for i in range(8)]
             type_mask[2] = False
             type_mask[3] = False
-        # Filter callables for call statements
-        if line_context == 3:
-            req_callable = True
+        elif line_context == 7:
+            # Variable definition statement (variables only)
+            name_only = True
+            type_mask[2] = True
+            type_mask[3] = True
         for candidate in get_candidates(scope_list, var_prefix, include_globals, public_only, abstract_only):
             # Skip module names (only valid in USE)
             candidate_type = candidate.get_type()
