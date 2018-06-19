@@ -198,6 +198,11 @@ def test_comp():
         "textDocument": {"uri": file_path},
         "position": {"line": 3, "character": 2}
     })
+    file_path = os.path.join(test_dir, "subdir", "test_abstract.f90")
+    string += write_rpc_request(13, "textDocument/completion", {
+        "textDocument": {"uri": file_path},
+        "position": {"line": 7, "character": 12}
+    })
     errcode, results = run_request(string)
     #
     assert errcode == 0
@@ -212,6 +217,7 @@ def test_comp():
     check_return(results[9], [2, "x"])
     check_return(results[10], [2, "val1"])
     check_return(results[11], [2, "val1"])
+    check_return(results[12], [1, "abs_interface"])
 
 
 def test_def():

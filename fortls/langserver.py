@@ -17,6 +17,7 @@ OBJBREAK_REGEX = re.compile(r'[\/\-(.,+*<>=$: ]', re.I)
 WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
 CALL_REGEX = re.compile(r'[ \t]*CALL[ \t]+[a-z0-9_%]*$', re.I)
 TYPE_STMNT_REGEX = re.compile(r'[ \t]*(TYPE|CLASS)[ \t]*(IS)?[ \t]*[a-z0-9_]*$', re.I)
+PROCEDURE_STMNT_REGEX = re.compile(r'[ \t]*(PROCEDURE)[ \t]*[a-z0-9_]*$', re.I)
 IMPORT_REGEX = re.compile(r'[ \t]*IMPORT[ \t]*', re.I)
 FIXED_CONT_REGEX = re.compile(r'(     [\S])')
 FREE_OPT_CONT_REGEX = re.compile(r'([ \t]*&)')
@@ -537,56 +538,48 @@ class LangServer:
             else:
                 return type
 
-        def get_candidates(scope_list, var_prefix, inc_globals=True, public_only=False):
+        def get_candidates(scope_list, var_prefix, inc_globals=True, public_only=False, abstract_only=False):
+            #
+            def child_candidates(scope, only_list=[], filter_public=True):
+                tmp_list = []
+                # Filter children
+                nonly = len(only_list)
+                for child in scope.get_children(filter_public):
+                    if (nonly > 0) and (child.name not in only_list):
+                        continue
+                    if abstract_only:
+                        if child.is_abstract():
+                            tmp_list += child.get_children()
+                    else:
+                        if child.is_external_int():
+                            tmp_list += child.get_children()
+                        else:
+                            tmp_list.append(child)
+                return tmp_list
             var_list = []
             use_dict = {}
             for scope in scope_list:
-                # Filter children
-                def_vis = scope.def_vis
-                for child in scope.get_children():
-                    if public_only:
-                        if child.vis < 0:
-                            continue
-                        if def_vis < 0 and child.vis <= 0:
-                            continue
-                    if child.name.lower().startswith(var_prefix):
-                        var_list.append(child)
-                    if child.is_external_int():
-                        for int_child in child.get_children():
-                            if int_child.name.lower().startswith(var_prefix):
-                                var_list.append(int_child)
-                # Add to use list
+                var_list += child_candidates(scope, filter_public=public_only)
+                # Traverse USE tree and add to list
                 use_dict = get_use_tree(scope, use_dict, self.obj_tree)
             # Look in found use modules
             for use_mod, only_list in use_dict.items():
                 scope = self.obj_tree[use_mod][0]
-                # Filter children
-                tmp_vars = []
-                def_vis = scope.def_vis
-                for child in scope.get_children():
-                    if child.vis < 0:
-                        continue
-                    if def_vis < 0 and child.vis <= 0:
-                        continue
-                    if child.name.lower().startswith(var_prefix):
-                        tmp_vars.append(child)
-                # Filter by ONLY statement
-                if len(only_list) > 0:
-                    for poss_var in tmp_vars:
-                        if poss_var.name in only_list:
-                            var_list.append(poss_var)
-                else:
-                    var_list.extend(tmp_vars)
+                var_list += child_candidates(scope, only_list)
             # Add globals
             if inc_globals:
                 for key, obj in self.obj_tree.items():
-                    global_obj = obj[0]
-                    if global_obj.name.lower().startswith(var_prefix):
-                        var_list.append(global_obj)
-                for obj in self.intrinsics:
-                    if obj.name.lower().startswith(var_prefix):
-                        var_list.append(obj)
-            return var_list
+                    var_list.append(obj[0])
+                var_list += self.intrinsics
+            # Filter by prefix if necessary
+            if var_prefix == '':
+                return var_list
+            else:
+                tmp_list = []
+                for var in var_list:
+                    if var.name.lower().startswith(var_prefix):
+                        tmp_list.append(var)
+                return tmp_list
 
         def build_comp(candidate, name_only=False, name_replace=None):
             comp_obj = {}
@@ -625,7 +618,7 @@ class LangServer:
                 test_match = CALL_REGEX.match(line_grouped[0][0][1])
                 if test_match is not None:
                     return 3, var_prefix, None
-            # Test if variable definition using type/class
+            # Test if variable definition using type/class or procedure
             if len(line_grouped) >= 2:
                 lev2_end = line_grouped[1][0][0][-1][1]
                 if lev2_end < 0:
@@ -635,6 +628,9 @@ class LangServer:
                     test_match = TYPE_STMNT_REGEX.match(line_grouped[0][0][1])
                     if test_match is not None:
                         return 4, var_prefix, None
+                    test_match = PROCEDURE_STMNT_REGEX.match(line_grouped[0][0][1])
+                    if test_match is not None:
+                        return 6, var_prefix, None
             # Default context
             return 0, var_prefix, None
         # Get parameters from request
@@ -693,6 +689,7 @@ class LangServer:
                 scope_list = [type_scope]
         # Setup based on context
         req_callable = False
+        abstract_only = False
         type_mask = [False for i in range(8)]
         type_mask[1] = True
         type_mask[4] = True
@@ -729,10 +726,19 @@ class LangServer:
             type_mask = [True for i in range(8)]
             type_mask[4] = False
             type_mask[6] = False
+        elif line_context == 6:
+            # Variable definition statement for procedure with interface
+            # (interfaces only)
+            abstract_only = True
+            include_globals = False
+            name_only = True
+            type_mask = [True for i in range(8)]
+            type_mask[2] = False
+            type_mask[3] = False
         # Filter callables for call statements
         if line_context == 3:
             req_callable = True
-        for candidate in get_candidates(scope_list, var_prefix, include_globals, public_only):
+        for candidate in get_candidates(scope_list, var_prefix, include_globals, public_only, abstract_only):
             # Skip module names (only valid in USE)
             candidate_type = candidate.get_type()
             if type_mask[candidate_type]:

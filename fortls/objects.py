@@ -232,8 +232,18 @@ class fortran_scope:
     def get_documentation(self, long=False):
         return None, False
 
-    def get_children(self):
-        return self.children
+    def get_children(self, public_only=False):
+        if public_only:
+            pub_children = []
+            for child in self.children:
+                if child.vis < 0:
+                    continue
+                if (self.def_vis < 0) and (child.vis <= 0):
+                    continue
+                pub_children.append(child)
+            return pub_children
+        else:
+            return self.children
 
     def get_ancestors(self):
         return []
@@ -248,6 +258,9 @@ class fortran_scope:
         return False
 
     def is_external_int(self):
+        return False
+
+    def is_abstract(self):
         return False
 
     def end(self, line_number):
@@ -380,7 +393,7 @@ class fortran_subroutine(fortran_scope):
             if child.name.lower() not in child_names:
                 self.in_children.append(child)
 
-    def get_children(self):
+    def get_children(self, public_only=False):
         tmp_list = copy.copy(self.children)
         tmp_list.extend(self.in_children)
         return tmp_list
@@ -534,7 +547,7 @@ class fortran_type(fortran_scope):
     def get_desc(self):
         return 'TYPE'
 
-    def get_children(self):
+    def get_children(self, public_only=False):
         tmp_list = copy.copy(self.children)
         tmp_list.extend(self.in_children)
         return tmp_list
@@ -577,6 +590,9 @@ class fortran_int(fortran_scope):
 
     def is_external_int(self):
         return self.external
+
+    def is_abstract(self):
+        return self.abstract
 
     def resolve_link(self, obj_tree):
         if self.parent is None:
@@ -681,7 +697,7 @@ class fortran_obj:
             doc_str += ", ".join(get_keywords(self.modifiers))
         return doc_str, True
 
-    def get_children(self):
+    def get_children(self, public_only=False):
         return []
 
     def resolve_inherit(self, obj_tree):
@@ -697,6 +713,9 @@ class fortran_obj:
         return self.callable
 
     def is_external_int(self):
+        return False
+
+    def is_abstract(self):
         return False
 
 
