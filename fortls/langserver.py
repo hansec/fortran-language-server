@@ -18,7 +18,9 @@ WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
 CALL_REGEX = re.compile(r'[ \t]*CALL[ \t]+[a-z0-9_%]*$', re.I)
 TYPE_STMNT_REGEX = re.compile(r'[ \t]*(TYPE|CLASS)[ \t]*(IS)?[ \t]*[a-z0-9_]*$', re.I)
 PROCEDURE_STMNT_REGEX = re.compile(r'[ \t]*(PROCEDURE)[ \t]*[a-z0-9_]*$', re.I)
-IMPORT_REGEX = re.compile(r'[ \t]*IMPORT[ \t]*', re.I)
+SCOPE_DEF_REGEX = re.compile(r'[ \t]*(MODULE|PROGRAM|SUBROUTINE|FUNCTION)[ \t]+', re.I)
+END_REGEX = re.compile(r'[ \t]*(END)[ \t]+', re.I)
+IMPORT_REGEX = re.compile(r'[ \t]*IMPORT[ \t]+', re.I)
 FIXED_CONT_REGEX = re.compile(r'(     [\S])')
 FREE_OPT_CONT_REGEX = re.compile(r'([ \t]*&)')
 
@@ -610,6 +612,12 @@ class LangServer:
                     return 2, var_prefix, test_match[1][0]
                 else:
                     return 1, var_prefix, None
+            # Test if scope declaration
+            if SCOPE_DEF_REGEX.match(line):
+                return -1, None, None
+            # Test if end statement
+            if END_REGEX.match(line):
+                return -1, None, None
             # Test if import statement
             if IMPORT_REGEX.match(line):
                 return 5, var_prefix, None
@@ -678,7 +686,7 @@ class LangServer:
         include_globals = True
         line_context, var_prefix, context_info = \
             get_context(line_prefix, var_prefix)
-        if var_prefix == '' and not (is_member or line_context == 2):
+        if (line_context < 0) or (var_prefix == '' and not (is_member or line_context == 2)):
             return req_dict
         if self.autocomplete_no_prefix:
             var_prefix = ''
