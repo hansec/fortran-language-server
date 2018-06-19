@@ -9,6 +9,11 @@ from .parse_fortran import process_file, detect_fixed_format
 __version__ = '0.5.0'
 
 
+def error_exit(error_str):
+    print("ERROR: {0}".format(error_str))
+    sys.exit(-1)
+
+
 def main():
     #
     freeze_support()
@@ -30,27 +35,45 @@ def main():
         '--autocomplete_no_prefix', action="store_true",
         help="Do not filter autocomplete results by variable prefix"
     )
-    parser.add_argument(
+    group = parser.add_argument_group("DEBUG", "Options for debugging language server")
+    group.add_argument(
         '--debug_parser', action="store_true",
-        help="Test source parser on specified file instead of running language server"
+        help="Test source code parser on specified file"
     )
-    parser.add_argument(
+    group.add_argument(
         '--debug_symbols', action="store_true",
-        help="Test symbol generation for specified file instead of running language server"
+        help="Test symbol request for specified file"
     )
-    parser.add_argument(
-        '--debug_filepath',
-        help="Path to file for file specific tests"
+    group.add_argument(
+        '--debug_completion', action="store_true",
+        help="Test completion request for specified file and position"
     )
-    parser.add_argument(
-        '--debug_rootpath',
+    group.add_argument(
+        '--debug_definition', action="store_true",
+        help="Test definition request for specified file and position"
+    )
+    group.add_argument(
+        '--debug_filepath', type=str,
+        help="File path for language server tests"
+    )
+    group.add_argument(
+        '--debug_rootpath', type=str,
         help="Root path for language server tests"
+    )
+    group.add_argument(
+        '--debug_line', type=int,
+        help="Line position for language server tests (1-indexed)"
+    )
+    group.add_argument(
+        '--debug_char', type=int,
+        help="Character position for language server tests (1-indexed)"
     )
     args = parser.parse_args()
     if args.version:
         print("{0}".format(__version__))
         sys.exit(0)
-    debug_server = args.debug_symbols or (args.debug_rootpath is not None)
+    debug_server = (args.debug_symbols or args.debug_completion
+                    or (args.debug_rootpath is not None))
     #
     settings = {
         "symbol_include_mem": (not args.symbol_skip_mem),
@@ -60,12 +83,10 @@ def main():
     #
     if args.debug_parser:
         if args.debug_filepath is None:
-            print("  ERROR: 'debug_filepath' not specified for parsing test")
-            sys.exit(-1)
+            error_exit("'debug_filepath' not specified for parsing test")
         file_exists = os.path.isfile(args.debug_filepath)
         if file_exists is False:
-            print("ERROR: Specified 'debug_filepath' does not exist")
-            sys.exit(-1)
+            error_exit("Specified 'debug_filepath' does not exist")
         filename, ext = os.path.splitext(os.path.basename(args.debug_filepath))
         #
         print('\nTesting parser')
@@ -94,8 +115,7 @@ def main():
         if args.debug_rootpath:
             dir_exists = os.path.isdir(args.debug_rootpath)
             if dir_exists is False:
-                print("ERROR: Specified 'debug_rootpath' does not exist or is not a directory")
-                sys.exit(-1)
+                error_exit("Specified 'debug_rootpath' does not exist or is not a directory")
             print('\nTesting "initialize" request:')
             print('  Root = "{0}"\n'.format(args.debug_rootpath))
             s.serve_initialize({
@@ -117,12 +137,10 @@ def main():
         if args.debug_symbols:
             print('\nTesting "textDocument/documentSymbol" request:')
             if args.debug_filepath is None:
-                print("  ERROR: 'debug_filepath' not specified for document symbol test")
-                sys.exit(-1)
+                error_exit("'debug_filepath' not specified for document symbol test")
             file_exists = os.path.isfile(args.debug_filepath)
             if file_exists is False:
-                print("ERROR: Specified 'debug_filepath' does not exist")
-                sys.exit(-1)
+                error_exit("Specified 'debug_filepath' does not exist")
             print('  File = "{0}"\n'.format(args.debug_filepath))
             s.serve_onSave({
                 "params": {
@@ -142,6 +160,68 @@ def main():
                     parent = "null"
                 print('  line {2:5d}  symbol -> {1:3d}:{0:30} parent = {3}'.format(symbol["name"],
                       symbol["kind"], sline, parent))
+        #
+        if args.debug_completion:
+            print('\nTesting "textDocument/completion" request:')
+            if args.debug_filepath is None:
+                error_exit("'debug_filepath' not specified for completion test")
+            file_exists = os.path.isfile(args.debug_filepath)
+            if file_exists is False:
+                error_exit("Specified 'debug_filepath' does not exist")
+            print('  File = "{0}"'.format(args.debug_filepath))
+            if args.debug_line is None:
+                error_exit("'debug_line' not specified for completion test")
+            print('  Line = {0}'.format(args.debug_line))
+            if args.debug_char is None:
+                error_exit("'debug_char' not specified for completion test")
+            print('  Char = {0}\n'.format(args.debug_char))
+            s.serve_onSave({
+                "params": {
+                    "textDocument": {"uri": args.debug_filepath}
+                }
+            })
+            completion_results = s.serve_autocomplete({
+                "params": {
+                    "textDocument": {"uri": args.debug_filepath},
+                    "position": {"line": args.debug_line-1, "character": args.debug_char-1}
+                }
+            })
+            print('  Results:')
+            for obj in completion_results['items']:
+                print('    {0}: {1}'.format(obj['kind'], obj['label']))
+        #
+        if args.debug_definition:
+            print('\nTesting "textDocument/definition" request:')
+            if args.debug_filepath is None:
+                error_exit("'debug_filepath' not specified for definition test")
+            file_exists = os.path.isfile(args.debug_filepath)
+            if file_exists is False:
+                error_exit("Specified 'debug_filepath' does not exist")
+            print('  File = "{0}"'.format(args.debug_filepath))
+            if args.debug_line is None:
+                error_exit("'debug_line' not specified for definition test")
+            print('  Line = {0}'.format(args.debug_line))
+            if args.debug_char is None:
+                error_exit("'debug_char' not specified for definition test")
+            print('  Char = {0}\n'.format(args.debug_char))
+            s.serve_onSave({
+                "params": {
+                    "textDocument": {"uri": args.debug_filepath}
+                }
+            })
+            completion_results = s.serve_definition({
+                "params": {
+                    "textDocument": {"uri": args.debug_filepath},
+                    "position": {"line": args.debug_line-1, "character": args.debug_char-1}
+                }
+            })
+            print('  Result:')
+            if completion_results is None:
+                print('    No result found!')
+            else:
+                print('    URI  = "{0}"'.format(completion_results['uri']))
+                print('    Line = {0}'.format(completion_results['range']['start']['line']+1))
+                print('    Char = {0}'.format(completion_results['range']['start']['character']+1))
         tmpout.close()
         tmpin.close()
     #
