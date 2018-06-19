@@ -6,21 +6,21 @@ from fortls.objects import parse_keywords, fortran_module, fortran_program, \
 #
 USE_REGEX = re.compile(r'[ \t]*USE([, \t]*INTRINSIC)?[ \t:]*([a-z0-9_]*)', re.I)
 INCLUDE_REGEX = re.compile(r'[ \t]*INCLUDE[ \t:]*[\'\"]([^\'\"]*)', re.I)
-SUB_REGEX = re.compile(r'[ \t]*(PURE|ELEMENTAL|RECURSIVE)*[ \t]*(SUBROUTINE)', re.I)
+SUB_REGEX = re.compile(r'[ \t]*(PURE|ELEMENTAL|RECURSIVE)*[ \t]*SUBROUTINE[ \t]+([a-z0-9_]+)', re.I)
 END_SUB_REGEX = re.compile(r'[ \t]*END[ \t]*SUBROUTINE', re.I)
-FUN_REGEX = re.compile(r'[ \t]*(PURE|ELEMENTAL|RECURSIVE)*[ \t]*(FUNCTION)', re.I)
+FUN_REGEX = re.compile(r'[ \t]*(PURE|ELEMENTAL|RECURSIVE)*[ \t]*FUNCTION[ \t]+([a-z0-9_]+)', re.I)
 RESULT_REGEX = re.compile(r'RESULT[ ]*\(([a-z0-9_]*)\)', re.I)
 END_FUN_REGEX = re.compile(r'[ \t]*END[ \t]*FUNCTION', re.I)
-MOD_REGEX = re.compile(r'[ \t]*MODULE[ \t]*([a-z0-9_]*)', re.I)
+MOD_REGEX = re.compile(r'[ \t]*MODULE[ \t]+([a-z0-9_]+)', re.I)
 END_MOD_REGEX = re.compile(r'[ \t]*END[ \t]*MODULE', re.I)
 SUBMOD_REGEX = re.compile(r'[ \t]*SUBMODULE[ \t]*\(', re.I)
 END_SMOD_REGEX = re.compile(r'[ \t]*END[ \t]*SUBMODULE', re.I)
-PROG_REGEX = re.compile(r'[ \t]*PROGRAM[ \t]*([a-z0-9_]*)', re.I)
+PROG_REGEX = re.compile(r'[ \t]*PROGRAM[ \t]+([a-z0-9_]+)', re.I)
 END_PROG_REGEX = re.compile(r'[ \t]*END[ \t]*PROGRAM', re.I)
 INT_REGEX = re.compile(r'[ \t]*(ABSTRACT)?[ \t]*INTERFACE[ \t]*([a-z0-9_]*)', re.I)
 END_INT_REGEX = re.compile(r'[ \t]*END[ \t]*INTERFACE', re.I)
 END_GEN_REGEX = re.compile(r'[ \t]*END[ \t]*$', re.I)
-TYPE_DEF_REGEX = re.compile(r'[ \t]*TYPE', re.I)
+TYPE_DEF_REGEX = re.compile(r'[ \t]*(TYPE)[, \t]+', re.I)
 EXTENDS_REGEX = re.compile(r'EXTENDS[ ]*\(([a-z0-9_]*)\)', re.I)
 END_TYPED_REGEX = re.compile(r'[ \t]*END[ \t]*TYPE', re.I)
 NAT_VAR_REGEX = re.compile(r'[ \t]*(INTEGER|REAL|DOUBLE PRECISION|COMPLEX'
@@ -177,14 +177,9 @@ def read_fun_def(line, return_type=None, mod_fun=False):
     if fun_match is None:
         return None
     #
-    trailing_line = line[fun_match.end(0):].strip()
-    trailing_line = trailing_line.split('!')[0]
-    name_match = WORD_REGEX.match(trailing_line)
-    if name_match is not None:
-        name = name_match.group(0)
-        trailing_line = trailing_line[name_match.end(0):].strip()
-    else:
-        return None
+    name = fun_match.group(2)
+    trailing_line = line[fun_match.end(0):].split('!')[0]
+    trailing_line = trailing_line.strip()
     #
     paren_match = SUB_PAREN_MATCH.match(trailing_line)
     args = ''
@@ -209,14 +204,9 @@ def read_sub_def(line, mod_sub=False):
     if sub_match is None:
         return None
     #
-    trailing_line = line[sub_match.end(0):].strip()
-    trailing_line = trailing_line.split('!')[0]
-    name_match = WORD_REGEX.match(trailing_line)
-    if name_match is not None:
-        name = name_match.group(0)
-        trailing_line = trailing_line[name_match.end(0):].strip()
-    else:
-        return None
+    name = sub_match.group(2)
+    trailing_line = line[sub_match.end(0):].split('!')[0]
+    trailing_line = trailing_line.strip()
     #
     paren_match = SUB_PAREN_MATCH.match(trailing_line)
     args = ''
@@ -233,8 +223,8 @@ def read_type_def(line):
     type_match = TYPE_DEF_REGEX.match(line)
     if type_match is None:
         return None
-    trailing_line = line[type_match.end(0):]
-    trailing_line = trailing_line.split('!')[0]
+    trailing_line = line[type_match.end(1):].split('!')[0]
+    trailing_line = trailing_line.strip()
     # Parse keywords
     keyword_match = TATTR_LIST_REGEX.match(trailing_line)
     keywords = []
@@ -301,8 +291,8 @@ def read_submod_def(line):
     else:
         parent_name = None
         name = None
-        trailing_line = line[submod_match.end(0):].strip()
-        trailing_line = trailing_line.split('!')[0]
+        trailing_line = line[submod_match.end(0):].split('!')[0]
+        trailing_line = trailing_line.strip()
         parent_match = WORD_REGEX.match(trailing_line)
         if parent_match is not None:
             parent_name = parent_match.group(0).lower()
