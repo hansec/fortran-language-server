@@ -15,14 +15,14 @@ PY3K = sys.version_info >= (3, 0)
 FORTRAN_EXT_REGEX = re.compile(r'^\.F(77|90|95|03|08|OR|PP)?$', re.I)
 OBJBREAK_REGEX = re.compile(r'[\/\-(.,+*<>=$: ]', re.I)
 WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
-CALL_REGEX = re.compile(r'[ \t]*CALL[ \t]+[a-z0-9_%]*$', re.I)
-TYPE_STMNT_REGEX = re.compile(r'[ \t]*(TYPE|CLASS)[ \t]*(IS)?[ \t]*$', re.I)
-PROCEDURE_STMNT_REGEX = re.compile(r'[ \t]*(PROCEDURE)[ \t]*$', re.I)
-SCOPE_DEF_REGEX = re.compile(r'[ \t]*(MODULE|PROGRAM|SUBROUTINE|FUNCTION)[ \t]+', re.I)
-END_REGEX = re.compile(r'[ \t]*(END)[ \t]+', re.I)
-IMPORT_REGEX = re.compile(r'[ \t]*IMPORT[ \t]+', re.I)
+CALL_REGEX = re.compile(r'[ ]*CALL[ ]+[a-z0-9_%]*$', re.I)
+TYPE_STMNT_REGEX = re.compile(r'[ ]*(TYPE|CLASS)[ ]*(IS)?[ ]*$', re.I)
+PROCEDURE_STMNT_REGEX = re.compile(r'[ ]*(PROCEDURE)[ ]*$', re.I)
+SCOPE_DEF_REGEX = re.compile(r'[ ]*(MODULE|PROGRAM|SUBROUTINE|FUNCTION)[ ]+', re.I)
+END_REGEX = re.compile(r'[ ]*(END)[ ]+', re.I)
+IMPORT_REGEX = re.compile(r'[ ]*IMPORT[ ]+', re.I)
 FIXED_CONT_REGEX = re.compile(r'(     [\S])')
-FREE_OPT_CONT_REGEX = re.compile(r'([ \t]*&)')
+FREE_OPT_CONT_REGEX = re.compile(r'([ ]*&)')
 
 
 def path_from_uri(uri):
@@ -48,10 +48,12 @@ def init_file(filepath):
     #
     if PY3K:
         with open(filepath, 'r', encoding="utf-8") as fhandle:
-            contents_split = fhandle.readlines()
+            contents = re.sub(r'\t', r'  ', fhandle.read())
+            contents_split = contents.splitlines()
     else:
         with open(filepath, 'r') as fhandle:
-            contents_split = fhandle.readlines()
+            contents = re.sub(r'\t', r'  ', fhandle.read())
+            contents_split = contents.splitlines()
     #
     try:
         fixed_flag = detect_fixed_format(contents_split)
@@ -853,6 +855,8 @@ class LangServer:
             for filename, file_obj in sorted(self.workspace.items()):
                 # Search through file line by line
                 for (i, line) in enumerate(file_obj["contents"]):
+                    if len(line) == 0:
+                        continue
                     # Skip comment lines
                     comm_start = detect_comment_start(line, file_obj["fixed"])
                     if (comm_start == 0) or (line[0] == '#'):
@@ -1008,10 +1012,12 @@ class LangServer:
         # Read and add file from disk
         if PY3K:
             with open(filepath, 'r', encoding="utf-8") as fhandle:
-                self.update_workspace_file(fhandle.readlines(), filepath)
+                contents = re.sub(r'\t', r'  ', fhandle.read())
+                self.update_workspace_file(contents.splitlines(), filepath)
         else:
             with open(filepath, 'r') as fhandle:
-                self.update_workspace_file(fhandle.readlines(), filepath)
+                contents = re.sub(r'\t', r'  ', fhandle.read())
+                self.update_workspace_file(contents.splitlines(), filepath)
 
     def update_workspace_file(self, contents_split, filepath, update_links=False):
         # Update workspace from file contents and path

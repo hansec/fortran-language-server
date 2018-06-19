@@ -2,7 +2,7 @@ import copy
 import re
 import os
 WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
-CLASS_VAR_REGEX = re.compile(r'(TYPE|CLASS)[ \t]*\(', re.I)
+CLASS_VAR_REGEX = re.compile(r'(TYPE|CLASS)[ ]*\(', re.I)
 
 
 def parse_keywords(keywords):
@@ -791,7 +791,7 @@ class fortran_file:
         if self.none_scope is not None:
             raise ValueError
         self.none_scope = fortran_program(self, 1, "main")
-        self.add_scope(self.none_scope, re.compile(r'[ \t]*END[ \t]*PROGRAM', re.I), exportable=False)
+        self.add_scope(self.none_scope, re.compile(r'[ ]*END[ ]*PROGRAM', re.I), exportable=False)
 
     def get_enc_scope_name(self):
         if self.current_scope is None:
