@@ -68,10 +68,14 @@ The following global settings can be used when launching the language server.
 
 The following settings can be used to perform `standalone debug tests <https://github.com/hansec/fortran-language-server/wiki>`_ on the language server.
 
-* ``--debug_filepath=DEBUG_FILEPATH`` Path to file for file specific tests
+* ``--debug_filepath=DEBUG_FILEPATH`` File path for language server tests
 * ``--debug_rootpath=DEBUG_ROOTPATH`` Root path for language server tests
-* ``--debug_parser`` Test source parser on specified file instead of running language server
-* ``--debug_symbols`` Test symbol generation for specified file instead of running language server
+* ``--debug_line=DEBUG_FILEPATH`` Line position for language server tests (1-indexed)
+* ``--debug_char=DEBUG_ROOTPATH`` Character position for language server tests (1-indexed)
+* ``--debug_parser`` Test source code parser on specified file
+* ``--debug_symbols`` Test symbol request for specified file
+* ``--debug_completion`` Test completion request for specified file and position
+* ``--debug_definition`` Test definition request for specified file and position
 
 Configuration
 -------------
