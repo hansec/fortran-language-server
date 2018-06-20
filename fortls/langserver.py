@@ -546,32 +546,32 @@ class LangServer:
 
         def get_candidates(scope_list, var_prefix, inc_globals=True, public_only=False, abstract_only=False):
             #
-            def child_candidates(scope, only_list=[], filter_public=True):
+            def child_candidates(scope, only_list=[], filter_public=True, req_abstract=False):
                 tmp_list = []
                 # Filter children
                 nonly = len(only_list)
                 for child in scope.get_children(filter_public):
-                    if (nonly > 0) and (child.name not in only_list):
-                        continue
-                    if abstract_only:
+                    if req_abstract:
                         if child.is_abstract():
-                            tmp_list += child.get_children()
+                            tmp_list += child_candidates(child, only_list, filter_public)
                     else:
                         if child.is_external_int():
-                            tmp_list += child.get_children()
+                            tmp_list += child_candidates(child, only_list, filter_public)
                         else:
+                            if (nonly > 0) and (child.name not in only_list):
+                                continue
                             tmp_list.append(child)
                 return tmp_list
             var_list = []
             use_dict = {}
             for scope in scope_list:
-                var_list += child_candidates(scope, filter_public=public_only)
+                var_list += child_candidates(scope, filter_public=public_only, req_abstract=abstract_only)
                 # Traverse USE tree and add to list
                 use_dict = get_use_tree(scope, use_dict, self.obj_tree)
             # Look in found use modules
             for use_mod, only_list in use_dict.items():
                 scope = self.obj_tree[use_mod][0]
-                var_list += child_candidates(scope, only_list)
+                var_list += child_candidates(scope, only_list, req_abstract=abstract_only)
             # Add globals
             if inc_globals:
                 for key, obj in self.obj_tree.items():

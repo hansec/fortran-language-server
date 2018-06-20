@@ -102,16 +102,26 @@ def get_use_tree(scope, use_dict, obj_tree, only_list=[]):
 
 
 def find_in_scope(scope, var_name, obj_tree):
+    def check_scope(local_scope, var_name_lower, filter_public=False):
+        for child in local_scope.get_children():
+            if child.name.startswith("#GEN_INT"):
+                tmp_var, tmp_scope = check_scope(child, var_name_lower, filter_public)
+                if tmp_var is not None:
+                    return tmp_var, tmp_scope
+            if filter_public:
+                if child.vis < 0:
+                    continue
+                if local_scope.def_vis < 0 and child.vis <= 0:
+                    continue
+            if child.name.lower() == var_name_lower:
+                return child, local_scope
+        return None, None
+    #
     var_name_lower = var_name.lower()
     # Check local scope
-    for child in scope.get_children():
-        name_lower = child.name.lower()
-        if name_lower == var_name_lower:
-            return child, scope
-        if name_lower.startswith("#gen_int"):
-            for int_child in child.get_children():
-                if int_child.name.lower() == var_name_lower:
-                    return int_child, child
+    tmp_var, tmp_scope = check_scope(scope, var_name_lower)
+    if tmp_var is not None:
+        return tmp_var, tmp_scope
     # Setup USE search
     use_dict = get_use_tree(scope, {}, obj_tree)
     # Look in found use modules
@@ -124,15 +134,9 @@ def find_in_scope(scope, var_name, obj_tree):
         if len(only_list) > 0:
             if var_name_lower not in only_list:
                 continue
-        # Check for variable in public children
-        def_vis = use_scope.def_vis
-        for child in use_scope.get_children():
-            if child.vis < 0:
-                continue
-            if def_vis < 0 and child.vis <= 0:
-                continue
-            if child.name.lower() == var_name_lower:
-                return child, use_scope
+        tmp_var, tmp_scope = check_scope(use_scope, var_name_lower, filter_public=True)
+        if tmp_var is not None:
+            return tmp_var, tmp_scope
     # Check parent scopes
     if scope.parent is not None:
         curr_scope = scope.parent
@@ -236,6 +240,9 @@ class fortran_scope:
         if public_only:
             pub_children = []
             for child in self.children:
+                if child.name.startswith("#GEN_INT"):
+                    pub_children.append(child)
+                    continue
                 if child.vis < 0:
                     continue
                 if (self.def_vis < 0) and (child.vis <= 0):
@@ -912,6 +919,13 @@ class fortran_file:
             for name in FQSN_split[1:]:
                 next_obj = None
                 for child in curr_obj.children:
+                    if child.name.startswith("#GEN_INT"):
+                        for int_child in child.get_children():
+                            if int_child.name == name:
+                                next_obj = int_child
+                                break
+                        if next_obj is not None:
+                            break
                     if child.name == name:
                         next_obj = child
                         break
