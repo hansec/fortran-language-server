@@ -35,6 +35,10 @@ def main():
         '--autocomplete_no_prefix', action="store_true",
         help="Do not filter autocomplete results by variable prefix"
     )
+    parser.add_argument(
+        '--lowercase_intrinsics', action="store_true",
+        help="Use lowercase for intrinsics and keywords in autocomplete requests"
+    )
     group = parser.add_argument_group("DEBUG", "Options for debugging language server")
     group.add_argument(
         '--debug_parser', action="store_true",
@@ -78,7 +82,8 @@ def main():
     settings = {
         "symbol_include_mem": (not args.symbol_skip_mem),
         "sync_type": 2 if args.incrmental_sync else 1,
-        "autocomplete_no_prefix": args.autocomplete_no_prefix
+        "autocomplete_no_prefix": args.autocomplete_no_prefix,
+        "lowercase_intrinsics": args.lowercase_intrinsics
     }
     #
     if args.debug_parser:

@@ -7,7 +7,8 @@ import re
 from fortls.parse_fortran import process_file, read_use_stmt, read_var_def, \
     detect_fixed_format, detect_comment_start
 from fortls.objects import find_in_scope, get_use_tree
-from fortls.intrinsics import get_intrinsics, get_intrinsic_modules
+from fortls.intrinsics import get_keywords, get_intrinsics, get_intrinsic_modules, \
+    set_lowercase_intrinsics
 
 log = logging.getLogger(__name__)
 PY3K = sys.version_info >= (3, 0)
@@ -320,6 +321,7 @@ class LangServer:
         self.streaming = True
         self.symbol_include_mem = True
         self.autocomplete_no_prefix = False
+        self.lowercase_intrinsics = False
         self.sync_type = 1
         if logLevel == 0:
             logging.basicConfig(level=logging.ERROR)
@@ -332,6 +334,10 @@ class LangServer:
                 self.sync_type = settings["sync_type"]
             if "autocomplete_no_prefix" in settings:
                 self.autocomplete_no_prefix = settings["autocomplete_no_prefix"]
+            if "lowercase_intrinsics" in settings:
+                self.lowercase_intrinsics = settings["lowercase_intrinsics"]
+        if self.lowercase_intrinsics:
+            set_lowercase_intrinsics()
         self.intrinsics = get_intrinsics()
         for module in get_intrinsic_modules():
             self.obj_tree[module.FQSN] = [module, None]
@@ -604,10 +610,16 @@ class LangServer:
             return comp_obj
 
         def get_context(line, var_prefix):
+            line_grouped = tokenize_line(line)
+            lev1_end = line_grouped[0][0][0][-1][1]
+            if lev1_end < 0:
+                lev1_end = len(line)
             # Test if variable definition statement
             test_match = read_var_def(line)
             if test_match is not None:
                 if test_match[0] == 'var':
+                    if (test_match[1][2] is None) and (lev1_end == len(line)):
+                        return 8, var_prefix, None
                     return 7, var_prefix, None
             # Test if in USE statement
             test_match = read_use_stmt(line)
@@ -626,12 +638,7 @@ class LangServer:
             type_def = False
             if TYPE_DEF_REGEX.match(line) is not None:
                 type_def = True
-            # tmp_prefix = var_prefix
-            line_grouped = tokenize_line(line)
             # Test if in call statement
-            lev1_end = line_grouped[0][0][0][-1][1]
-            if lev1_end < 0:
-                lev1_end = len(line)
             if lev1_end == len(line):
                 if CALL_REGEX.match(line_grouped[0][0][1]) is not None:
                     return 3, var_prefix, None
@@ -763,6 +770,21 @@ class LangServer:
             name_only = True
             type_mask[2] = True
             type_mask[3] = True
+        elif line_context == 8:
+            # Variable definition keywords (variables only)
+            key_context = 0
+            enc_scope_type = scope_list[-1].get_type()
+            if enc_scope_type == 1:
+                key_context = 1
+            elif (enc_scope_type == 2) or (enc_scope_type == 3):
+                key_context = 2
+            elif enc_scope_type == 4:
+                key_context = 3
+            for candidate in get_keywords(key_context):
+                if candidate.name.lower().startswith(var_prefix):
+                    item_list.append(build_comp(candidate))
+            req_dict["items"] = item_list
+            return req_dict
         for candidate in get_candidates(scope_list, var_prefix, include_globals, public_only, abstract_only):
             # Skip module names (only valid in USE)
             candidate_type = candidate.get_type()

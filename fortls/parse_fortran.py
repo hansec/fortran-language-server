@@ -1,6 +1,6 @@
 from __future__ import print_function
 import re
-from fortls.objects import parse_keywords, fortran_module, fortran_program, \
+from fortls.objects import map_keywords, fortran_module, fortran_program, \
     fortran_submodule, fortran_subroutine, fortran_function, fortran_type, \
     fortran_int, fortran_obj, fortran_meth, fortran_file
 #
@@ -95,14 +95,28 @@ def separate_def_list(test_str):
         elif char == ')':
             paren_count -= 1
         elif char == ',' and paren_count == 0:
+            curr_str = curr_str.strip()
             if curr_str != '':
                 def_list.append(curr_str)
                 curr_str = ''
+            elif (curr_str == '') and (len(def_list) == 0):
+                return None
             continue
         curr_str += char
+    curr_str = curr_str.strip()
     if curr_str != '':
         def_list.append(curr_str)
     return def_list
+
+
+def parse_keywords(test_str):
+    keyword_match = KEYWORD_LIST_REGEX.match(test_str)
+    keywords = []
+    while (keyword_match is not None):
+        keywords.append(keyword_match.group(0).replace(',', ' ').strip().upper())
+        test_str = test_str[keyword_match.end(0):]
+        keyword_match = KEYWORD_LIST_REGEX.match(test_str)
+    return keywords, test_str
 
 
 def get_var_dims(test_str):
@@ -147,12 +161,7 @@ def read_var_def(line, type_word=None):
         if trailing_line[0] != ' ' and trailing_line[0] != ',':
             return None
     #
-    keyword_match = KEYWORD_LIST_REGEX.match(trailing_line)
-    keywords = []
-    while (keyword_match is not None):
-        keywords.append(keyword_match.group(0).replace(',', ' ').strip().upper())
-        trailing_line = trailing_line[keyword_match.end(0):]
-        keyword_match = KEYWORD_LIST_REGEX.match(trailing_line)
+    keywords, trailing_line = parse_keywords(trailing_line)
     # Check if function
     fun_def = read_fun_def(trailing_line, [type_word, keywords])
     if fun_def is not None:
@@ -161,13 +170,15 @@ def read_var_def(line, type_word=None):
     line_split = trailing_line.split('::')
     if len(line_split) == 1:
         if len(keywords) > 0:
-            return None
+            var_words = None
         else:
             trailing_line = line_split[0]
+            var_words = separate_def_list(trailing_line.strip())
     else:
         trailing_line = line_split[1]
-    #
-    var_words = separate_def_list(trailing_line.strip())
+        var_words = separate_def_list(trailing_line.strip())
+        if var_words is None:
+            var_words = []
     #
     return 'var', [type_word, keywords, var_words]
 
@@ -467,6 +478,8 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
             obj_type = obj_read[0]
             obj = obj_read[1]
             if obj_type == 'var':
+                if obj[2] is None:
+                    continue
                 link_name = None
                 if obj[0][:3] == 'PRO':
                     if isinstance(file_obj.current_scope, fortran_int):
@@ -492,7 +505,7 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                     if name_stripped.find('(') > -1:
                         var_dim = get_var_dims(name_stripped)
                     name_stripped = name_stripped.split('(')[0].strip()
-                    modifiers = parse_keywords(obj[1])
+                    modifiers = map_keywords(obj[1])
                     if obj[0][:3] == 'PRO':
                         new_var = fortran_meth(file_obj, line_number, name_stripped, obj[0],
                                                modifiers, file_obj.enc_scope_name, link_name)
@@ -535,7 +548,7 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 if(debug):
                     print('{1} !!! FUNCTION statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'typ':
-                modifiers = parse_keywords(obj[2])
+                modifiers = map_keywords(obj[2])
                 new_type = fortran_type(file_obj, line_number, obj[0], modifiers, file_obj.enc_scope_name)
                 if obj[1] is not None:
                     new_type.set_inherit(obj[1])

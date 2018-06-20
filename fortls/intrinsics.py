@@ -1,18 +1,27 @@
 import os
 import json
 from fortls.objects import fortran_file, fortran_module, fortran_subroutine, \
-    fortran_function, fortran_type, fortran_obj, parse_keywords
+    fortran_function, fortran_type, fortran_obj, map_keywords
 none_file = fortran_file()
+lowercase_intrinsics = False
+
+
+def set_lowercase_intrinsics():
+    global lowercase_intrinsics
+    lowercase_intrinsics = True
 
 
 class fortran_intrinsic_obj:
-    def __init__(self, name, type, doc_str, args="", parent=None):
+    def __init__(self, name, type, doc_str=None, args="", parent=None):
         self.name = name
         self.type = type
         self.doc_str = doc_str
         self.args = args
         self.parent = parent
         self.file = none_file
+        if lowercase_intrinsics:
+            self.name = self.name.lower()
+            self.args = self.args.lower()
 
     def get_type(self):
         return self.type
@@ -20,13 +29,20 @@ class fortran_intrinsic_obj:
     def get_desc(self):
         if self.type == 2:
             return 'SUBROUTINE'
+        elif self.type == 14:
+            return 'KEYWORD'
         else:
             return 'INTRINSIC'
 
     def get_snippet(self, name_replace=None, drop_arg=None):
-        arg_list = self.args.split(",")
         arg_snip = None
-        if len(arg_list) > 0:
+        if self.args == "":
+            if self.type == 14:
+                arg_str = ""
+            else:
+                arg_str = "()"
+        else:
+            arg_list = self.args.split(",")
             place_holders = []
             for i, arg in enumerate(arg_list):
                 opt_split = arg.split("=")
@@ -36,8 +52,6 @@ class fortran_intrinsic_obj:
                     place_holders.append("${{{0}:{1}}}".format(i+1, arg))
             arg_str = "({0})".format(",".join(arg_list))
             arg_snip = "({0})".format(",".join(place_holders))
-        else:
-            arg_str = "()"
         name = self.name
         if name_replace is not None:
             name = name_replace
@@ -62,6 +76,39 @@ class fortran_intrinsic_obj:
             return False
 
 
+def get_keywords(context=0):
+    var_type_keywords = [
+        fortran_intrinsic_obj("ALLOCATABLE", 14),
+        fortran_intrinsic_obj("ASYNCHRONOUS", 14),
+        fortran_intrinsic_obj("CONTIGUOUS", 14),
+        fortran_intrinsic_obj("DIMENSION(:)", 14),
+        fortran_intrinsic_obj("POINTER", 14),
+        fortran_intrinsic_obj("TARGET", 14)
+    ]
+    arg_keywords = [
+        fortran_intrinsic_obj("INTENT(IN)", 14),
+        fortran_intrinsic_obj("INTENT(OUT)", 14),
+        fortran_intrinsic_obj("INTENT(INOUT)", 14),
+        fortran_intrinsic_obj("OPTIONAL", 14),
+        fortran_intrinsic_obj("SAVE", 14)
+    ]
+    type_mem_keywords = [
+        fortran_intrinsic_obj("DEFERRED", 14),
+        fortran_intrinsic_obj("NOPASS", 14)
+    ]
+    vis_keywords = [
+        fortran_intrinsic_obj("PRIVATE", 14),
+        fortran_intrinsic_obj("PUBLIC", 14)
+    ]
+    if context == 1:
+        return var_type_keywords + vis_keywords
+    elif context == 2:
+        return var_type_keywords + arg_keywords
+    elif context == 3:
+        return var_type_keywords + type_mem_keywords + vis_keywords
+    return var_type_keywords
+
+
 def get_intrinsic_modules():
     def create_object(json_obj, enc_obj=None):
         enc_scope_name = None
@@ -72,22 +119,26 @@ def get_intrinsic_modules():
         if "args" in json_obj:
             args = json_obj["args"]
         if "mods" in json_obj:
-            modifiers = parse_keywords(json_obj["mods"])
+            modifiers = map_keywords(json_obj["mods"])
+        name = json_obj["name"]
+        if lowercase_intrinsics:
+            name = name.lower()
+            args = args.lower()
         if json_obj["type"] == 0:
-            mod_tmp = fortran_module(none_file, 0, json_obj["name"], enc_scope=enc_scope_name)
+            mod_tmp = fortran_module(none_file, 0, name, enc_scope=enc_scope_name)
             if "use" in json_obj:
                 mod_tmp.add_use(json_obj["use"], 0)
             return mod_tmp
         elif json_obj["type"] == 1:
-            return fortran_subroutine(none_file, 0, json_obj["name"], enc_scope=enc_scope_name,
+            return fortran_subroutine(none_file, 0, name, enc_scope=enc_scope_name,
                                       args=args)
         elif json_obj["type"] == 2:
-            return fortran_function(none_file, 0, json_obj["name"], enc_scope=enc_scope_name,
+            return fortran_function(none_file, 0, name, enc_scope=enc_scope_name,
                                     args=args, return_type=[json_obj["return"], modifiers])
         elif json_obj["type"] == 3:
-            return fortran_obj(none_file, 0, json_obj["name"], json_obj["desc"], modifiers, enc_scope_name)
+            return fortran_obj(none_file, 0, name, json_obj["desc"], modifiers, enc_scope_name)
         elif json_obj["type"] == 4:
-            return fortran_type(none_file, 0, json_obj["name"], modifiers, enc_scope_name)
+            return fortran_type(none_file, 0, name, modifiers, enc_scope_name)
         else:
             raise ValueError
 

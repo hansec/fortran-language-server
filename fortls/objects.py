@@ -5,7 +5,7 @@ WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
 CLASS_VAR_REGEX = re.compile(r'(TYPE|CLASS)[ ]*\(', re.I)
 
 
-def parse_keywords(keywords):
+def map_keywords(keywords):
     modifiers = []
     for key in keywords:
         key_lower = key.lower()
@@ -488,7 +488,7 @@ class fortran_function(fortran_subroutine):
         self.result_obj = None
         if return_type is not None:
             self.return_type = return_type[0]
-            self.modifiers = parse_keywords(return_type[1])
+            self.modifiers = map_keywords(return_type[1])
         else:
             self.return_type = None
             self.modifiers = []
