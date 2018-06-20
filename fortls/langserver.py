@@ -17,6 +17,8 @@ OBJBREAK_REGEX = re.compile(r'[\/\-(.,+*<>=$: ]', re.I)
 WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
 CALL_REGEX = re.compile(r'[ ]*CALL[ ]+[a-z0-9_%]*$', re.I)
 TYPE_STMNT_REGEX = re.compile(r'[ ]*(TYPE|CLASS)[ ]*(IS)?[ ]*$', re.I)
+TYPE_DEF_REGEX = re.compile(r'[ ]*TYPE[, ]+', re.I)
+EXTENDS_REGEX = re.compile(r'EXTENDS[ ]*$', re.I)
 PROCEDURE_STMNT_REGEX = re.compile(r'[ ]*(PROCEDURE)[ ]*$', re.I)
 SCOPE_DEF_REGEX = re.compile(r'[ ]*(MODULE|PROGRAM|SUBROUTINE|FUNCTION)[ ]+', re.I)
 END_REGEX = re.compile(r'[ ]*(END)[ ]+', re.I)
@@ -614,15 +616,16 @@ class LangServer:
                     return 2, var_prefix, test_match[1][0]
                 else:
                     return 1, var_prefix, None
-            # Test if scope declaration
-            if SCOPE_DEF_REGEX.match(line):
-                return -1, None, None
-            # Test if end statement
-            if END_REGEX.match(line):
+            # Test if scope declaration or end statement
+            if SCOPE_DEF_REGEX.match(line) or END_REGEX.match(line):
                 return -1, None, None
             # Test if import statement
             if IMPORT_REGEX.match(line):
                 return 5, var_prefix, None
+            # In type-def
+            type_def = False
+            if TYPE_DEF_REGEX.match(line) is not None:
+                type_def = True
             # tmp_prefix = var_prefix
             line_grouped = tokenize_line(line)
             # Test if in call statement
@@ -630,24 +633,26 @@ class LangServer:
             if lev1_end < 0:
                 lev1_end = len(line)
             if lev1_end == len(line):
-                test_match = CALL_REGEX.match(line_grouped[0][0][1])
-                if test_match is not None:
+                if CALL_REGEX.match(line_grouped[0][0][1]) is not None:
                     return 3, var_prefix, None
             # Test if variable definition using type/class or procedure
             if len(line_grouped) >= 2:
                 lev2_end = line_grouped[1][0][0][-1][1]
                 if lev2_end < 0:
                     lev2_end = len(line)
-                if lev2_end == len(line) and \
-                   line_grouped[1][0][0][-1][0] == lev1_end + 1:
-                    test_match = TYPE_STMNT_REGEX.match(line_grouped[0][0][1])
-                    if test_match is not None:
+                if (lev2_end == len(line)
+                        and line_grouped[1][0][0][-1][0] == lev1_end + 1):
+                    test_str = line_grouped[0][0][1]
+                    if ((TYPE_STMNT_REGEX.match(test_str) is not None)
+                            or (type_def and EXTENDS_REGEX.search(test_str) is not None)):
                         return 4, var_prefix, None
-                    test_match = PROCEDURE_STMNT_REGEX.match(line_grouped[0][0][1])
-                    if test_match is not None:
+                    if PROCEDURE_STMNT_REGEX.match(test_str) is not None:
                         return 6, var_prefix, None
             # Default context
-            return 0, var_prefix, None
+            if type_def:
+                return -1, var_prefix, None
+            else:
+                return 0, var_prefix, None
         # Get parameters from request
         req_dict = {"isIncomplete": False, "items": []}
         params = request["params"]
