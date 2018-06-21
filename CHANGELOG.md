@@ -1,3 +1,20 @@
+## 0.6.0
+
+### Improvements
+* Add keywords to autocomplete results in variable definition statements
+* Filter autocompletion results in extend, import, and procedure statements
+* Ignore completion requests on scope definition and ending lines to reduce autocomplete noise
+* Filter autocompletion results in variable definition statements to reduce autocomplete noise (variables only)
+* Ignore autocomplete and definition requests on preprocessor lines
+* Add option to test completion and definition requests in debug mode
+
+### Fixes
+* Improve export of abstract and external interfaces for completion and definition requests
+* Fix scope name detection to prevent confusing variables that start with Fortran statement names
+* Fix handling of external and abstract interface specifications
+* Fix bug preventing unrestricted USE statements from overriding USE only statements
+* Fix bug where file parsing ended prematurely in some cases with line continuations
+
 ## 0.5.0
 
 ### Improvements
