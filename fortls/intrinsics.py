@@ -100,13 +100,14 @@ def get_keywords(context=0):
         fortran_intrinsic_obj("PRIVATE", 14),
         fortran_intrinsic_obj("PUBLIC", 14)
     ]
+    param_keyword = [fortran_intrinsic_obj("PARAMETER", 14)]
     if context == 1:
-        return var_type_keywords + vis_keywords
+        return var_type_keywords + vis_keywords + param_keyword
     elif context == 2:
-        return var_type_keywords + arg_keywords
+        return var_type_keywords + arg_keywords + param_keyword
     elif context == 3:
         return var_type_keywords + type_mem_keywords + vis_keywords
-    return var_type_keywords
+    return var_type_keywords + param_keyword
 
 
 def get_intrinsic_modules():
