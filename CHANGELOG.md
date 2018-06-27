@@ -1,3 +1,8 @@
+## 0.6.1
+
+### Fixes
+* Fix bug with incremental sync using VSCode on windows, fixes [#20](https://github.com/hansec/fortran-language-server/issues/20)
+
 ## 0.6.0
 
 ### Improvements
