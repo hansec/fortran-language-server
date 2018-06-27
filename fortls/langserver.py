@@ -34,6 +34,7 @@ def path_from_uri(uri):
         return uri
     if os.name == "nt":
         _, path = uri.split("file:///", 1)
+        path = path.replace("%3A", ":")  # Replace escaped colon in Windows paths
     else:
         _, path = uri.split("file://", 1)
     return path
@@ -268,7 +269,7 @@ def apply_change(contents_split, change):
         if text[-1] == "\n" or text[-1] == "\r":
             text_split.append("")
 
-    if not change_range:
+    if change_range is None:
         # The whole file has changed
         return text_split, -1
 
@@ -1002,7 +1003,7 @@ class LangServer:
                 except:
                     self.conn.send_notification("window/showMessage", {
                         "type": 1,
-                        "message": 'Change request failed for unknown file "{0}"'.format(path)
+                        "message": 'Change request failed for file "{0}"'.format(path)
                     })
                 else:
                     self.update_workspace_file(new_contents, path, update_links=True)
