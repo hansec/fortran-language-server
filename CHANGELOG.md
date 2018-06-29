@@ -1,3 +1,8 @@
+## 0.6.2
+
+### Improvements
+* Catch and report more types of errors related to file processing, fixes [#21](https://github.com/hansec/fortran-language-server/issues/21)
+
 ## 0.6.1
 
 ### Fixes
