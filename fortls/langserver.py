@@ -48,30 +48,41 @@ def path_to_uri(path):
         return "file://"+path
 
 
+def read_file_split(filepath):
+    # Read and add file from disk
+    try:
+        if PY3K:
+            with open(filepath, 'r', encoding="utf-8") as fhandle:
+                contents = re.sub(r'\t', r'  ', fhandle.read())
+                contents_split = contents.splitlines()
+        else:
+            with open(filepath, 'r') as fhandle:
+                contents = re.sub(r'\t', r'  ', fhandle.read())
+                contents_split = contents.splitlines()
+    except:
+        return None, 'Could not read/decode file'
+    else:
+        return contents_split, None
+
+
 def init_file(filepath):
     #
-    if PY3K:
-        with open(filepath, 'r', encoding="utf-8") as fhandle:
-            contents = re.sub(r'\t', r'  ', fhandle.read())
-            contents_split = contents.splitlines()
-    else:
-        with open(filepath, 'r') as fhandle:
-            contents = re.sub(r'\t', r'  ', fhandle.read())
-            contents_split = contents.splitlines()
+    contents_split, err_str = read_file_split(filepath)
+    if contents_split is None:
+        return None, err_str
     #
     try:
         fixed_flag = detect_fixed_format(contents_split)
         ast_new = process_file(contents_split, True, filepath, fixed_flag)
     except:
-        return None
-    else:
-        # Construct new file object and add to workspace
-        tmp_obj = {
-            "contents": contents_split,
-            "ast": ast_new,
-            "fixed": fixed_flag
-        }
-        return tmp_obj
+        return None, 'Error during parsing'
+    # Construct new file object and add to workspace
+    tmp_obj = {
+        "contents": contents_split,
+        "ast": ast_new,
+        "fixed": fixed_flag
+    }
+    return tmp_obj, None
 
 
 def tokenize_line(line):
@@ -343,6 +354,12 @@ class LangServer:
         for module in get_intrinsic_modules():
             self.obj_tree[module.FQSN] = [module, None]
 
+    def post_message(self, message, type=1):
+        self.conn.send_notification("window/showMessage", {
+            "type": type,
+            "message": message
+        })
+
     def run(self):
         # Run server
         while self.running:
@@ -356,10 +373,7 @@ class LangServer:
                 break
             else:
                 for message in self.post_messages:
-                    self.conn.send_notification("window/showMessage", {
-                        "type": message[0],
-                        "message": message[1]
-                    })
+                    self.post_message(message[1], message[0])
                 self.post_messages = []
 
     def handle(self, request):
@@ -989,10 +1003,9 @@ class LangServer:
         params = request["params"]
         uri = params["textDocument"]["uri"]
         path = path_from_uri(uri)
-        # Update file with changes
+        # Update file contents with changes
         if self.sync_type == 1:
             new_contents = params["contentChanges"][0]["text"].splitlines()
-            self.update_workspace_file(new_contents, path, update_links=True)
         else:
             if path in self.workspace:
                 new_contents = self.workspace[path]["contents"]
@@ -1001,17 +1014,16 @@ class LangServer:
                         old_contents = new_contents
                         new_contents, line_tmp = apply_change(old_contents, change)
                 except:
-                    self.conn.send_notification("window/showMessage", {
-                        "type": 1,
-                        "message": 'Change request failed for file "{0}"'.format(path)
-                    })
-                else:
-                    self.update_workspace_file(new_contents, path, update_links=True)
+                    self.post_message('Change request failed for file "{0}": Could not apply change'.format(path))
+                    return
             else:
-                self.conn.send_notification("window/showMessage", {
-                    "type": 1,
-                    "message": 'Change request failed for unknown file "{0}"'.format(path)
-                })
+                self.post_message('Change request failed for unknown file "{0}"'.format(path))
+                return
+        # Parse newly updated file
+        err_str = self.update_workspace_file(new_contents, path, update_links=True)
+        if err_str is not None:
+            self.post_message('Change request failed for file "{0}": {1}'.format(path, err_str))
+            return
         # Update include statements linking to this file
         for tmp_path, file_obj in self.workspace.items():
             file_obj["ast"].resolve_includes(self.workspace, path=path)
@@ -1026,7 +1038,10 @@ class LangServer:
         params = request["params"]
         uri = params["textDocument"]["uri"]
         filepath = path_from_uri(uri)
-        self.add_file(filepath)
+        err_str = self.add_file(filepath)
+        if err_str is not None:
+            self.post_message('Save request failed for file "{0}": {1}'.format(filepath, err_str))
+            return
         # Update include statements
         for path, file_obj in self.workspace.items():
             file_obj["ast"].resolve_includes(self.workspace)
@@ -1038,14 +1053,10 @@ class LangServer:
 
     def add_file(self, filepath):
         # Read and add file from disk
-        if PY3K:
-            with open(filepath, 'r', encoding="utf-8") as fhandle:
-                contents = re.sub(r'\t', r'  ', fhandle.read())
-                self.update_workspace_file(contents.splitlines(), filepath)
-        else:
-            with open(filepath, 'r') as fhandle:
-                contents = re.sub(r'\t', r'  ', fhandle.read())
-                self.update_workspace_file(contents.splitlines(), filepath)
+        contents_split, err_str = read_file_split(filepath)
+        if contents_split is None:
+            return err_str
+        return self.update_workspace_file(contents_split, filepath)
 
     def update_workspace_file(self, contents_split, filepath, update_links=False):
         # Update workspace from file contents and path
@@ -1053,32 +1064,28 @@ class LangServer:
             fixed_flag = detect_fixed_format(contents_split)
             ast_new = process_file(contents_split, True, filepath, fixed_flag)
         except:
-            self.conn.send_notification("window/showMessage", {
-                "type": 1,
-                "message": 'Parsing failed for file "{0}"'.format(filepath)
-            })
-            return  # Error during parsing
-        else:
-            # Remove old objects from tree
-            if filepath in self.workspace:
-                ast_old = self.workspace[filepath]["ast"]
-                for key in ast_old.global_dict:
-                    self.obj_tree.pop(key, None)
-            # Construct new file object and add to workspace
-            tmp_obj = {
-                "contents": contents_split,
-                "ast": ast_new,
-                "fixed": fixed_flag
-            }
-            self.workspace[filepath] = tmp_obj
-            # Add top-level objects to object tree
+            return 'Error during parsing'  # Error during parsing
+        # Remove old objects from tree
+        if filepath in self.workspace:
+            ast_old = self.workspace[filepath]["ast"]
+            for key in ast_old.global_dict:
+                self.obj_tree.pop(key, None)
+        # Construct new file object and add to workspace
+        tmp_obj = {
+            "contents": contents_split,
+            "ast": ast_new,
+            "fixed": fixed_flag
+        }
+        self.workspace[filepath] = tmp_obj
+        # Add top-level objects to object tree
+        for key, obj in ast_new.global_dict.items():
+            self.obj_tree[key] = [obj, filepath]
+        # Update local links/inheritance if necessary
+        if update_links:
             for key, obj in ast_new.global_dict.items():
-                self.obj_tree[key] = [obj, filepath]
-            # Update local links/inheritance if necessary
-            if update_links:
-                for key, obj in ast_new.global_dict.items():
-                    obj.resolve_inherit(self.obj_tree)
-                    obj.resolve_link(self.obj_tree)
+                obj.resolve_inherit(self.obj_tree)
+                obj.resolve_link(self.obj_tree)
+        return None
 
     def workspace_init(self):
         # Get filenames
@@ -1101,10 +1108,10 @@ class LangServer:
         pool.join()
         for path, result in results.items():
             result_obj = result.get()
-            if result_obj is None:
-                self.post_messages.append([1, 'Parsing failed for file "{0}"'.format(path)])
+            if result_obj[0] is None:
+                self.post_messages.append([1, 'Initialization failed for file "{0}": {1}'.format(path, result_obj[1])])
                 continue
-            self.workspace[path] = result_obj
+            self.workspace[path] = result_obj[0]
             # Add top-level objects to object tree
             ast_new = self.workspace[path]["ast"]
             for key in ast_new.global_dict:
