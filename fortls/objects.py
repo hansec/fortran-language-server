@@ -289,12 +289,12 @@ class fortran_scope:
             else:
                 FQSN_list.append(child.FQSN)
             # Check for masking from parent scope in subroutines and functions
-            if self.parent is not None and (self.get_type() == 2 or self.get_type() == 3):
+            if (self.parent is not None) and (self.get_type() in (2, 3, 8)):
                 parent_var, parent_scope = \
                     find_in_scope(self.parent, child.name, obj_tree)
                 if parent_var is not None:
                     # Ignore if function return variable
-                    if self.get_type() == 3 and parent_var.FQSN == self.FQSN:
+                    if (self.get_type() == 3) and (parent_var.FQSN == self.FQSN):
                         continue
                     line_number = child.sline - 1
                     i0, i1 = find_word_in_line(file_contents[line_number].lower(), child.name.lower())
@@ -579,6 +579,20 @@ class fortran_type(fortran_scope):
                     self.in_children.append(child)
 
 
+class fortran_block(fortran_scope):
+    def __init__(self, file_obj, line_number, name, enc_scope=None):
+        self.base_setup(file_obj, line_number, name, enc_scope)
+
+    def get_type(self):
+        return 8
+
+    def get_desc(self):
+        return 'BLOCK'
+
+    def get_children(self, public_only=False):
+        return self.children
+
+
 class fortran_int(fortran_scope):
     def __init__(self, file_obj, line_number, name, enc_scope=None, abstract=False):
         self.base_setup(file_obj, line_number, name, enc_scope)
@@ -805,11 +819,8 @@ class fortran_file:
             return None
         return self.current_scope.FQSN
 
-    def add_scope(self, new_scope, END_SCOPE_REGEX, hidden=False, exportable=True, req_container=False):
-        if hidden:
-            self.variable_list.append(new_scope)
-        else:
-            self.scope_list.append(new_scope)
+    def add_scope(self, new_scope, END_SCOPE_REGEX, exportable=True, req_container=False):
+        self.scope_list.append(new_scope)
         if self.current_scope is None:
             if req_container:
                 self.create_none_scope()
@@ -888,7 +899,7 @@ class fortran_file:
                 scope_list.append(scope)
                 for ancestor in scope.get_ancestors():
                     scope_list.append(ancestor)
-        if len(scope_list) == 0 and self.none_scope is not None:
+        if (len(scope_list) == 0) and (self.none_scope is not None):
             return [self.none_scope]
         return scope_list
 
@@ -897,10 +908,10 @@ class fortran_file:
         curr_scope = None
         for scope in self.scope_list:
             if scope.sline > scope_sline:
-                if line_number >= scope.sline and line_number <= scope.eline:
+                if (line_number >= scope.sline) and (line_number <= scope.eline):
                     curr_scope = scope
                     scope_sline = scope.sline
-        if curr_scope is None and self.none_scope is not None:
+        if (curr_scope is None) and (self.none_scope is not None):
             return self.none_scope
         return curr_scope
 

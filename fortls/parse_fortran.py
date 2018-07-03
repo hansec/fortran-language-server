@@ -1,8 +1,8 @@
 from __future__ import print_function
 import re
 from fortls.objects import map_keywords, fortran_module, fortran_program, \
-    fortran_submodule, fortran_subroutine, fortran_function, fortran_type, \
-    fortran_int, fortran_obj, fortran_meth, fortran_file
+    fortran_submodule, fortran_subroutine, fortran_function, fortran_block, \
+    fortran_type, fortran_int, fortran_obj, fortran_meth, fortran_file
 #
 USE_REGEX = re.compile(r'[ ]*USE([, ]*INTRINSIC)?[ :]*([a-z0-9_]*)', re.I)
 INCLUDE_REGEX = re.compile(r'[ ]*INCLUDE[ :]*[\'\"]([^\'\"]*)', re.I)
@@ -15,6 +15,8 @@ MOD_REGEX = re.compile(r'[ ]*MODULE[ ]+([a-z0-9_]+)', re.I)
 END_MOD_REGEX = re.compile(r'[ ]*END[ ]*MODULE', re.I)
 SUBMOD_REGEX = re.compile(r'[ ]*SUBMODULE[ ]*\(', re.I)
 END_SMOD_REGEX = re.compile(r'[ ]*END[ ]*SUBMODULE', re.I)
+BLOCK_REGEX = re.compile(r'[ ]*([a-z_][a-z0-9_]*[ ]*:)?[ ]*BLOCK', re.I)
+END_BLOCK_REGEX = re.compile(r'[ ]*END[ ]*BLOCK', re.I)
 PROG_REGEX = re.compile(r'[ ]*PROGRAM[ ]+([a-z0-9_]+)', re.I)
 END_PROG_REGEX = re.compile(r'[ ]*END[ ]*PROGRAM', re.I)
 INT_REGEX = re.compile(r'[ ]*(ABSTRACT)?[ ]*INTERFACE[ ]*([a-z0-9_]*)', re.I)
@@ -230,6 +232,17 @@ def read_sub_def(line, mod_sub=False):
     return 'sub', [name, args, mod_sub]
 
 
+def read_block_def(line):
+    block_match = BLOCK_REGEX.match(line)
+    if block_match is None:
+        return None
+    #
+    name = block_match.group(1)
+    if name is not None:
+        name = name.replace(':', ' ').strip()
+    return 'block', [name]
+
+
 def read_type_def(line):
     type_match = TYPE_DEF_REGEX.match(line)
     if type_match is None:
@@ -365,9 +378,9 @@ def read_inc_stmt(line):
         return 'inc', [inc_path]
 
 
-def_tests = [read_var_def, read_sub_def, read_fun_def, read_type_def,
-             read_use_stmt, read_int_def, read_mod_def, read_prog_def,
-             read_submod_def, read_inc_stmt]
+def_tests = [read_var_def, read_sub_def, read_fun_def, read_block_def,
+             read_type_def, read_use_stmt, read_int_def, read_mod_def,
+             read_prog_def, read_submod_def, read_inc_stmt]
 
 
 def process_file(file_str, close_open_scopes, path=None, fixed_format=False, debug=False):
@@ -383,6 +396,7 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
     line_number = 0
     next_line_num = 1
     int_counter = 0
+    block_counter = 0
     # at_eof = False
     next_line = None
     line_ind = 0
@@ -547,6 +561,15 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                     file_obj.add_variable(new_obj)
                 if(debug):
                     print('{1} !!! FUNCTION statement({0})'.format(line_number, line.strip()))
+            elif obj_type == 'block':
+                name = obj[0]
+                if name is None:
+                    block_counter += 1
+                    name = '#BLOCK{0}'.format(int_counter)
+                new_block = fortran_block(file_obj, line_number, name, file_obj.enc_scope_name)
+                file_obj.add_scope(new_block, END_BLOCK_REGEX, req_container=True)
+                if(debug):
+                    print('{1} !!! BLOCK statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'typ':
                 modifiers = map_keywords(obj[2])
                 new_type = fortran_type(file_obj, line_number, obj[0], modifiers, file_obj.enc_scope_name)
@@ -556,15 +579,13 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 if(debug):
                     print('{1} !!! TYPE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'int':
-                hidden = False
                 abstract = obj[1]
                 name = obj[0]
                 if name is None:
                     int_counter += 1
                     name = '#GEN_INT{0}'.format(int_counter)
-                    hidden = True
                 new_int = fortran_int(file_obj, line_number, name, file_obj.enc_scope_name, abstract)
-                file_obj.add_scope(new_int, END_INT_REGEX, hidden=hidden, req_container=True)
+                file_obj.add_scope(new_int, END_INT_REGEX, req_container=True)
                 if(debug):
                     print('{1} !!! INTERFACE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'int_pro':

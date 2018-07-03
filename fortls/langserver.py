@@ -509,6 +509,8 @@ class LangServer:
         # Add scopes to outline view
         test_output = []
         for scope in file_obj.get_scopes():
+            if (scope.name[0] == "#") or (scope.get_type() == 8):
+                continue
             scope_tree = scope.FQSN.split("::")
             if len(scope_tree) > 2:
                 if scope_tree[1].startswith("#gen_int"):
@@ -564,6 +566,9 @@ class LangServer:
                 return 6
             else:
                 return type
+
+        def set_type_mask(def_value):
+            return [def_value for i in range(9)]
 
         def get_candidates(scope_list, var_prefix, inc_globals=True, public_only=False, abstract_only=False):
             #
@@ -732,17 +737,16 @@ class LangServer:
         # Setup based on context
         req_callable = False
         abstract_only = False
-        type_mask = [False for i in range(8)]
+        type_mask = set_type_mask(False)
         type_mask[1] = True
         type_mask[4] = True
+        type_mask[8] = True
         if line_context == 1:
             # Use statement module part (modules only)
             for key in self.obj_tree:
                 candidate = self.obj_tree[key][0]
-                candidate_type = candidate.get_type()
-                if candidate_type != 1:
-                    continue
-                if candidate.name.lower().startswith(var_prefix):
+                if (candidate.get_type() == 1) and \
+                   candidate.name.lower().startswith(var_prefix):
                     item_list.append(build_comp(candidate, name_only=True))
             req_dict["items"] = item_list
             return req_dict
@@ -763,12 +767,12 @@ class LangServer:
         elif line_context == 4:
             # Variable definition statement for user-defined type
             # (user-defined types only)
-            type_mask = [True for i in range(8)]
+            type_mask = set_type_mask(True)
             type_mask[4] = False
         elif line_context == 5:
             # Include statement (variables and user-defined types only)
             name_only = True
-            type_mask = [True for i in range(8)]
+            type_mask = set_type_mask(True)
             type_mask[4] = False
             type_mask[6] = False
         elif line_context == 6:
@@ -777,7 +781,7 @@ class LangServer:
             abstract_only = True
             include_globals = False
             name_only = True
-            type_mask = [True for i in range(8)]
+            type_mask = set_type_mask(True)
             type_mask[2] = False
             type_mask[3] = False
         elif line_context == 7:

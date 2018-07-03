@@ -208,9 +208,22 @@ def test_comp():
         "textDocument": {"uri": file_path},
         "position": {"line": 10, "character": 22}
     })
-    string += write_rpc_request(14, "textDocument/completion", {
+    string += write_rpc_request(15, "textDocument/completion", {
         "textDocument": {"uri": file_path},
         "position": {"line": 26, "character": 14}
+    })
+    file_path = os.path.join(test_dir, "test_block.f08")
+    string += write_rpc_request(16, "textDocument/completion", {
+        "textDocument": {"uri": file_path},
+        "position": {"line": 2, "character": 2}
+    })
+    string += write_rpc_request(17, "textDocument/completion", {
+        "textDocument": {"uri": file_path},
+        "position": {"line": 5, "character": 4}
+    })
+    string += write_rpc_request(18, "textDocument/completion", {
+        "textDocument": {"uri": file_path},
+        "position": {"line": 8, "character": 6}
     })
     errcode, results = run_request(string)
     #
@@ -229,6 +242,9 @@ def test_comp():
     check_return(results[12], [1, "abs_interface"])
     check_return(results[13], [1, "DIMENSION(:)"])
     check_return(results[14], [3, "INTENT(IN)"])
+    check_return(results[15], [3, "res0"])
+    check_return(results[16], [4, "res0"])
+    check_return(results[17], [5, "res0"])
 
 
 def test_def():
