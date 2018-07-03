@@ -319,7 +319,7 @@ def apply_change(contents_split, change):
 
 
 class LangServer:
-    def __init__(self, conn, logLevel=0, settings=None):
+    def __init__(self, conn, logLevel=0, settings={}):
         self.conn = conn
         self.running = True
         self.root_path = None
@@ -331,23 +331,16 @@ class LangServer:
         self.excl_paths = []
         self.post_messages = []
         self.streaming = True
-        self.symbol_include_mem = True
-        self.autocomplete_no_prefix = False
-        self.lowercase_intrinsics = False
-        self.sync_type = 1
         if logLevel == 0:
             logging.basicConfig(level=logging.ERROR)
         elif logLevel == 1:
             logging.basicConfig(level=logging.DEBUG)
-        if settings is not None:
-            if "symbol_include_mem" in settings:
-                self.symbol_include_mem = settings["symbol_include_mem"]
-            if "sync_type" in settings:
-                self.sync_type = settings["sync_type"]
-            if "autocomplete_no_prefix" in settings:
-                self.autocomplete_no_prefix = settings["autocomplete_no_prefix"]
-            if "lowercase_intrinsics" in settings:
-                self.lowercase_intrinsics = settings["lowercase_intrinsics"]
+        # Get launch settings
+        self.symbol_include_mem = settings.get("symbol_include_mem", True)
+        self.sync_type = settings.get("sync_type", 1)
+        self.autocomplete_no_prefix = settings.get("autocomplete_no_prefix", False)
+        self.lowercase_intrinsics = settings.get("lowercase_intrinsics", False)
+        self.use_signature_help = settings.get("use_signature_help", False)
         if self.lowercase_intrinsics:
             set_lowercase_intrinsics()
         self.intrinsics = get_intrinsics()
@@ -385,6 +378,7 @@ class LangServer:
             "initialize": self.serve_initialize,
             "textDocument/documentSymbol": self.serve_document_symbols,
             "textDocument/completion": self.serve_autocomplete,
+            "textDocument/signatureHelp": self.serve_signature,
             "textDocument/definition": self.serve_definition,
             "textDocument/references": self.serve_references,
             "textDocument/hover": self.serve_hover,
@@ -463,19 +457,22 @@ class LangServer:
         # Initialize workspace
         self.workspace_init()
         #
-        return {
-            "capabilities": {
-                "completionProvider": {
-                    "resolveProvider": False,
-                    "triggerCharacters": ["%"]
-                },
-                "definitionProvider": True,
-                "documentSymbolProvider": True,
-                "referencesProvider": True,
-                "hoverProvider": True,
-                "textDocumentSync": self.sync_type
-            }
+        server_capabilities = {
+            "completionProvider": {
+                "resolveProvider": False,
+                "triggerCharacters": ["%"]
+            },
+            "definitionProvider": True,
+            "documentSymbolProvider": True,
+            "referencesProvider": True,
+            "hoverProvider": True,
+            "textDocumentSync": self.sync_type
         }
+        if self.use_signature_help:
+            server_capabilities["signatureHelpProvider"] = {
+                "triggerCharacters": ["(", ","]
+            }
+        return {"capabilities": server_capabilities}
         #     "workspaceSymbolProvider": True,
         #     "streaming": False,
         # }
@@ -613,13 +610,17 @@ class LangServer:
                         tmp_list.append(var)
                 return tmp_list
 
-        def build_comp(candidate, name_only=False, name_replace=None):
+        def build_comp(candidate, name_only=False, name_replace=None, is_interface=False):
             comp_obj = {}
             if name_only:
                 comp_obj["label"] = candidate.name
             else:
                 comp_obj["label"], snippet = candidate.get_snippet(name_replace)
                 if snippet is not None:
+                    if self.use_signature_help and (not is_interface):
+                        arg_open = snippet.find('(')
+                        if arg_open > 0:
+                            snippet = snippet[:arg_open] + "(${0})"
                     comp_obj["insertText"] = snippet
                     comp_obj["insertTextFormat"] = 2
             comp_obj["kind"] = map_types(candidate.get_type())
@@ -819,7 +820,7 @@ class LangServer:
                     if tmp_list.count(tmp_text) > 0:
                         continue
                     tmp_list.append(tmp_text)
-                    item_list.append(build_comp(member, name_replace=candidate.name))
+                    item_list.append(build_comp(member, name_replace=candidate.name, is_interface=True))
                 continue
             #
             item_list.append(build_comp(candidate, name_only=name_only))
@@ -876,6 +877,121 @@ class LangServer:
         else:
             return var_obj
         return None
+
+    def serve_signature(self, request):
+        def get_sub_name(line):
+            nLine = len(line)
+            line_grouped = tokenize_line(line)
+            if len(line_grouped) < 2:
+                return None
+            lowest_level = -1
+            for i, level in enumerate(line_grouped):
+                if level[-1][0][-1][-1] == nLine:
+                    lowest_level = i
+            if lowest_level > 0:
+                arg_string = ''
+                for char_group in line_grouped[lowest_level]:
+                    arg_string += char_group[-1]
+                return line_grouped[lowest_level-1][0][1], arg_string.split(',')
+            else:
+                return None
+
+        def check_optional(arg, params):
+            opt_split = arg.split("=")
+            if len(opt_split) > 1:
+                opt_arg = opt_split[0].strip().lower()
+                for i, param in enumerate(params):
+                    param_split = param["label"].split("=")[0]
+                    if param_split.lower() == opt_arg:
+                        return i
+            return None
+        # Get parameters from request
+        req_dict = {"signatures": []}
+        params = request["params"]
+        uri = params["textDocument"]["uri"]
+        path = path_from_uri(uri)
+        if path not in self.workspace:
+            return req_dict
+        # Check line
+        sig_line = params["position"]["line"]
+        sig_char = params["position"]["character"]
+        # Get full line (and possible continuations) from file
+        curr_line, sig_char = get_line(sig_line, sig_char, self.workspace[path])
+        if curr_line is None:
+            return req_dict
+        # Test if scope declaration or end statement
+        if SCOPE_DEF_REGEX.match(curr_line) or END_REGEX.match(curr_line):
+            return req_dict
+        is_member = False
+        try:
+            line_prefix = curr_line[:sig_char].lower()
+            # Ignore for comment lines
+            comm_start = detect_comment_start(line_prefix, self.workspace[path]["fixed"])
+            if (comm_start >= 0) or (line_prefix[0] == '#'):
+                return req_dict
+            # Ignore string literals
+            if (line_prefix.count("'") % 2 == 1) or \
+               (line_prefix.count('"') % 2 == 1):
+                return req_dict
+            sub_name, arg_strings = get_sub_name(line_prefix)
+            var_stack = get_var_stack(sub_name)
+            is_member = (len(var_stack) > 1)
+        except:
+            return req_dict
+        #
+        file_obj = self.workspace[path]["ast"]
+        curr_scope = file_obj.get_inner_scope(sig_line+1)
+        # Traverse type tree if necessary
+        if is_member:
+            type_scope = climb_type_tree(var_stack, curr_scope, self.obj_tree)
+            # Set enclosing type as scope
+            if type_scope is None:
+                curr_scope = None
+            else:
+                curr_scope = type_scope
+        sub_name = var_stack[-1]
+        # Find in available scopes
+        var_obj = None
+        if curr_scope is not None:
+            var_obj, enc_scope = find_in_scope(curr_scope, sub_name, self.obj_tree)
+        # Search in global scope
+        if var_obj is None:
+            key = sub_name.lower()
+            if key in self.obj_tree:
+                var_obj = self.obj_tree[key][0]
+            else:
+                for obj in self.intrinsics:
+                    if obj.name.lower() == key:
+                        var_obj = obj
+                        break
+        if var_obj is None:
+            return req_dict
+        # Build signature
+        label, doc_str, params = var_obj.get_signature()
+        if label is None:
+            return req_dict
+        # Find current parameter by index or by
+        # looking at last arg with optional name
+        param_num = len(arg_strings)-1
+        opt_num = check_optional(arg_strings[-1], params)
+        if opt_num is None:
+            if len(arg_strings) > 1:
+                opt_num = check_optional(arg_strings[-2], params)
+                if opt_num is not None:
+                    param_num = opt_num + 1
+        else:
+            param_num = opt_num
+        signature = {
+            "label": label,
+            "parameters": params
+        }
+        if doc_str is not None:
+            signature["documentation"] = doc_str
+        req_dict = {
+            "signatures": [signature],
+            "activeParameter": param_num
+        }
+        return req_dict
 
     def serve_references(self, request):
         # Get parameters from request

@@ -39,6 +39,10 @@ def main():
         '--lowercase_intrinsics', action="store_true",
         help="Use lowercase for intrinsics and keywords in autocomplete requests"
     )
+    parser.add_argument(
+        '--use_signature_help', action="store_true",
+        help="Use signature help instead of subroutine/function snippets (beta)"
+    )
     group = parser.add_argument_group("DEBUG", "Options for debugging language server")
     group.add_argument(
         '--debug_parser', action="store_true",
@@ -51,6 +55,10 @@ def main():
     group.add_argument(
         '--debug_completion', action="store_true",
         help="Test completion request for specified file and position"
+    )
+    group.add_argument(
+        '--debug_signature', action="store_true",
+        help="Test signatureHelp request for specified file and position"
     )
     group.add_argument(
         '--debug_definition', action="store_true",
@@ -77,13 +85,14 @@ def main():
         print("{0}".format(__version__))
         sys.exit(0)
     debug_server = (args.debug_symbols or args.debug_completion
-                    or (args.debug_rootpath is not None))
+                    or args.debug_signature or (args.debug_rootpath is not None))
     #
     settings = {
         "symbol_include_mem": (not args.symbol_skip_mem),
         "sync_type": 2 if args.incrmental_sync else 1,
         "autocomplete_no_prefix": args.autocomplete_no_prefix,
-        "lowercase_intrinsics": args.lowercase_intrinsics
+        "lowercase_intrinsics": args.lowercase_intrinsics,
+        "use_signature_help": args.use_signature_help
     }
     #
     if args.debug_parser:
@@ -194,6 +203,48 @@ def main():
             print('  Results:')
             for obj in completion_results['items']:
                 print('    {0}: {1}'.format(obj['kind'], obj['label']))
+        #
+        if args.debug_signature:
+            print('\nTesting "textDocument/signatureHelp" request:')
+            if args.debug_filepath is None:
+                error_exit("'debug_filepath' not specified for completion test")
+            file_exists = os.path.isfile(args.debug_filepath)
+            if file_exists is False:
+                error_exit("Specified 'debug_filepath' does not exist")
+            print('  File = "{0}"'.format(args.debug_filepath))
+            if args.debug_line is None:
+                error_exit("'debug_line' not specified for completion test")
+            print('  Line = {0}'.format(args.debug_line))
+            if args.debug_char is None:
+                error_exit("'debug_char' not specified for completion test")
+            print('  Char = {0}\n'.format(args.debug_char))
+            s.serve_onSave({
+                "params": {
+                    "textDocument": {"uri": args.debug_filepath}
+                }
+            })
+            signature_results = s.serve_signature({
+                "params": {
+                    "textDocument": {"uri": args.debug_filepath},
+                    "position": {"line": args.debug_line-1, "character": args.debug_char-1}
+                }
+            })
+            if len(signature_results['signatures']) == 0:
+                print('  No Results')
+            else:
+                print('  Results:')
+                active_param = signature_results.get('activeParameter', 0)
+                print('    Active param = {0}'.format(active_param))
+                active_signature = signature_results.get('activeSignature', 0)
+                print('    Active sig   = {0}'.format(active_signature))
+                for i, signature in enumerate(signature_results['signatures']):
+                    print('    {0}'.format(signature['label']))
+                    for j, obj in enumerate(signature['parameters']):
+                        if (i == active_signature) and (j == active_param):
+                            active_mark = '*'
+                        else:
+                            active_mark = ' '
+                        print('{2}     {0} :: {1}'.format(obj['documentation'], obj['label'], active_mark))
         #
         if args.debug_definition:
             print('\nTesting "textDocument/definition" request:')
