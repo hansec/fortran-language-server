@@ -26,7 +26,8 @@ TYPE_DEF_REGEX = re.compile(r'[ ]*(TYPE)[, ]+', re.I)
 EXTENDS_REGEX = re.compile(r'EXTENDS[ ]*\(([a-z0-9_]*)\)', re.I)
 END_TYPED_REGEX = re.compile(r'[ ]*END[ ]*TYPE', re.I)
 NAT_VAR_REGEX = re.compile(r'[ ]*(INTEGER|REAL|DOUBLE PRECISION|COMPLEX'
-                           r'|CHARACTER|LOGICAL|PROCEDURE|CLASS|TYPE)', re.I)
+                           r'|DOUBLE COMPLEX|CHARACTER|LOGICAL|PROCEDURE'
+                           r'|CLASS|TYPE)', re.I)
 KIND_SPEC_REGEX = re.compile(r'([ ]*\([a-z0-9_ =*]*\)|\*[0-9]*)', re.I)
 KEYWORD_LIST_REGEX = re.compile(r'[ ]*,[ ]*(PUBLIC|PRIVATE|ALLOCATABLE|'
                                 r'POINTER|TARGET|DIMENSION\([a-z0-9_:, ]*\)|'
