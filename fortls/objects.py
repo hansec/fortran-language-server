@@ -240,12 +240,12 @@ class fortran_scope:
         if public_only:
             pub_children = []
             for child in self.children:
-                if child.name.startswith("#GEN_INT"):
-                    pub_children.append(child)
-                    continue
                 if child.vis < 0:
                     continue
                 if (self.def_vis < 0) and (child.vis <= 0):
+                    continue
+                if child.name.startswith("#GEN_INT"):
+                    pub_children.append(child)
                     continue
                 pub_children.append(child)
             return pub_children
