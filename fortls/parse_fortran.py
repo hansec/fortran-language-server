@@ -508,6 +508,7 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                     if i1 > -1 and i2 > -1:
                         link_name = obj[0][i1+1:i2]
                 for var_name in obj[2]:
+                    link_name = None
                     if var_name.find('=>') > -1:
                         name_split = var_name.split('=>')
                         name_stripped = name_split[0]
