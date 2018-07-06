@@ -630,6 +630,11 @@ class fortran_int(fortran_scope):
 class fortran_obj:
     def __init__(self, file_obj, line_number, name, var_desc, modifiers,
                  enc_scope=None, link_obj=None):
+        self.base_setup(file_obj, line_number, name, var_desc, modifiers,
+                        enc_scope, link_obj)
+
+    def base_setup(self, file_obj, line_number, name, var_desc, modifiers,
+                   enc_scope, link_obj):
         self.file = file_obj
         self.sline = line_number
         self.name = name
@@ -669,13 +674,9 @@ class fortran_obj:
         if self.link_name is None:
             return
         if self.parent is not None:
-            parent = self.parent
-            while(parent is not None):
-                for child in parent.children:
-                    if child.name.lower() == self.link_name:
-                        self.link_obj = child
-                        return
-                parent = parent.parent
+            link_obj, _ = find_in_scope(self.parent, self.link_name, obj_tree)
+            if link_obj is not None:
+                self.link_obj = link_obj
 
     def set_visibility(self, new_vis):
         self.vis = new_vis
@@ -741,6 +742,16 @@ class fortran_obj:
 
 
 class fortran_meth(fortran_obj):
+    def __init__(self, file_obj, line_number, name, var_desc, modifiers,
+                 enc_scope=None, link_obj=None):
+        self.base_setup(file_obj, line_number, name, var_desc, modifiers,
+                        enc_scope, link_obj)
+        if link_obj is None:
+            open_paren = var_desc.find('(')
+            close_paren = var_desc.find(')')
+            if (open_paren > 0) and (close_paren > open_paren):
+                self.link_name = var_desc[open_paren+1:close_paren].lower()
+
     def get_snippet(self, name_replace=None, drop_arg=None):
         if self.modifiers.count(6) > 0:
             nopass = True
