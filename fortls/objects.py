@@ -815,6 +815,7 @@ class fortran_file:
         self.pp_if = []
         self.include_stmnts = []
         self.none_scope = None
+        self.inc_scope = None
         self.current_scope = None
         self.END_REGEX = None
         self.enc_scope_name = None
@@ -967,12 +968,14 @@ class fortran_file:
             added_entities = include_path[2]
             if file_path in workspace:
                 include_obj = workspace[file_path]["ast"]
-                if (include_obj.none_scope is not None) and (include_obj.none_scope is not parent_scope):
+                if include_obj.none_scope is not None:
+                    if include_obj.inc_scope is None:
+                        include_obj.inc_scope = include_obj.none_scope
                     # Remove old objects
                     for obj in added_entities:
                         parent_scope.children.remove(obj)
                     added_entities = []
-                    for child in include_obj.none_scope.children:
+                    for child in include_obj.inc_scope.children:
                         added_entities.append(child)
                         parent_scope.add_child(child)
                         child.update_fqsn(parent_scope.FQSN)

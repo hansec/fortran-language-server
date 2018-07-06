@@ -1046,9 +1046,10 @@ class LangServer:
         if err_str is not None:
             self.post_message('Save request failed for file "{0}": {1}'.format(filepath, err_str))
             return
-        # Update include statements
-        for path, file_obj in self.workspace.items():
-            file_obj["ast"].resolve_includes(self.workspace)
+        # Update include statements linking to this file
+        for tmp_path, file_obj in self.workspace.items():
+            file_obj["ast"].resolve_includes(self.workspace, path=filepath)
+        self.workspace[filepath]["ast"].resolve_includes(self.workspace)
         # Update inheritance
         for key in self.obj_tree:
             self.obj_tree[key][0].resolve_inherit(self.obj_tree)
