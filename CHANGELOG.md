@@ -1,3 +1,15 @@
+## 0.7.0
+
+### Improvements
+* Add support for signatureHelp requests with non-overloaded subroutines/functions
+* Provide autocomplete and hover information for procedures with explicit interface definitions
+* Add support for Fortran 2008 block constructs, fixes [#23](https://github.com/hansec/fortran-language-server/issues/23)
+* Add support for "DOUBLE COMPLEX" datatype
+
+### Fixes
+* Fix bug where external interfaces were erroneously public in default private modules
+* Fix bug producing repeated objects with include statements
+
 ## 0.6.2
 
 ### Improvements
