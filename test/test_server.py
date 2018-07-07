@@ -10,7 +10,7 @@ sys.path.insert(0, root_dir)
 from fortls.jsonrpc import write_rpc_request, write_rpc_notification, read_rpc_messages
 from fortls.langserver import path_to_uri
 
-run_command = os.path.join(root_dir, "fortls.py --incrmental_sync")
+run_command = os.path.join(root_dir, "fortls.py --incrmental_sync --use_signature_help")
 test_dir = os.path.join(root_dir, "test", "test_source")
 
 
@@ -88,7 +88,7 @@ def test_change():
             "text": "",
             "range": {
                 "start": {"line": 7, "character": 0},
-                "end": {"line": 34, "character": 0}
+                "end": {"line": 39, "character": 0}
             }
         }]
     })
@@ -106,7 +106,7 @@ def test_symbols():
     def check_return(result_array):
         # Expected objects
         objs = [
-            ["test_free", 2, 0, 64],
+            ["test_free", 2, 0, 69],
             ["scale_type", 5, 4, 6],
             ["val", 13, 5, 5],
             ["vector", 5, 8, 14],
@@ -123,7 +123,8 @@ def test_symbols():
             ["vector_norm", 12, 41, 45],
             ["scaled_vector_set", 6, 47, 51],
             ["scaled_vector_norm", 12, 53, 57],
-            ["unscaled_norm", 12, 59, 63]
+            ["unscaled_norm", 12, 59, 63],
+            ["test_sig_sub", 6, 65, 68]
         ]
         assert len(result_array) == len(objs)
         for i, obj in enumerate(objs):
@@ -228,8 +229,8 @@ def test_comp():
     errcode, results = run_request(string)
     #
     assert errcode == 0
-    check_return(results[1], [1, "myfun(n,xval)"])
-    check_return(results[2], [4, "glob_sub(n,xval,yval)"])
+    check_return(results[1], [1, "myfun(n, xval)"])
+    check_return(results[2], [4, "glob_sub(n, xval, yval)"])
     check_return(results[3], [1, "stretch_vector"])
     check_return(results[4], [4, "scale"])
     check_return(results[5], [2, "n"])
@@ -245,6 +246,45 @@ def test_comp():
     check_return(results[15], [3, "res0"])
     check_return(results[16], [4, "res0"])
     check_return(results[17], [5, "res0"])
+
+def test_sig():
+    def check_return(results, checks):
+        assert results.get('activeParameter', -1) == checks[0]
+        signatures = results.get('signatures')
+        assert signatures[0].get('label') == checks[2]
+        assert len(signatures[0].get('parameters')) == checks[1]
+    #
+    string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
+    file_path = os.path.join(test_dir, "test_prog.f08")
+    string += write_rpc_request(2, "textDocument/signatureHelp", {
+        "textDocument": {"uri": file_path},
+        "position": {"line": 23, "character": 18}
+    })
+    string += write_rpc_request(2, "textDocument/signatureHelp", {
+        "textDocument": {"uri": file_path},
+        "position": {"line": 23, "character": 20}
+    })
+    string += write_rpc_request(2, "textDocument/signatureHelp", {
+        "textDocument": {"uri": file_path},
+        "position": {"line": 23, "character": 22}
+    })
+    string += write_rpc_request(2, "textDocument/signatureHelp", {
+        "textDocument": {"uri": file_path},
+        "position": {"line": 23, "character": 27}
+    })
+    string += write_rpc_request(2, "textDocument/signatureHelp", {
+        "textDocument": {"uri": file_path},
+        "position": {"line": 23, "character": 29}
+    })
+    errcode, results = run_request(string)
+    #
+    assert errcode == 0
+    sub_sig = "test_sig_sub(arg1, arg2, opt1=opt1, opt2=opt2, opt3=opt3)"
+    check_return(results[1], [0, 5, sub_sig])
+    check_return(results[2], [1, 5, sub_sig])
+    check_return(results[3], [2, 5, sub_sig])
+    check_return(results[4], [3, 5, sub_sig])
+    check_return(results[5], [4, 5, sub_sig])
 
 
 def test_def():

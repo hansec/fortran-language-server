@@ -236,6 +236,9 @@ class fortran_scope:
     def get_documentation(self, long=False):
         return None, False
 
+    def get_signature(self):
+        return None, None, None
+
     def get_children(self, public_only=False):
         if public_only:
             pub_children = []
@@ -375,7 +378,8 @@ class fortran_submodule(fortran_module):
 class fortran_subroutine(fortran_scope):
     def __init__(self, file_obj, line_number, name, enc_scope=None, args="", mod_sub=False):
         self.base_setup(file_obj, line_number, name, enc_scope)
-        self.args = args
+        self.args = args.replace(' ', '').lower()
+        self.args_snip = self.args
         self.arg_objs = []
         self.in_children = []
         self.mod_scope = mod_sub
@@ -389,6 +393,7 @@ class fortran_subroutine(fortran_scope):
     def copy_interface(self, copy_source):
         # Copy arguments
         self.args = copy_source.args
+        self.args_snip = copy_source.args_snip
         self.arg_objs = copy_source.arg_objs
         # Get current fields
         child_names = []
@@ -397,6 +402,8 @@ class fortran_subroutine(fortran_scope):
         # Import arg_objs from copy object
         self.in_children = []
         for child in copy_source.arg_objs:
+            if child is None:
+                continue
             if child.name.lower() not in child_names:
                 self.in_children.append(child)
 
@@ -406,8 +413,8 @@ class fortran_subroutine(fortran_scope):
         return tmp_list
 
     def resolve_arg_link(self, obj_tree):
-        self.arg_objs = []
-        arg_list = self.args.replace(' ', '').lower().split(',')
+        arg_list = self.args.replace(' ', '').split(',')
+        self.arg_objs = [None for arg in arg_list]
         for child in self.children:
             ind = -1
             for i, arg in enumerate(arg_list):
@@ -415,11 +422,11 @@ class fortran_subroutine(fortran_scope):
                     ind = i
                     break
             if ind >= 0:
-                self.arg_objs.append(child)
+                self.arg_objs[ind] = child
                 if child.is_optional():
                     arg_list[ind] = "{0}={0}".format(arg_list[ind])
             child.resolve_link(obj_tree)
-        self.args = ",".join(arg_list)
+        self.args_snip = ",".join(arg_list)
 
     def resolve_link(self, obj_tree):
         self.resolve_arg_link(obj_tree)
@@ -428,7 +435,7 @@ class fortran_subroutine(fortran_scope):
         return 2
 
     def get_snippet(self, name_replace=None, drop_arg=None):
-        arg_list = self.args.split(",")
+        arg_list = self.args_snip.split(",")
         if drop_arg is not None:
             if len(arg_list) > 1:
                 arg_list = arg_list[1:]
@@ -443,8 +450,8 @@ class fortran_subroutine(fortran_scope):
                     place_holders.append("{1}=${{{0}:{2}}}".format(i+1, opt_split[0], opt_split[1]))
                 else:
                     place_holders.append("${{{0}:{1}}}".format(i+1, arg))
-            arg_str = "({0})".format(",".join(arg_list))
-            arg_snip = "({0})".format(",".join(place_holders))
+            arg_str = "({0})".format(", ".join(arg_list))
+            arg_snip = "({0})".format(", ".join(place_holders))
         else:
             arg_str = "()"
         name = self.name
@@ -460,27 +467,42 @@ class fortran_subroutine(fortran_scope):
 
     def get_documentation(self, long=False):
         if long:
-            skip_arg = False
             hover_str, _ = self.get_snippet()
             hover_str += "\n"
             for arg_obj in self.arg_objs:
-                if skip_arg:
-                    skip_arg = False
+                if arg_obj is None:
                     continue
                 arg_doc, _ = arg_obj.get_documentation()
-                tmp_str = "  " + arg_doc
-                tmp_str += " :: {0}".format(arg_obj.name)
-                hover_str = hover_str + tmp_str + "\n"
+                hover_str += " {0} :: {1}\n".format(arg_doc, arg_obj.name)
             return hover_str, True
         else:
             return None, False
+
+    def get_signature(self):
+        arg_sigs = []
+        arg_list = self.args.split(",")
+        for i, arg_obj in enumerate(self.arg_objs):
+            if arg_obj is None:
+                arg_sigs.append({"label": arg_list[i]})
+            else:
+                if arg_obj.is_optional():
+                    label = "{0}={0}".format(arg_obj.name.lower())
+                else:
+                    label = arg_obj.name.lower()
+                arg_sigs.append({
+                    "label": label,
+                    "documentation": arg_obj.get_documentation()[0]
+                })
+        call_sig, _ = self.get_snippet()
+        return call_sig, None, arg_sigs
 
 
 class fortran_function(fortran_subroutine):
     def __init__(self, file_obj, line_number, name, enc_scope=None, args="",
                  mod_fun=False, return_type=None, result_var=None):
         self.base_setup(file_obj, line_number, name, enc_scope)
-        self.args = args
+        self.args = args.replace(' ', '').lower()
+        self.args_snip = self.args
         self.arg_objs = []
         self.in_children = []
         self.mod_scope = mod_fun
@@ -496,6 +518,7 @@ class fortran_function(fortran_subroutine):
     def copy_interface(self, copy_source):
         # Copy arguments and returns
         self.args = copy_source.args
+        self.args_snip = copy_source.args_snip
         self.arg_objs = copy_source.arg_objs
         self.result_var = copy_source.result_var
         self.result_obj = copy_source.result_obj
@@ -506,6 +529,8 @@ class fortran_function(fortran_subroutine):
         # Import arg_objs from copy object
         self.in_children = []
         for child in copy_source.arg_objs:
+            if child is None:
+                continue
             if child.name.lower() not in child_names:
                 self.in_children.append(child)
         if copy_source.result_obj is not None:
@@ -719,6 +744,9 @@ class fortran_obj:
             doc_str += ", ".join(get_keywords(self.modifiers))
         return doc_str, True
 
+    def get_signature(self):
+        return None, None, None
+
     def get_children(self, public_only=False):
         return []
 
@@ -783,10 +811,10 @@ class fortran_meth(fortran_obj):
                 if skip_arg:
                     skip_arg = False
                     continue
+                if arg_obj is None:
+                    continue
                 arg_doc, _ = arg_obj.get_documentation()
-                tmp_str = "  " + arg_doc
-                tmp_str += " :: {0}".format(arg_obj.name)
-                hover_str = hover_str + tmp_str + "\n"
+                hover_str += " {0} :: {1}\n".format(arg_doc, arg_obj.name)
             return hover_str, True
         else:
             if self.link_obj is not None:
@@ -797,6 +825,31 @@ class fortran_meth(fortran_obj):
                 doc_str += ", "
                 doc_str += ", ".join(get_keywords(self.modifiers))
             return doc_str, True
+
+    def get_signature(self):
+        arg_sigs = []
+        skip_arg = False
+        if self.modifiers.count(6) == 0:
+            skip_arg = True
+        var_obj = self.link_obj
+        arg_list = var_obj.args.split(",")
+        for i, arg_obj in enumerate(var_obj.arg_objs):
+            if skip_arg:
+                skip_arg = False
+                continue
+            if arg_obj is None:
+                arg_sigs.append({"label": arg_list[i]})
+            else:
+                if arg_obj.is_optional():
+                    label = "{0}={0}".format(arg_obj.name.lower())
+                else:
+                    label = arg_obj.name.lower()
+                arg_sigs.append({
+                    "label": label,
+                    "documentation": arg_obj.get_documentation()[0]
+                })
+        call_sig, _ = self.get_snippet()
+        return call_sig, None, arg_sigs
 
     def is_callable(self):
         return True

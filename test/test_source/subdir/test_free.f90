@@ -62,4 +62,9 @@ CLASS(scaled_vector), INTENT(in) :: self
 REAL(8) :: unscaled_norm
 unscaled_norm = SQRT(DOT_PRODUCT(self%v,self%v))
 END FUNCTION unscaled_norm
+!
+SUBROUTINE test_sig_sub(arg1,arg2,opt1,opt2,opt3)
+INTEGER, INTENT(in) :: arg1,arg2
+INTEGER, OPTIONAL, INTENT(in) :: opt1,opt2,opt3
+END SUBROUTINE test_sig_sub
 END MODULE test_free

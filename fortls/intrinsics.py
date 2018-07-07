@@ -16,7 +16,7 @@ class fortran_intrinsic_obj:
         self.name = name
         self.type = type
         self.doc_str = doc_str
-        self.args = args
+        self.args = args.lower()
         self.parent = parent
         self.file = none_file
         if lowercase_intrinsics:
@@ -50,8 +50,8 @@ class fortran_intrinsic_obj:
                     place_holders.append("{1}=${{{0}:{2}}}".format(i+1, opt_split[0], opt_split[1]))
                 else:
                     place_holders.append("${{{0}:{1}}}".format(i+1, arg))
-            arg_str = "({0})".format(",".join(arg_list))
-            arg_snip = "({0})".format(",".join(place_holders))
+            arg_str = "({0})".format(", ".join(arg_list))
+            arg_snip = "({0})".format(", ".join(place_holders))
         name = self.name
         if name_replace is not None:
             name = name_replace
@@ -59,6 +59,13 @@ class fortran_intrinsic_obj:
         if arg_snip is not None:
             snippet = name + arg_snip
         return name + arg_str, snippet
+
+    def get_signature(self):
+        arg_sigs = []
+        for arg in self.args.split(","):
+            arg_sigs.append({"label": arg})
+        call_sig, _ = self.get_snippet()
+        return call_sig, self.doc_str, arg_sigs
 
     def get_documentation(self, long=False):
         return self.doc_str, False

@@ -28,6 +28,12 @@ Auto Completion:
 
 .. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_autocomplete.gif
 
+Signature Help (beta):
+
+*Note:* Not available for overloaded subroutines/functions.
+
+.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_sigHelp.gif
+
 Go to definition:
 
 .. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_gotodef.gif
@@ -64,6 +70,7 @@ The following global settings can be used when launching the language server.
 * ``--incrmental_sync`` Use incremental document synchronization (beta)
 * ``--autocomplete_no_prefix`` Do not filter autocomplete results by variable prefix
 * ``--lowercase_intrinsics`` Use lowercase for intrinsics and keywords in autocomplete requests
+* ``--use_signature_help`` Use signature help instead of snippets for subroutines/functions (beta)
 
 **Debug settings:**
 
@@ -76,6 +83,7 @@ The following settings can be used to perform `standalone debug tests <https://g
 * ``--debug_parser`` Test source code parser on specified file
 * ``--debug_symbols`` Test symbol request for specified file
 * ``--debug_completion`` Test completion request for specified file and position
+* ``--debug_signature`` Test signatureHelp request for specified file and position
 * ``--debug_definition`` Test definition request for specified file and position
 
 Configuration
