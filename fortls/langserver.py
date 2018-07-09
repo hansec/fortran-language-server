@@ -883,7 +883,7 @@ class LangServer:
             nLine = len(line)
             line_grouped = tokenize_line(line)
             if len(line_grouped) < 2:
-                return None
+                return None, None
             lowest_level = -1
             for i, level in enumerate(line_grouped):
                 if level[-1][0][-1][-1] == nLine:
@@ -892,9 +892,9 @@ class LangServer:
                 arg_string = ''
                 for char_group in line_grouped[lowest_level]:
                     arg_string += char_group[-1]
-                return line_grouped[lowest_level-1][0][1], arg_string.split(',')
+                return line_grouped[lowest_level-1][0][1].strip(), arg_string.split(',')
             else:
-                return None
+                return None, None
 
         def check_optional(arg, params):
             opt_split = arg.split("=")
