@@ -21,12 +21,22 @@ def map_keywords(keywords):
             modifiers.append(5)
         elif key_lower == 'nopass':
             modifiers.append(6)
-        elif key_lower == 'intent(in)':
+        elif key_lower == 'target':
             modifiers.append(7)
-        elif key_lower == 'intent(out)':
+        elif key_lower == 'save':
             modifiers.append(8)
-        elif key_lower == 'intent(inout)':
+        elif key_lower == 'parameter':
             modifiers.append(9)
+        elif key_lower == 'contiguous':
+            modifiers.append(10)
+        elif key_lower == 'deferred':
+            modifiers.append(11)
+        elif key_lower == 'intent(in)':
+            modifiers.append(101)
+        elif key_lower == 'intent(out)':
+            modifiers.append(102)
+        elif key_lower == 'intent(inout)':
+            modifiers.append(103)
         elif key_lower.startswith('dimension'):
             ndims = key_lower.count(':')
             modifiers.append(20+ndims)
@@ -50,10 +60,20 @@ def get_keywords(modifiers):
         elif modifier == 6:
             mod_strings.append('NOPASS')
         elif modifier == 7:
-            mod_strings.append('INTENT(IN)')
+            mod_strings.append('TARGET')
         elif modifier == 8:
-            mod_strings.append('INTENT(OUT)')
+            mod_strings.append('SAVE')
         elif modifier == 9:
+            mod_strings.append('PARAMETER')
+        elif modifier == 10:
+            mod_strings.append('CONTIGUOUS')
+        elif modifier == 11:
+            mod_strings.append('DEFERRED')
+        elif modifier == 101:
+            mod_strings.append('INTENT(IN)')
+        elif modifier == 102:
+            mod_strings.append('INTENT(OUT)')
+        elif modifier == 103:
             mod_strings.append('INTENT(INOUT)')
         elif modifier > 20:
             dim_str = ":"

@@ -32,7 +32,7 @@ KIND_SPEC_REGEX = re.compile(r'([ ]*\([a-z0-9_ =*]*\)|\*[0-9]*)', re.I)
 KEYWORD_LIST_REGEX = re.compile(r'[ ]*,[ ]*(PUBLIC|PRIVATE|ALLOCATABLE|'
                                 r'POINTER|TARGET|DIMENSION\([a-z0-9_:, ]*\)|'
                                 r'OPTIONAL|INTENT\([inout]*\)|DEFERRED|NOPASS|'
-                                r'SAVE|PARAMETER)', re.I)
+                                r'SAVE|PARAMETER|CONTIGUOUS)', re.I)
 TATTR_LIST_REGEX = re.compile(r'[ ]*,[ ]*(PUBLIC|PRIVATE|ABSTRACT|EXTENDS\([a-z0-9_]*\))', re.I)
 VIS_REGEX = re.compile(r'(PUBLIC|PRIVATE)', re.I)
 WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
