@@ -43,6 +43,10 @@ def main():
         '--use_signature_help', action="store_true",
         help="Use signature help instead of subroutine/function snippets (beta)"
     )
+    parser.add_argument(
+        '--variable_hover', action="store_true",
+        help="Show hover information for variables (default: subroutines/functions only)"
+    )
     group = parser.add_argument_group("DEBUG", "Options for debugging language server")
     group.add_argument(
         '--debug_parser', action="store_true",
@@ -65,6 +69,10 @@ def main():
         help="Test definition request for specified file and position"
     )
     group.add_argument(
+        '--debug_hover', action="store_true",
+        help="Test hover request for specified file and position"
+    )
+    group.add_argument(
         '--debug_filepath', type=str,
         help="File path for language server tests"
     )
@@ -85,14 +93,16 @@ def main():
         print("{0}".format(__version__))
         sys.exit(0)
     debug_server = (args.debug_symbols or args.debug_completion
-                    or args.debug_signature or (args.debug_rootpath is not None))
+                    or args.debug_signature or args.debug_definition
+                    or args.debug_hover or (args.debug_rootpath is not None))
     #
     settings = {
         "symbol_include_mem": (not args.symbol_skip_mem),
         "sync_type": 2 if args.incrmental_sync else 1,
         "autocomplete_no_prefix": args.autocomplete_no_prefix,
         "lowercase_intrinsics": args.lowercase_intrinsics,
-        "use_signature_help": args.use_signature_help
+        "use_signature_help": args.use_signature_help,
+        "variable_hover": args.variable_hover
     }
     #
     if args.debug_parser:
@@ -133,9 +143,7 @@ def main():
             print('\nTesting "initialize" request:')
             print('  Root = "{0}"\n'.format(args.debug_rootpath))
             s.serve_initialize({
-                "params": {
-                    "rootPath": args.debug_rootpath
-                }
+                "params": {"rootPath": args.debug_rootpath}
             })
             if len(s.post_messages) == 0:
                 print("  Succesful")
@@ -150,12 +158,7 @@ def main():
         #
         if args.debug_symbols:
             print('\nTesting "textDocument/documentSymbol" request:')
-            if args.debug_filepath is None:
-                error_exit("'debug_filepath' not specified for document symbol test")
-            file_exists = os.path.isfile(args.debug_filepath)
-            if file_exists is False:
-                error_exit("Specified 'debug_filepath' does not exist")
-            print('  File = "{0}"\n'.format(args.debug_filepath))
+            check_request_params(args, loc_needed=False)
             s.serve_onSave({
                 "params": {
                     "textDocument": {"uri": args.debug_filepath}
@@ -177,18 +180,7 @@ def main():
         #
         if args.debug_completion:
             print('\nTesting "textDocument/completion" request:')
-            if args.debug_filepath is None:
-                error_exit("'debug_filepath' not specified for completion test")
-            file_exists = os.path.isfile(args.debug_filepath)
-            if file_exists is False:
-                error_exit("Specified 'debug_filepath' does not exist")
-            print('  File = "{0}"'.format(args.debug_filepath))
-            if args.debug_line is None:
-                error_exit("'debug_line' not specified for completion test")
-            print('  Line = {0}'.format(args.debug_line))
-            if args.debug_char is None:
-                error_exit("'debug_char' not specified for completion test")
-            print('  Char = {0}\n'.format(args.debug_char))
+            check_request_params(args)
             s.serve_onSave({
                 "params": {
                     "textDocument": {"uri": args.debug_filepath}
@@ -206,18 +198,7 @@ def main():
         #
         if args.debug_signature:
             print('\nTesting "textDocument/signatureHelp" request:')
-            if args.debug_filepath is None:
-                error_exit("'debug_filepath' not specified for completion test")
-            file_exists = os.path.isfile(args.debug_filepath)
-            if file_exists is False:
-                error_exit("Specified 'debug_filepath' does not exist")
-            print('  File = "{0}"'.format(args.debug_filepath))
-            if args.debug_line is None:
-                error_exit("'debug_line' not specified for completion test")
-            print('  Line = {0}'.format(args.debug_line))
-            if args.debug_char is None:
-                error_exit("'debug_char' not specified for completion test")
-            print('  Char = {0}\n'.format(args.debug_char))
+            check_request_params(args)
             s.serve_onSave({
                 "params": {
                     "textDocument": {"uri": args.debug_filepath}
@@ -248,36 +229,51 @@ def main():
         #
         if args.debug_definition:
             print('\nTesting "textDocument/definition" request:')
-            if args.debug_filepath is None:
-                error_exit("'debug_filepath' not specified for definition test")
-            file_exists = os.path.isfile(args.debug_filepath)
-            if file_exists is False:
-                error_exit("Specified 'debug_filepath' does not exist")
-            print('  File = "{0}"'.format(args.debug_filepath))
-            if args.debug_line is None:
-                error_exit("'debug_line' not specified for definition test")
-            print('  Line = {0}'.format(args.debug_line))
-            if args.debug_char is None:
-                error_exit("'debug_char' not specified for definition test")
-            print('  Char = {0}\n'.format(args.debug_char))
+            check_request_params(args)
             s.serve_onSave({
                 "params": {
                     "textDocument": {"uri": args.debug_filepath}
                 }
             })
-            completion_results = s.serve_definition({
+            definition_results = s.serve_definition({
                 "params": {
                     "textDocument": {"uri": args.debug_filepath},
                     "position": {"line": args.debug_line-1, "character": args.debug_char-1}
                 }
             })
             print('  Result:')
-            if completion_results is None:
+            if definition_results is None:
                 print('    No result found!')
             else:
-                print('    URI  = "{0}"'.format(completion_results['uri']))
-                print('    Line = {0}'.format(completion_results['range']['start']['line']+1))
-                print('    Char = {0}'.format(completion_results['range']['start']['character']+1))
+                print('    URI  = "{0}"'.format(definition_results['uri']))
+                print('    Line = {0}'.format(definition_results['range']['start']['line']+1))
+                print('    Char = {0}'.format(definition_results['range']['start']['character']+1))
+        #
+        if args.debug_hover:
+            print('\nTesting "textDocument/hover" request:')
+            check_request_params(args)
+            s.serve_onSave({
+                "params": {
+                    "textDocument": {"uri": args.debug_filepath}
+                }
+            })
+            hover_results = s.serve_hover({
+                "params": {
+                    "textDocument": {"uri": args.debug_filepath},
+                    "position": {"line": args.debug_line-1, "character": args.debug_char-1}
+                }
+            })
+            print('  Result:')
+            if hover_results is None:
+                print('    No result found!')
+            else:
+                contents = hover_results['contents']
+                print('=======')
+                if isinstance(contents, dict):
+                    print(contents['value'])
+                else:
+                    print(contents)
+                print('=======')
         tmpout.close()
         tmpin.close()
     #
@@ -286,6 +282,22 @@ def main():
         s = LangServer(conn=JSONRPC2Connection(ReadWriter(stdin, stdout)),
                        logLevel=0, settings=settings)
         s.run()
+
+
+def check_request_params(args, loc_needed=True):
+    if args.debug_filepath is None:
+        error_exit("'debug_filepath' not specified for debug request")
+    file_exists = os.path.isfile(args.debug_filepath)
+    if file_exists is False:
+        error_exit("Specified 'debug_filepath' does not exist")
+    print('  File = "{0}"'.format(args.debug_filepath))
+    if loc_needed:
+        if args.debug_line is None:
+            error_exit("'debug_line' not specified for debug request")
+        print('  Line = {0}'.format(args.debug_line))
+        if args.debug_char is None:
+            error_exit("'debug_char' not specified for debug request")
+        print('  Char = {0}\n'.format(args.debug_char))
 
 
 def print_children(obj, indent=""):

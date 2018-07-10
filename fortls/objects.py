@@ -248,7 +248,7 @@ class fortran_scope:
     def get_desc(self):
         return 'unknown'
 
-    def get_snippet(self, name_replace=None, drop_arg=None):
+    def get_snippet(self, name_replace=None, drop_arg=False):
         if name_replace is not None:
             return name_replace, None
         return self.name, None
@@ -454,9 +454,9 @@ class fortran_subroutine(fortran_scope):
     def get_type(self):
         return 2
 
-    def get_snippet(self, name_replace=None, drop_arg=None):
+    def get_snippet(self, name_replace=None, drop_arg=False):
         arg_list = self.args_snip.split(",")
-        if drop_arg is not None:
+        if drop_arg:
             if len(arg_list) > 1:
                 arg_list = arg_list[1:]
             else:
@@ -487,14 +487,14 @@ class fortran_subroutine(fortran_scope):
 
     def get_documentation(self, long=False):
         if long:
-            hover_str, _ = self.get_snippet()
-            hover_str += "\n"
+            sub_sig, _ = self.get_snippet()
+            hover_array = ["SUBROUTINE " + sub_sig]
             for arg_obj in self.arg_objs:
                 if arg_obj is None:
                     continue
                 arg_doc, _ = arg_obj.get_documentation()
-                hover_str += " {0} :: {1}\n".format(arg_doc, arg_obj.name)
-            return hover_str, True
+                hover_array.append(" {0} :: {1}".format(arg_doc, arg_obj.name))
+            return "\n".join(hover_array), True
         else:
             return None, False
 
@@ -578,6 +578,24 @@ class fortran_function(fortran_subroutine):
 
     def is_callable(self):
         return False
+
+    def get_documentation(self, long=False):
+        if long:
+            fun_sig, _ = self.get_snippet()
+            fun_return = ""
+            if self.result_obj is not None:
+                fun_return, _ = self.result_obj.get_documentation()
+            if self.return_type is not None:
+                fun_return = self.return_type
+            hover_array = ["{0} FUNCTION {1}".format(fun_return, fun_sig)]
+            for arg_obj in self.arg_objs:
+                if arg_obj is None:
+                    continue
+                arg_doc, _ = arg_obj.get_documentation()
+                hover_array.append(" {0} :: {1}".format(arg_doc, arg_obj.name))
+            return "\n".join(hover_array), True
+        else:
+            return None, False
 
 
 class fortran_type(fortran_scope):
@@ -745,7 +763,7 @@ class fortran_obj:
                 return
         self.modifiers.append(ndim+20)
 
-    def get_snippet(self, name_replace=None, drop_arg=None):
+    def get_snippet(self, name_replace=None, drop_arg=False):
         name = self.name
         if name_replace is not None:
             name = name_replace
@@ -755,9 +773,6 @@ class fortran_obj:
         return name, None
 
     def get_documentation(self, long=False):
-        if self.link_obj is not None:
-            return self.link_obj.get_documentation()
-        #
         doc_str = self.desc
         if len(self.modifiers) > 0:
             doc_str += ", "
@@ -794,23 +809,24 @@ class fortran_meth(fortran_obj):
                  enc_scope=None, link_obj=None):
         self.base_setup(file_obj, line_number, name, var_desc, modifiers,
                         enc_scope, link_obj)
+        self.drop_arg = False
         if link_obj is None:
             open_paren = var_desc.find('(')
             close_paren = var_desc.find(')')
             if (open_paren > 0) and (close_paren > open_paren):
                 self.link_name = var_desc[open_paren+1:close_paren].lower()
 
-    def get_snippet(self, name_replace=None, drop_arg=None):
-        if self.modifiers.count(6) > 0:
-            nopass = True
-        else:
-            nopass = False
-        #
+    def set_parent(self, parent_obj):
+        self.parent = parent_obj
+        if (self.parent.get_type() == 4) and (self.modifiers.count(6) == 0):
+            self.drop_arg = True
+
+    def get_snippet(self, name_replace=None, drop_arg=False):
         name = self.name
         if name_replace is not None:
             name = name_replace
         if self.link_obj is not None:
-            return self.link_obj.get_snippet(name, nopass)
+            return self.link_obj.get_snippet(name, self.drop_arg)
         return name, None
 
     def get_type(self):
@@ -821,25 +837,30 @@ class fortran_meth(fortran_obj):
 
     def get_documentation(self, long=False):
         if long:
-            skip_arg = False
-            hover_str, _ = self.get_snippet()
-            hover_str += "\n"
-            if self.modifiers.count(6) == 0:
-                skip_arg = True
-            var_obj = self.link_obj
-            for arg_obj in var_obj.arg_objs:
-                if skip_arg:
-                    skip_arg = False
-                    continue
-                if arg_obj is None:
-                    continue
-                arg_doc, _ = arg_obj.get_documentation()
-                hover_str += " {0} :: {1}\n".format(arg_doc, arg_obj.name)
+            sub_sig, _ = self.get_snippet()
+            hover_str = "{0} {1}\n".format(self.get_desc(), sub_sig)
+            if self.link_obj is not None:
+                link_hover, _ = self.link_obj.get_documentation(long=True)
+                hover_split = link_hover.splitlines()
+                call_sig = hover_split[0]
+                paren_start = call_sig.rfind('(')
+                link_name_len = len(self.link_obj.name)
+                call_sig = call_sig[:paren_start-link_name_len] + self.name + call_sig[paren_start:]
+                paren_start += len(self.name) - link_name_len
+                if self.drop_arg:
+                    paren_end = call_sig.rfind(')')
+                    args = call_sig[paren_start+1:paren_end].split(',')
+                    if len(args) > 1:
+                        args = args[1:]
+                    else:
+                        args = []
+                    call_sig = call_sig[:paren_start] + '(' + (','.join(args)).strip() + ')'
+                    arg_list = hover_split[2:]
+                else:
+                    arg_list = hover_split[1:]
+                hover_str = '\n'.join([call_sig] + arg_list)
             return hover_str, True
         else:
-            if self.link_obj is not None:
-                return self.link_obj.get_documentation()
-            #
             doc_str = self.desc
             if len(self.modifiers) > 0:
                 doc_str += ", "
@@ -848,14 +869,10 @@ class fortran_meth(fortran_obj):
 
     def get_signature(self):
         arg_sigs = []
-        skip_arg = False
-        if self.modifiers.count(6) == 0:
-            skip_arg = True
         var_obj = self.link_obj
         arg_list = var_obj.args.split(",")
         for i, arg_obj in enumerate(var_obj.arg_objs):
-            if skip_arg:
-                skip_arg = False
+            if self.drop_arg and (i == 0):
                 continue
             if arg_obj is None:
                 arg_sigs.append({"label": arg_list[i]})
