@@ -341,6 +341,7 @@ class LangServer:
         self.autocomplete_no_prefix = settings.get("autocomplete_no_prefix", False)
         self.lowercase_intrinsics = settings.get("lowercase_intrinsics", False)
         self.use_signature_help = settings.get("use_signature_help", False)
+        self.variable_hover = settings.get("variable_hover", False)
         if self.lowercase_intrinsics:
             set_lowercase_intrinsics()
         self.intrinsics = get_intrinsics()
@@ -1079,21 +1080,25 @@ class LangServer:
         # Construct hover information
         if var_obj is not None:
             var_type = var_obj.get_type()
+            hover_str = None
             # Currently only show for subroutines
             if var_type == 2 or var_type == 3:
                 hover_str, highlight = var_obj.get_documentation(long=True)
-                if hover_str is not None:
-                    if highlight:
-                        return {
-                            "contents": {
-                                "language": "fortran",
-                                "value": hover_str
-                            }
+            elif var_type == 6 and self.variable_hover:
+                hover_str, highlight = var_obj.get_documentation()
+            #
+            if hover_str is not None:
+                if highlight:
+                    return {
+                        "contents": {
+                            "language": "fortran",
+                            "value": hover_str
                         }
-                    else:
-                        return {
-                            "contents": hover_str
-                        }
+                    }
+                else:
+                    return {
+                        "contents": hover_str
+                    }
         else:
             return None
 
