@@ -28,7 +28,7 @@ def main():
         help="Do not include type members in document symbol results"
     )
     parser.add_argument(
-        '--incrmental_sync', action="store_true",
+        '--incremental_sync', '--incrmental_sync', action="store_true",
         help="Use incremental document synchronization (beta)"
     )
     parser.add_argument(
@@ -98,7 +98,7 @@ def main():
     #
     settings = {
         "symbol_include_mem": (not args.symbol_skip_mem),
-        "sync_type": 2 if args.incrmental_sync else 1,
+        "sync_type": 2 if args.incremental_sync else 1,
         "autocomplete_no_prefix": args.autocomplete_no_prefix,
         "lowercase_intrinsics": args.lowercase_intrinsics,
         "use_signature_help": args.use_signature_help,
