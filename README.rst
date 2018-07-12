@@ -67,10 +67,11 @@ Language server settings
 The following global settings can be used when launching the language server.
 
 * ``--symbol_skip_mem`` Do not include type members in document symbol results
-* ``--incrmental_sync`` Use incremental document synchronization (beta)
+* ``--incremental_sync`` Use incremental document synchronization (beta)
 * ``--autocomplete_no_prefix`` Do not filter autocomplete results by variable prefix
 * ``--lowercase_intrinsics`` Use lowercase for intrinsics and keywords in autocomplete requests
 * ``--use_signature_help`` Use signature help instead of snippets for subroutines/functions (beta)
+* ``--variable_hover`` Show hover information for variables (default: subroutines/functions only)
 
 **Debug settings:**
 

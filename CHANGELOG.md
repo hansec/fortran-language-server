@@ -1,3 +1,18 @@
+## 0.7.1
+
+### Improvements
+* Add option for displaying hover information for variables
+* Add subroutine/function keywords to hover information
+* Add more keywords to variable information
+* Support spaces between subroutine name and parentheses in signatureHelp
+
+### Fixes
+* Fix bug with file paths that include spaces, fixes [#29](https://github.com/hansec/fortran-language-server/issues/29)
+* Fix bug where arguments were erroneously dropped for procedure variables
+* Fix bug where arguments of procedure type did not have definition information in subroutine/function hover results
+* Correct spelling of incremental_sync argument, fixes [#28](https://github.com/hansec/fortran-language-server/issues/28)
+
+
 ## 0.7.0
 
 ### Improvements
