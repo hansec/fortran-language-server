@@ -4,8 +4,9 @@ import os
 import traceback
 import re
 try:
-    from urllib.parse import unquote
+    from urllib.parse import unquote, quote
 except ImportError:
+    from urllib2 import quote
     from urlparse import unquote
 # Local modules
 from fortls.parse_fortran import process_file, read_use_stmt, read_var_def, \
@@ -46,9 +47,9 @@ def path_from_uri(uri):
 def path_to_uri(path):
     # Convert path to file uri (add html like head part)
     if os.name == "nt":
-        return "file:///"+path
+        return "file:///" + quote(path)
     else:
-        return "file://"+path
+        return "file://" + quote(path)
 
 
 def read_file_split(filepath):
