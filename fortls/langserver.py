@@ -3,6 +3,10 @@ import sys
 import os
 import traceback
 import re
+try:
+    from urllib.parse import unquote
+except ImportError:
+    from urlparse import unquote
 # Local modules
 from fortls.parse_fortran import process_file, read_use_stmt, read_var_def, \
     detect_fixed_format, detect_comment_start
@@ -34,10 +38,9 @@ def path_from_uri(uri):
         return uri
     if os.name == "nt":
         _, path = uri.split("file:///", 1)
-        path = path.replace("%3A", ":")  # Replace escaped colon in Windows paths
     else:
         _, path = uri.split("file://", 1)
-    return path
+    return unquote(path)
 
 
 def path_to_uri(path):
