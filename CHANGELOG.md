@@ -1,3 +1,8 @@
+## 0.7.2
+
+### Fixes
+* Fix variable definition detection without spaces, fixes [#30](https://github.com/hansec/fortran-language-server/issues/30)
+
 ## 0.7.1
 
 ### Improvements
@@ -11,7 +16,6 @@
 * Fix bug where arguments were erroneously dropped for procedure variables
 * Fix bug where arguments of procedure type did not have definition information in subroutine/function hover results
 * Correct spelling of incremental_sync argument, fixes [#28](https://github.com/hansec/fortran-language-server/issues/28)
-
 
 ## 0.7.0
 
