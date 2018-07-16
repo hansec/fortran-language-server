@@ -160,8 +160,8 @@ def read_var_def(line, type_word=None):
         # Class and Type statements need a kind spec
         if type_word.lower() == 'class' or type_word.lower() == 'type':
             return None
-        # Make sure next character is space or comma
-        if trailing_line[0] != ' ' and trailing_line[0] != ',':
+        # Make sure next character is space or comma or colon
+        if not trailing_line[0] in (' ', ',', ':'):
             return None
     #
     keywords, trailing_line = parse_keywords(trailing_line)
