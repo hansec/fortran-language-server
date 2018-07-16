@@ -124,7 +124,7 @@ def test_symbols():
             ["scaled_vector_set", 6, 47, 51],
             ["scaled_vector_norm", 12, 53, 57],
             ["unscaled_norm", 12, 59, 63],
-            ["test_sig_sub", 6, 65, 68]
+            ["test_sig_Sub", 6, 65, 68]
         ]
         assert len(result_array) == len(objs)
         for i, obj in enumerate(objs):
@@ -279,7 +279,7 @@ def test_sig():
     errcode, results = run_request(string)
     #
     assert errcode == 0
-    sub_sig = "test_sig_sub(arg1, arg2, opt1=opt1, opt2=opt2, opt3=opt3)"
+    sub_sig = "test_sig_Sub(arg1, arg2, opt1=opt1, opt2=opt2, opt3=opt3)"
     check_return(results[1], [0, 5, sub_sig])
     check_return(results[2], [1, 5, sub_sig])
     check_return(results[3], [2, 5, sub_sig])

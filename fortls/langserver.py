@@ -586,7 +586,7 @@ class LangServer:
                         if child.is_external_int():
                             tmp_list += child_candidates(child, only_list, filter_public)
                         else:
-                            if (nonly > 0) and (child.name not in only_list):
+                            if (nonly > 0) and (child.name.lower() not in only_list):
                                 continue
                             tmp_list.append(child)
                 return tmp_list
