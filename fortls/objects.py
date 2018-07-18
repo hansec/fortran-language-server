@@ -1073,6 +1073,14 @@ class fortran_file:
                     include_path[2] = added_entities
 
     def close_file(self, line_number):
+        # Close open scopes
+        while len(self.scope_stack) > 0:
+            scope = self.scope_stack.pop()
+            scope.end(line_number)
+        # Close and delist none_scope
+        if self.none_scope is not None:
+            self.none_scope.end(line_number)
+            self.scope_list.remove(self.none_scope)
         # Tasks to be done when file parsing is finished
         for private_name in self.private_list:
             obj = self.get_object(private_name)
@@ -1082,9 +1090,6 @@ class fortran_file:
             obj = self.get_object(public_name)
             if obj is not None:
                 obj.set_visibility(1)
-        if self.none_scope is not None:
-            self.none_scope.end(line_number)
-            self.scope_list.remove(self.none_scope)
 
     def check_file(self, obj_tree, file_contents):
         errors = []
