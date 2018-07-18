@@ -1,3 +1,9 @@
+## 0.7.3
+
+### Fixes
+* Improve detection of block statements, fixes [#32](https://github.com/hansec/fortran-language-server/issues/32)
+* Fix autocompletion with mixed case object definitions
+
 ## 0.7.2
 
 ### Fixes
