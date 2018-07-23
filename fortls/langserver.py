@@ -1076,6 +1076,14 @@ class LangServer:
             return None
 
     def serve_hover(self, request):
+        def create_hover(string, highlight):
+            if highlight:
+                return {
+                    "language": "fortran",
+                    "value": string
+                }
+            else:
+                return string
         # Get parameters from request
         params = request["params"]
         uri = params["textDocument"]["uri"]
@@ -1091,24 +1099,20 @@ class LangServer:
         if var_obj is not None:
             var_type = var_obj.get_type()
             hover_str = None
-            # Currently only show for subroutines
             if var_type == 2 or var_type == 3:
                 hover_str, highlight = var_obj.get_documentation(long=True)
+            elif var_type == 5:
+                hover_array = []
+                for member in var_obj.mems:
+                    hover_str, highlight = member.get_documentation(long=True)
+                    if hover_str is not None:
+                        hover_array.append(create_hover(hover_str, highlight))
+                return {"contents": hover_array}
             elif var_type == 6 and self.variable_hover:
                 hover_str, highlight = var_obj.get_documentation()
             #
             if hover_str is not None:
-                if highlight:
-                    return {
-                        "contents": {
-                            "language": "fortran",
-                            "value": hover_str
-                        }
-                    }
-                else:
-                    return {
-                        "contents": hover_str
-                    }
+                return {"contents": create_hover(hover_str, highlight)}
         else:
             return None
 
