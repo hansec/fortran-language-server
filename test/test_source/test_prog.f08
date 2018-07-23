@@ -15,6 +15,8 @@ CALL glob_sub(n,xc,yc)
 !
 CALL loc_vector%create(n)
 x = loc_vector%norm()
+CALL loc_vector%bound_nopass(a,x)
+CALL loc_vector%bound_pass(n)
 !
 CALL stretch_vector%create(n)
 CALL stretch_vector%set_scale(loc_vector%norm(self))

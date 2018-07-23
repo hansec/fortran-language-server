@@ -32,7 +32,8 @@ KIND_SPEC_REGEX = re.compile(r'([ ]*\([a-z0-9_ =*]*\)|\*[0-9]*)', re.I)
 KEYWORD_LIST_REGEX = re.compile(r'[ ]*,[ ]*(PUBLIC|PRIVATE|ALLOCATABLE|'
                                 r'POINTER|TARGET|DIMENSION\([a-z0-9_:, ]*\)|'
                                 r'OPTIONAL|INTENT\([inout]*\)|DEFERRED|NOPASS|'
-                                r'SAVE|PARAMETER|CONTIGUOUS)', re.I)
+                                r'PASS\([a-z0-9_]*\)|SAVE|PARAMETER|'
+                                r'CONTIGUOUS)', re.I)
 TATTR_LIST_REGEX = re.compile(r'[ ]*,[ ]*(PUBLIC|PRIVATE|ABSTRACT|EXTENDS\([a-z0-9_]*\))', re.I)
 VIS_REGEX = re.compile(r'(PUBLIC|PRIVATE)', re.I)
 WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
@@ -521,10 +522,11 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                     if name_stripped.find('(') > -1:
                         var_dim = get_var_dims(name_stripped)
                     name_stripped = name_stripped.split('(')[0].strip()
-                    modifiers = map_keywords(obj[1])
+                    modifiers, pass_name = map_keywords(obj[1])
                     if obj[0][:3] == 'PRO':
                         new_var = fortran_meth(file_obj, line_number, name_stripped, obj[0],
-                                               modifiers, file_obj.enc_scope_name, link_name)
+                                               modifiers, file_obj.enc_scope_name, link_name,
+                                               pass_name=pass_name)
                     else:
                         new_var = fortran_obj(file_obj, line_number, name_stripped, obj[0],
                                               modifiers, file_obj.enc_scope_name, link_name)
@@ -573,7 +575,7 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 if(debug):
                     print('{1} !!! BLOCK statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'typ':
-                modifiers = map_keywords(obj[2])
+                modifiers, _ = map_keywords(obj[2])
                 new_type = fortran_type(file_obj, line_number, obj[0], modifiers, file_obj.enc_scope_name)
                 if obj[1] is not None:
                     new_type.set_inherit(obj[1])

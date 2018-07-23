@@ -7,6 +7,7 @@ CLASS_VAR_REGEX = re.compile(r'(TYPE|CLASS)[ ]*\(', re.I)
 
 def map_keywords(keywords):
     modifiers = []
+    pass_name = None
     for key in keywords:
         key_lower = key.lower()
         if key_lower == 'pointer':
@@ -40,8 +41,13 @@ def map_keywords(keywords):
         elif key_lower.startswith('dimension'):
             ndims = key_lower.count(':')
             modifiers.append(20+ndims)
+        elif key_lower.startswith('pass'):
+            i1 = key_lower.find('(')
+            i2 = key_lower.find(')')
+            if i1 > -1 and i2 > i1:
+                pass_name = key_lower[i1+1:i2]
     modifiers.sort()
-    return modifiers
+    return modifiers, pass_name
 
 
 def get_keywords(modifiers):
@@ -248,7 +254,7 @@ class fortran_scope:
     def get_desc(self):
         return 'unknown'
 
-    def get_snippet(self, name_replace=None, drop_arg=False):
+    def get_snippet(self, name_replace=None, drop_arg=-1):
         if name_replace is not None:
             return name_replace, None
         return self.name, None
@@ -454,13 +460,10 @@ class fortran_subroutine(fortran_scope):
     def get_type(self):
         return 2
 
-    def get_snippet(self, name_replace=None, drop_arg=False):
+    def get_snippet(self, name_replace=None, drop_arg=-1):
         arg_list = self.args_snip.split(",")
-        if drop_arg:
-            if len(arg_list) > 1:
-                arg_list = arg_list[1:]
-            else:
-                arg_list = []
+        if (drop_arg >= 0) and (drop_arg < len(arg_list)):
+            del arg_list[drop_arg]
         arg_snip = None
         if len(arg_list) > 0:
             place_holders = []
@@ -763,7 +766,7 @@ class fortran_obj:
                 return
         self.modifiers.append(ndim+20)
 
-    def get_snippet(self, name_replace=None, drop_arg=False):
+    def get_snippet(self, name_replace=None, drop_arg=-1):
         name = self.name
         if name_replace is not None:
             name = name_replace
@@ -806,10 +809,11 @@ class fortran_obj:
 
 class fortran_meth(fortran_obj):
     def __init__(self, file_obj, line_number, name, var_desc, modifiers,
-                 enc_scope=None, link_obj=None):
+                 enc_scope=None, link_obj=None, pass_name=None):
         self.base_setup(file_obj, line_number, name, var_desc, modifiers,
                         enc_scope, link_obj)
-        self.drop_arg = False
+        self.drop_arg = -1
+        self.pass_name = pass_name
         if link_obj is None:
             open_paren = var_desc.find('(')
             close_paren = var_desc.find(')')
@@ -819,9 +823,9 @@ class fortran_meth(fortran_obj):
     def set_parent(self, parent_obj):
         self.parent = parent_obj
         if (self.parent.get_type() == 4) and (self.modifiers.count(6) == 0):
-            self.drop_arg = True
+            self.drop_arg = 0
 
-    def get_snippet(self, name_replace=None, drop_arg=False):
+    def get_snippet(self, name_replace=None, drop_arg=-1):
         name = self.name
         if name_replace is not None:
             name = name_replace
@@ -847,18 +851,14 @@ class fortran_meth(fortran_obj):
                 link_name_len = len(self.link_obj.name)
                 call_sig = call_sig[:paren_start-link_name_len] + self.name + call_sig[paren_start:]
                 paren_start += len(self.name) - link_name_len
-                if self.drop_arg:
+                hover_split = hover_split[1:]
+                if (self.drop_arg >= 0) and (self.drop_arg < len(hover_split)):
                     paren_end = call_sig.rfind(')')
                     args = call_sig[paren_start+1:paren_end].split(',')
-                    if len(args) > 1:
-                        args = args[1:]
-                    else:
-                        args = []
+                    del args[self.drop_arg]
+                    del hover_split[self.drop_arg]
                     call_sig = call_sig[:paren_start] + '(' + (','.join(args)).strip() + ')'
-                    arg_list = hover_split[2:]
-                else:
-                    arg_list = hover_split[1:]
-                hover_str = '\n'.join([call_sig] + arg_list)
+                hover_str = '\n'.join([call_sig] + hover_split)
             return hover_str, True
         else:
             doc_str = self.desc
@@ -872,7 +872,7 @@ class fortran_meth(fortran_obj):
         var_obj = self.link_obj
         arg_list = var_obj.args.split(",")
         for i, arg_obj in enumerate(var_obj.arg_objs):
-            if self.drop_arg and (i == 0):
+            if self.drop_arg == i:
                 continue
             if arg_obj is None:
                 arg_sigs.append({"label": arg_list[i]})
@@ -887,6 +887,23 @@ class fortran_meth(fortran_obj):
                 })
         call_sig, _ = self.get_snippet()
         return call_sig, None, arg_sigs
+
+    def resolve_link(self, obj_tree):
+        if self.link_name is None:
+            return
+        if self.parent is not None:
+            if self.parent.get_type() == 4:
+                link_obj, _ = find_in_scope(self.parent.parent, self.link_name, obj_tree)
+            else:
+                link_obj, _ = find_in_scope(self.parent, self.link_name, obj_tree)
+            if link_obj is not None:
+                self.link_obj = link_obj
+                if self.pass_name is not None:
+                    self.pass_name = self.pass_name.lower()
+                    for i, arg in enumerate(link_obj.args_snip.split(',')):
+                        if arg.lower() == self.pass_name:
+                            self.drop_arg = i
+                            break
 
     def is_callable(self):
         return True
