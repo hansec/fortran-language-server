@@ -9,9 +9,11 @@ END TYPE scale_type
 TYPE :: vector
   INTEGER(4) :: n
   REAL(8), POINTER, DIMENSION(:) :: v => NULL()
+  PROCEDURE(fort_wrap), NOPASS, POINTER :: bound_nopass => NULL()
 CONTAINS
   PROCEDURE :: create => vector_create
   PROCEDURE :: norm => vector_norm
+  PROCEDURE, PASS(self) :: bound_pass => bound_pass
 END TYPE vector
 !
 TYPE, EXTENDS(vector) :: scaled_vector
@@ -67,4 +69,10 @@ SUBROUTINE test_sig_Sub(arg1,arg2,opt1,opt2,opt3)
 INTEGER, INTENT(in) :: arg1,arg2
 INTEGER, OPTIONAL, INTENT(in) :: opt1,opt2,opt3
 END SUBROUTINE test_sig_Sub
+!
+SUBROUTINE bound_pass(arg1, self)
+INTEGER(4), INTENT(in) :: arg1
+CLASS(vector), INTENT(inout) :: self
+self%n = arg1
+END SUBROUTINE bound_pass
 END MODULE test_free
