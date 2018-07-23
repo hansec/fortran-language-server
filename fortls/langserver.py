@@ -617,19 +617,25 @@ class LangServer:
 
         def build_comp(candidate, name_only=False, name_replace=None, is_interface=False):
             comp_obj = {}
+            call_sig = None
             if name_only:
                 comp_obj["label"] = candidate.name
             else:
-                comp_obj["label"], snippet = candidate.get_snippet(name_replace)
+                comp_obj["label"] = candidate.name
+                if name_replace is not None:
+                    comp_obj["label"] = name_replace
+                call_sig, snippet = candidate.get_snippet(name_replace)
                 if snippet is not None:
                     if self.use_signature_help and (not is_interface):
                         arg_open = snippet.find('(')
                         if arg_open > 0:
-                            snippet = snippet[:arg_open] + "(${0})"
+                            snippet = snippet[:arg_open]
                     comp_obj["insertText"] = snippet
                     comp_obj["insertTextFormat"] = 2
             comp_obj["kind"] = map_types(candidate.get_type())
             comp_obj["detail"] = candidate.get_desc()
+            if call_sig is not None:
+                comp_obj["detail"] += ' ' + call_sig
             doc_str, _ = candidate.get_documentation()
             if doc_str is not None:
                 comp_obj["documentation"] = doc_str

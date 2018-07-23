@@ -152,6 +152,7 @@ def test_comp():
         assert len(result_array["items"]) == checks[0]
         if checks[0] > 0:
             assert result_array["items"][0]["label"] == checks[1]
+            assert result_array["items"][0]["detail"] == checks[2]
 
     def comp_request(file_path, line, char):
         return write_rpc_request(1, "textDocument/completion", {
@@ -190,25 +191,25 @@ def test_comp():
     assert errcode == 0
     #
     exp_results = (
-        [1, "myfun(n, xval)"],
-        [4, "glob_sub(n, xval, yval)"],
-        [1, "bound_nopass(a, b)"],
-        [1, "bound_pass(arg1)"],
-        [1, "stretch_vector"],
-        [6, "scale"],
-        [2, "n"],
-        [1, "val"],
-        [1, "point"],
-        [1, "distance"],
-        [2, "x"],
-        [2, "val1"],
-        [2, "val1"],
-        [1, "abs_interface"],
-        [1, "DIMENSION(:)"],
-        [3, "INTENT(IN)"],
-        [3, "res0"],
-        [4, "res0"],
-        [5, "res0"]
+        [1, "myfun", "DOUBLE PRECISION FUNCTION myfun(n, xval)"],
+        [4, "glob_sub", "SUBROUTINE glob_sub(n, xval, yval)"],
+        [1, "bound_nopass", "SUBROUTINE bound_nopass(a, b)"],
+        [1, "bound_pass", "SUBROUTINE bound_pass(arg1)"],
+        [1, "stretch_vector", "TYPE(scaled_vector)"],
+        [6, "scale", "TYPE(scale_type)"],
+        [2, "n", "INTEGER(4)"],
+        [1, "val", "REAL(8)"],
+        [1, "point", "TYPE"],
+        [1, "distance", "REAL"],
+        [2, "x", "REAL"],
+        [2, "val1", "REAL(8)"],
+        [2, "val1", "REAL(8)"],
+        [1, "abs_interface", "SUBROUTINE"],
+        [1, "DIMENSION(:)", "KEYWORD"],
+        [3, "INTENT(IN)", "KEYWORD"],
+        [3, "res0", "INTEGER"],
+        [4, "res0", "INTEGER"],
+        [5, "res0", "INTEGER"]
     )
     assert len(exp_results)+1 == len(results)
     for i in range(len(exp_results)):

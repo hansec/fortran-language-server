@@ -255,9 +255,7 @@ class fortran_scope:
         return 'unknown'
 
     def get_snippet(self, name_replace=None, drop_arg=-1):
-        if name_replace is not None:
-            return name_replace, None
-        return self.name, None
+        return None, None
 
     def get_documentation(self, long=False):
         return None, False
@@ -574,9 +572,9 @@ class fortran_function(fortran_subroutine):
     def get_desc(self):
         # desc = None
         if self.result_obj is not None:
-            return self.result_obj.get_desc()
+            return self.result_obj.get_desc() + ' FUNCTION'
         if self.return_type is not None:
-            return self.return_type
+            return self.return_type + ' FUNCTION'
         return 'FUNCTION'
 
     def is_callable(self):
@@ -773,7 +771,7 @@ class fortran_obj:
         if self.link_obj is not None:
             return self.link_obj.get_snippet(name, drop_arg)
         # Normal variable
-        return name, None
+        return None, None
 
     def get_documentation(self, long=False):
         doc_str = self.desc
@@ -831,7 +829,7 @@ class fortran_meth(fortran_obj):
             name = name_replace
         if self.link_obj is not None:
             return self.link_obj.get_snippet(name, self.drop_arg)
-        return name, None
+        return None, None
 
     def get_type(self):
         if self.link_obj is not None:
