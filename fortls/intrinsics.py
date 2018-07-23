@@ -34,7 +34,7 @@ class fortran_intrinsic_obj:
         else:
             return 'INTRINSIC'
 
-    def get_snippet(self, name_replace=None, drop_arg=False):
+    def get_snippet(self, name_replace=None, drop_arg=-1):
         arg_snip = None
         if self.args == "":
             if self.type == 14:
