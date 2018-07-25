@@ -439,7 +439,11 @@ class fortran_subroutine(fortran_scope):
     def resolve_arg_link(self, obj_tree):
         arg_list = self.args.replace(' ', '').split(',')
         self.arg_objs = [None for arg in arg_list]
+        check_objs = self.children
         for child in self.children:
+            if child.is_external_int():
+                check_objs += child.get_children()
+        for child in check_objs:
             ind = -1
             for i, arg in enumerate(arg_list):
                 if arg == child.name.lower():
@@ -487,8 +491,8 @@ class fortran_subroutine(fortran_scope):
         return 'SUBROUTINE'
 
     def get_documentation(self, long=False):
+        sub_sig, _ = self.get_snippet()
         if long:
-            sub_sig, _ = self.get_snippet()
             hover_array = ["SUBROUTINE " + sub_sig]
             for arg_obj in self.arg_objs:
                 if arg_obj is None:
@@ -497,7 +501,7 @@ class fortran_subroutine(fortran_scope):
                 hover_array.append(" {0} :: {1}".format(arg_doc, arg_obj.name))
             return "\n".join(hover_array), True
         else:
-            return None, False
+            return "SUBROUTINE " + sub_sig, False
 
     def get_signature(self):
         arg_sigs = []
@@ -581,13 +585,13 @@ class fortran_function(fortran_subroutine):
         return False
 
     def get_documentation(self, long=False):
+        fun_sig, _ = self.get_snippet()
+        fun_return = ""
+        if self.result_obj is not None:
+            fun_return, _ = self.result_obj.get_documentation()
+        if self.return_type is not None:
+            fun_return = self.return_type
         if long:
-            fun_sig, _ = self.get_snippet()
-            fun_return = ""
-            if self.result_obj is not None:
-                fun_return, _ = self.result_obj.get_documentation()
-            if self.return_type is not None:
-                fun_return = self.return_type
             hover_array = ["{0} FUNCTION {1}".format(fun_return, fun_sig)]
             for arg_obj in self.arg_objs:
                 if arg_obj is None:
@@ -596,7 +600,7 @@ class fortran_function(fortran_subroutine):
                 hover_array.append(" {0} :: {1}".format(arg_doc, arg_obj.name))
             return "\n".join(hover_array), True
         else:
-            return None, False
+            return "{0} FUNCTION {1}".format(fun_return, fun_sig) + fun_sig, False
 
 
 class fortran_type(fortran_scope):
