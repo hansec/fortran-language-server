@@ -194,7 +194,7 @@ def main():
             })
             print('  Results:')
             for obj in completion_results['items']:
-                print('    {0}: {1}'.format(obj['kind'], obj['label']))
+                print('    {0}: {1} -> {2}'.format(obj['kind'], obj['label'], obj['detail']))
         #
         if args.debug_signature:
             print('\nTesting "textDocument/signatureHelp" request:')

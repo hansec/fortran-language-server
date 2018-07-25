@@ -315,7 +315,7 @@ class fortran_scope:
                 errors.append([0, line_number, i0, i1, child.name])
             else:
                 FQSN_list.append(child.FQSN)
-            # Check for masking from parent scope in subroutines and functions
+            # Check for masking from parent scope in subroutines, functions, and blocks
             if (self.parent is not None) and (self.get_type() in (2, 3, 8)):
                 parent_var, parent_scope = \
                     find_in_scope(self.parent, child.name, obj_tree)
@@ -657,6 +657,33 @@ class fortran_block(fortran_scope):
         return self.children
 
 
+class fortran_select(fortran_scope):
+    def __init__(self, file_obj, line_number, name, select_info, enc_scope=None):
+        self.base_setup(file_obj, line_number, name, enc_scope)
+        self.type = select_info[0]
+        self.binding_name = None
+        self.bound_var = None
+        self.binding_type = None
+        if self.type == 2:
+            binding_split = select_info[1].split('=>')
+            if len(binding_split) == 1:
+                self.bound_var = binding_split[0].strip()
+            elif len(binding_split) == 2:
+                self.binding_name = binding_split[0].strip()
+                self.bound_var = binding_split[1].strip()
+        elif self.type == 3:
+            self.binding_type = select_info[1]
+
+    def get_type(self):
+        return 9
+
+    def get_desc(self):
+        return r'SELECT'
+
+    def get_children(self, public_only=False):
+        return self.children
+
+
 class fortran_int(fortran_scope):
     def __init__(self, file_obj, line_number, name, enc_scope=None, abstract=False):
         self.base_setup(file_obj, line_number, name, enc_scope)
@@ -706,6 +733,7 @@ class fortran_obj:
         self.modifiers = modifiers
         self.callable = (CLASS_VAR_REGEX.match(var_desc) is not None)
         self.children = []
+        self.use = []
         self.vis = 0
         self.parent = None
         self.link_obj = None

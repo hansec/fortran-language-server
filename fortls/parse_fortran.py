@@ -2,7 +2,7 @@ from __future__ import print_function
 import re
 from fortls.objects import map_keywords, fortran_module, fortran_program, \
     fortran_submodule, fortran_subroutine, fortran_function, fortran_block, \
-    fortran_type, fortran_int, fortran_obj, fortran_meth, fortran_file
+    fortran_select, fortran_type, fortran_int, fortran_obj, fortran_meth, fortran_file
 #
 USE_REGEX = re.compile(r'[ ]*USE([, ]*INTRINSIC)?[ :]*([a-z0-9_]*)', re.I)
 INCLUDE_REGEX = re.compile(r'[ ]*INCLUDE[ :]*[\'\"]([^\'\"]*)', re.I)
@@ -17,6 +17,10 @@ SUBMOD_REGEX = re.compile(r'[ ]*SUBMODULE[ ]*\(', re.I)
 END_SMOD_REGEX = re.compile(r'[ ]*END[ ]*SUBMODULE', re.I)
 BLOCK_REGEX = re.compile(r'[ ]*([a-z_][a-z0-9_]*[ ]*:)?[ ]*BLOCK(?![a-z0-9_])', re.I)
 END_BLOCK_REGEX = re.compile(r'[ ]*END[ ]*BLOCK', re.I)
+SELECT_REGEX = re.compile(r'[ ]*SELECT[ ]+(CASE|TYPE)[ ]*\(([a-z0-9_=> ]*)', re.I)
+SELECT_TYPE_REGEX = re.compile(r'[ ]*(TYPE|CLASS)[ ]+IS[ ]*\(([a-z0-9_ ]*)', re.I)
+SELECT_DEFAULT_REGEX = re.compile(r'[ ]*CLASS[ ]+DEFAULT', re.I)
+END_SELECT_REGEX = re.compile(r'[ ]*END[ ]*SELECT', re.I)
 PROG_REGEX = re.compile(r'[ ]*PROGRAM[ ]+([a-z0-9_]+)', re.I)
 END_PROG_REGEX = re.compile(r'[ ]*END[ ]*PROGRAM', re.I)
 INT_REGEX = re.compile(r'[ ]*(ABSTRACT)?[ ]*INTERFACE[ ]*([a-z0-9_]*)', re.I)
@@ -245,6 +249,32 @@ def read_block_def(line):
     return 'block', [name]
 
 
+def read_select_def(line):
+    select_match = SELECT_REGEX.match(line)
+    select_desc = None
+    select_binding = None
+    if select_match is None:
+        select_type_match = SELECT_TYPE_REGEX.match(line)
+        if select_type_match is None:
+            select_default_match = SELECT_DEFAULT_REGEX.match(line)
+            if select_default_match is None:
+                return None
+            else:
+                return 'select', [4, None, None]
+        select_type = 3
+        select_desc = select_type_match.group(1).upper()
+        select_binding = select_type_match.group(2)
+    else:
+        select_word = select_match.group(1)
+        select_type = -1
+        if select_word.lower().startswith('case'):
+            select_type = 1
+        elif select_word.lower().startswith('type'):
+            select_type = 2
+        select_binding = select_match.group(2)
+    return 'select', [select_type, select_binding, select_desc]
+
+
 def read_type_def(line):
     type_match = TYPE_DEF_REGEX.match(line)
     if type_match is None:
@@ -381,8 +411,8 @@ def read_inc_stmt(line):
 
 
 def_tests = [read_var_def, read_sub_def, read_fun_def, read_block_def,
-             read_type_def, read_use_stmt, read_int_def, read_mod_def,
-             read_prog_def, read_submod_def, read_inc_stmt]
+             read_select_def, read_type_def, read_use_stmt, read_int_def,
+             read_mod_def, read_prog_def, read_submod_def, read_inc_stmt]
 
 
 def process_file(file_str, close_open_scopes, path=None, fixed_format=False, debug=False):
@@ -399,6 +429,7 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
     next_line_num = 1
     int_counter = 0
     block_counter = 0
+    select_counter = 0
     # at_eof = False
     next_line = None
     line_ind = 0
@@ -472,6 +503,8 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
         if file_obj.END_REGEX is not None:
             match = file_obj.END_REGEX.match(line)
             if (match is not None):
+                if (file_obj.current_scope.get_type() == 9) and (file_obj.current_scope.type in (3, 4)):
+                    file_obj.end_scope(line_number)
                 file_obj.end_scope(line_number)
                 if(debug):
                     print('{1} !!! END scope({0})'.format(line_number, line.strip()))
@@ -569,11 +602,40 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 name = obj[0]
                 if name is None:
                     block_counter += 1
-                    name = '#BLOCK{0}'.format(int_counter)
+                    name = '#BLOCK{0}'.format(block_counter)
                 new_block = fortran_block(file_obj, line_number, name, file_obj.enc_scope_name)
                 file_obj.add_scope(new_block, END_BLOCK_REGEX, req_container=True)
                 if(debug):
                     print('{1} !!! BLOCK statement({0})'.format(line_number, line.strip()))
+            elif obj_type == 'select':
+                select_counter += 1
+                name = '#SELECT{0}'.format(select_counter)
+                binding_name = None
+                bound_var = None
+                if file_obj.current_scope is not None:
+                    if (obj[0] in (3, 4)) and (file_obj.current_scope.get_type() == 9):
+                        if file_obj.current_scope.type in (3, 4):
+                            file_obj.end_scope(line_number)
+                if file_obj.current_scope is not None:
+                    if (obj[0] in (3, 4)) and (file_obj.current_scope.get_type() == 9):
+                        if file_obj.current_scope.type == 2:
+                            binding_name = file_obj.current_scope.binding_name
+                            bound_var = file_obj.current_scope.bound_var
+                new_select = fortran_select(file_obj, line_number, name, obj, file_obj.enc_scope_name)
+                file_obj.add_scope(new_select, END_SELECT_REGEX, req_container=True)
+                if binding_name is not None:
+                    if obj[0] != 4:
+                        bound_var = None
+                    new_var = fortran_obj(file_obj, line_number, binding_name,
+                                          '{0}({1})'.format(obj[2], obj[1]), [], file_obj.enc_scope_name,
+                                          link_obj=bound_var)
+                    file_obj.add_variable(new_var)
+                elif (binding_name is None) and (bound_var is not None):
+                    new_var = fortran_obj(file_obj, line_number, bound_var,
+                                          '{0}({1})'.format(obj[2], obj[1]), [], file_obj.enc_scope_name)
+                    file_obj.add_variable(new_var)
+                if(debug):
+                    print('{1} !!! SELECT statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'typ':
                 modifiers, _ = map_keywords(obj[2])
                 new_type = fortran_type(file_obj, line_number, obj[0], modifiers, file_obj.enc_scope_name)

@@ -183,6 +183,11 @@ def test_comp():
     file_path = os.path.join(test_dir, "subdir", "test_free.f90")
     string += comp_request(file_path, 10, 22)
     string += comp_request(file_path, 28, 14)
+    file_path = os.path.join(test_dir, "subdir", "test_select.f90")
+    string += comp_request(file_path, 21, 7)
+    string += comp_request(file_path, 23, 7)
+    string += comp_request(file_path, 25, 7)
+    string += comp_request(file_path, 30, 7)
     file_path = os.path.join(test_dir, "test_block.f08")
     string += comp_request(file_path, 2, 2)
     string += comp_request(file_path, 5, 4)
@@ -207,6 +212,10 @@ def test_comp():
         [1, "abs_interface", "SUBROUTINE"],
         [1, "DIMENSION(:)", "KEYWORD"],
         [3, "INTENT(IN)", "KEYWORD"],
+        [2, "a", "REAL(8)"],
+        [2, "a", "COMPLEX(8)"],
+        [1, "n", "INTEGER(4)"],
+        [2, "a", "REAL(8)"],
         [3, "res0", "INTEGER"],
         [4, "res0", "INTEGER"],
         [5, "res0", "INTEGER"]
