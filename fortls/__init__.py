@@ -41,7 +41,7 @@ def main():
     )
     parser.add_argument(
         '--use_signature_help', action="store_true",
-        help="Use signature help instead of subroutine/function snippets (beta)"
+        help="Use signature help instead of subroutine/function snippets"
     )
     parser.add_argument(
         '--variable_hover', action="store_true",
