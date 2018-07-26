@@ -1,3 +1,16 @@
+## 0.8.0
+
+### Improvements
+* Reformat completion information and snippets to match common language server conventions
+* Provide hover information for overloaded interfaces
+* Add support for autocompletion in select type statements
+* Add support for type bound procedures with explicit pass statements
+* Add support for arguments defined as interfaces in hover and signatureHelp requests
+* Unbetafy signatureHelp support
+
+### Fixes
+* Fix linking type bound procedures with same name as subroutine/function definition
+
 ## 0.7.3
 
 ### Fixes
