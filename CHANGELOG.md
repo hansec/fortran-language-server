@@ -1,3 +1,8 @@
+## 0.8.1
+
+### Fixes
+* Fix crash in completion requests with intrinsic modules
+
 ## 0.8.0
 
 ### Improvements
