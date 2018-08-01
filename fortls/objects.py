@@ -535,7 +535,7 @@ class fortran_function(fortran_subroutine):
         self.result_obj = None
         if return_type is not None:
             self.return_type = return_type[0]
-            self.modifiers = map_keywords(return_type[1])
+            self.modifiers, _ = map_keywords(return_type[1])
         else:
             self.return_type = None
             self.modifiers = []

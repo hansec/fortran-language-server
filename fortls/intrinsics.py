@@ -129,7 +129,7 @@ def get_intrinsic_modules():
         if "args" in json_obj:
             args = json_obj["args"]
         if "mods" in json_obj:
-            modifiers = map_keywords(json_obj["mods"])
+            modifiers, _ = map_keywords(json_obj["mods"])
         name = json_obj["name"]
         if lowercase_intrinsics:
             name = name.lower()
