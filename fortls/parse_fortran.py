@@ -98,11 +98,11 @@ def separate_def_list(test_str):
     def_list = []
     curr_str = ''
     for char in stripped_str:
-        if char == '(':
+        if (char == '(') or (char == '['):
             paren_count += 1
-        elif char == ')':
+        elif (char == ')') or (char == ']'):
             paren_count -= 1
-        elif char == ',' and paren_count == 0:
+        elif (char == ',') and (paren_count == 0):
             curr_str = curr_str.strip()
             if curr_str != '':
                 def_list.append(curr_str)
