@@ -1,3 +1,8 @@
+## 0.8.2
+
+### Improvements
+* Add support for F03 style bracket array initialization, fixes [#35](https://github.com/hansec/fortran-language-server/issues/35)
+
 ## 0.8.1
 
 ### Fixes
