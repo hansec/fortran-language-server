@@ -337,3 +337,24 @@ def test_refs():
         [21, 27, os.path.join(test_dir, "test_prog.f08")],
         [5, 11, os.path.join(test_dir, "test_prog.f08")]
     ))
+
+
+def test_hover():
+    def check_return(result_array, checks):
+        assert len(result_array) == len(checks)
+        for (i, check) in enumerate(checks):
+            assert result_array[i]['contents']['value'] == check
+    #
+    string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
+    file_path = os.path.join(test_dir, "subdir", "test_abstract.f90")
+    string += write_rpc_request(2, "textDocument/hover", {
+        "textDocument": {"uri": file_path},
+        "position": {"line": 7, "character": 30}
+    })
+    errcode, results = run_request(string)
+    assert errcode == 0
+    #
+    free_path = os.path.join(test_dir, "subdir", "test_free.f90")
+    check_return(results[1:], ("""SUBROUTINE test(a, b)
+ INTEGER(4), DIMENSION(3,6), INTENT(IN) :: a
+ REAL(8), DIMENSION(4), INTENT(OUT) :: b""",))

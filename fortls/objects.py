@@ -8,6 +8,7 @@ CLASS_VAR_REGEX = re.compile(r'(TYPE|CLASS)[ ]*\(', re.I)
 def map_keywords(keywords):
     modifiers = []
     pass_name = None
+    dim_str = None
     for key in keywords:
         key_lower = key.lower()
         if key_lower == 'pointer':
@@ -39,18 +40,21 @@ def map_keywords(keywords):
         elif key_lower == 'intent(inout)':
             modifiers.append(103)
         elif key_lower.startswith('dimension'):
-            ndims = key_lower.count(':')
-            modifiers.append(20+ndims)
+            i1 = key_lower.find('(')
+            i2 = key_lower.find(')')
+            if i1 > -1 and i2 > i1:
+                dim_str = key_lower[i1+1:i2]
+                modifiers.append(20)
         elif key_lower.startswith('pass'):
             i1 = key_lower.find('(')
             i2 = key_lower.find(')')
             if i1 > -1 and i2 > i1:
                 pass_name = key_lower[i1+1:i2]
     modifiers.sort()
-    return modifiers, pass_name
+    return modifiers, dim_str, pass_name
 
 
-def get_keywords(modifiers):
+def get_keywords(modifiers, dim_str=None):
     mod_strings = []
     for modifier in modifiers:
         if modifier == 1:
@@ -81,10 +85,7 @@ def get_keywords(modifiers):
             mod_strings.append('INTENT(OUT)')
         elif modifier == 103:
             mod_strings.append('INTENT(INOUT)')
-        elif modifier > 20:
-            dim_str = ":"
-            for i in range(modifier-21):
-                dim_str += ",:"
+        elif (modifier == 20) and (dim_str is not None):
             mod_strings.append('DIMENSION({0})'.format(dim_str))
     return mod_strings
 
@@ -535,10 +536,11 @@ class fortran_function(fortran_subroutine):
         self.result_obj = None
         if return_type is not None:
             self.return_type = return_type[0]
-            self.modifiers, _ = map_keywords(return_type[1])
+            self.modifiers, self.dim_str, _ = map_keywords(return_type[1])
         else:
             self.return_type = None
             self.modifiers = []
+            self.dim_str = None
 
     def copy_interface(self, copy_source):
         # Copy arguments and returns
@@ -724,17 +726,18 @@ class fortran_int(fortran_scope):
 
 class fortran_obj:
     def __init__(self, file_obj, line_number, name, var_desc, modifiers,
-                 enc_scope=None, link_obj=None):
+                 dim_str, enc_scope=None, link_obj=None):
         self.base_setup(file_obj, line_number, name, var_desc, modifiers,
-                        enc_scope, link_obj)
+                        dim_str, enc_scope, link_obj)
 
     def base_setup(self, file_obj, line_number, name, var_desc, modifiers,
-                   enc_scope, link_obj):
+                   dim_str, enc_scope, link_obj):
         self.file = file_obj
         self.sline = line_number
         self.name = name
         self.desc = var_desc
         self.modifiers = modifiers
+        self.dim_str = dim_str
         self.callable = (CLASS_VAR_REGEX.match(var_desc) is not None)
         self.children = []
         self.use = []
@@ -789,12 +792,11 @@ class fortran_obj:
         # Normal variable
         return self.desc
 
-    def set_dim(self, ndim):
-        for (i, modifier) in enumerate(self.modifiers):
-            if modifier > 20:
-                self.modifiers[i] = ndim+20
-                return
-        self.modifiers.append(ndim+20)
+    def set_dim(self, dim_str):
+        self.dim_str = dim_str
+        if 20 not in self.modifiers:
+            self.modifiers.append(20)
+            self.modifiers.sort()
 
     def get_snippet(self, name_replace=None, drop_arg=-1):
         name = self.name
@@ -809,7 +811,7 @@ class fortran_obj:
         doc_str = self.desc
         if len(self.modifiers) > 0:
             doc_str += ", "
-            doc_str += ", ".join(get_keywords(self.modifiers))
+            doc_str += ", ".join(get_keywords(self.modifiers, self.dim_str))
         return doc_str, True
 
     def get_signature(self):
@@ -841,7 +843,7 @@ class fortran_meth(fortran_obj):
     def __init__(self, file_obj, line_number, name, var_desc, modifiers,
                  enc_scope=None, link_obj=None, pass_name=None):
         self.base_setup(file_obj, line_number, name, var_desc, modifiers,
-                        enc_scope, link_obj)
+                        None, enc_scope, link_obj)
         self.drop_arg = -1
         self.pass_name = pass_name
         if link_obj is None:

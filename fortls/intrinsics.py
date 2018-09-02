@@ -124,12 +124,13 @@ def get_intrinsic_modules():
         enc_scope_name = None
         args = ""
         modifiers = []
+        dim_str = None
         if enc_obj is not None:
             enc_scope_name = enc_obj.FQSN
         if "args" in json_obj:
             args = json_obj["args"]
         if "mods" in json_obj:
-            modifiers, _ = map_keywords(json_obj["mods"])
+            modifiers, dim_str, _ = map_keywords(json_obj["mods"])
         name = json_obj["name"]
         if lowercase_intrinsics:
             name = name.lower()
@@ -144,9 +145,9 @@ def get_intrinsic_modules():
                                       args=args)
         elif json_obj["type"] == 2:
             return fortran_function(none_file, 0, name, enc_scope=enc_scope_name,
-                                    args=args, return_type=[json_obj["return"], modifiers])
+                                    args=args, return_type=[json_obj["return"], modifiers, dim_str])
         elif json_obj["type"] == 3:
-            return fortran_obj(none_file, 0, name, json_obj["desc"], modifiers, enc_scope_name)
+            return fortran_obj(none_file, 0, name, json_obj["desc"], modifiers, dim_str, enc_scope_name)
         elif json_obj["type"] == 4:
             return fortran_type(none_file, 0, name, modifiers, enc_scope_name)
         else:

@@ -121,25 +121,20 @@ def parse_keywords(test_str):
     keyword_match = KEYWORD_LIST_REGEX.match(test_str)
     keywords = []
     while (keyword_match is not None):
-        keywords.append(keyword_match.group(0).replace(',', ' ').strip().upper())
+        tmp_str = re.sub(r'^[, ]*', '', keyword_match.group(0))
+        keywords.append(tmp_str.strip().upper())
         test_str = test_str[keyword_match.end(0):]
         keyword_match = KEYWORD_LIST_REGEX.match(test_str)
     return keywords, test_str
 
 
 def get_var_dims(test_str):
-    paren_count = 0
-    curr_dim = 0
-    for char in test_str:
-        if char == '(':
-            paren_count += 1
-            if paren_count == 1:
-                curr_dim = 1
-        elif char == ')':
-            paren_count -= 1
-        elif char == ',' and paren_count == 1:
-            curr_dim += 1
-    return curr_dim
+    i1 = test_str.find('(')
+    i2 = test_str.find(')')
+    if i1 > -1 and i2 > i1:
+        return test_str[i1+1:i2]
+    else:
+        return None
 
 
 def read_var_def(line, type_word=None):
@@ -551,20 +546,20 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                             link_name = None
                     else:
                         name_stripped = var_name.split('=')[0]
-                    var_dim = 0
+                    var_dim_str = None
                     if name_stripped.find('(') > -1:
-                        var_dim = get_var_dims(name_stripped)
+                        var_dim_str = get_var_dims(name_stripped)
                     name_stripped = name_stripped.split('(')[0].strip()
-                    modifiers, pass_name = map_keywords(obj[1])
+                    modifiers, dim_str, pass_name = map_keywords(obj[1])
                     if obj[0][:3] == 'PRO':
                         new_var = fortran_meth(file_obj, line_number, name_stripped, obj[0],
                                                modifiers, file_obj.enc_scope_name, link_name,
                                                pass_name=pass_name)
                     else:
                         new_var = fortran_obj(file_obj, line_number, name_stripped, obj[0],
-                                              modifiers, file_obj.enc_scope_name, link_name)
-                    if var_dim > 0:
-                        new_var.set_dim(var_dim)
+                                              modifiers, dim_str, file_obj.enc_scope_name, link_name)
+                    if var_dim_str is not None:
+                        new_var.set_dim(var_dim_str)
                     file_obj.add_variable(new_var)
                 if(debug):
                     print('{1} !!! VARIABLE statement({0})'.format(line_number, line.strip()))
@@ -637,7 +632,7 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 if(debug):
                     print('{1} !!! SELECT statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'typ':
-                modifiers, _ = map_keywords(obj[2])
+                modifiers, _, _ = map_keywords(obj[2])
                 new_type = fortran_type(file_obj, line_number, obj[0], modifiers, file_obj.enc_scope_name)
                 if obj[1] is not None:
                     new_type.set_inherit(obj[1])
