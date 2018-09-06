@@ -12,14 +12,14 @@ except ImportError:
 from fortls.parse_fortran import process_file, read_use_stmt, read_var_def, \
     detect_fixed_format, detect_comment_start
 from fortls.objects import find_in_scope, get_use_tree
-from fortls.intrinsics import get_keywords, get_intrinsics, get_intrinsic_modules, \
-    set_lowercase_intrinsics
+from fortls.intrinsics import get_keywords, load_intrinsics, set_lowercase_intrinsics
 
 log = logging.getLogger(__name__)
 PY3K = sys.version_info >= (3, 0)
 # Global regexes
 FORTRAN_EXT_REGEX = re.compile(r'^\.F(77|90|95|03|08|OR|PP)?$', re.I)
 OBJBREAK_REGEX = re.compile(r'[\/\-(.,+*<>=$: ]', re.I)
+INT_STMNT_REGEX = re.compile(r'^[ ]*[a-z]*$', re.I)
 WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
 CALL_REGEX = re.compile(r'[ ]*CALL[ ]+[a-z0-9_%]*$', re.I)
 TYPE_STMNT_REGEX = re.compile(r'[ ]*(TYPE|CLASS)[ ]*(IS)?[ ]*$', re.I)
@@ -346,11 +346,6 @@ class LangServer:
         self.lowercase_intrinsics = settings.get("lowercase_intrinsics", False)
         self.use_signature_help = settings.get("use_signature_help", False)
         self.variable_hover = settings.get("variable_hover", False)
-        if self.lowercase_intrinsics:
-            set_lowercase_intrinsics()
-        self.intrinsics = get_intrinsics()
-        for module in get_intrinsic_modules():
-            self.obj_tree[module.FQSN] = [module, None]
 
     def post_message(self, message, type=1):
         self.conn.send_notification("window/showMessage", {
@@ -435,16 +430,25 @@ class LangServer:
         config_path = os.path.join(self.root_path, ".fortls")
         config_exists = os.path.isfile(config_path)
         if config_exists:
-            import json
-            with open(config_path, 'r') as fhandle:
-                config_dict = json.load(fhandle)
-                if "excl_paths" in config_dict:
-                    for excl_path in config_dict["excl_paths"]:
+            try:
+                import json
+                with open(config_path, 'r') as fhandle:
+                    config_dict = json.load(fhandle)
+                    for excl_path in config_dict.get("excl_paths", []):
                         self.excl_paths.append(os.path.join(self.root_path, excl_path))
-                if "mod_dirs" in config_dict:
-                    for mod_dir in config_dict["mod_dirs"]:
+                    for mod_dir in config_dict.get("mod_dirs", []):
                         self.mod_dirs.append(os.path.join(self.root_path, mod_dir))
-        if len(self.mod_dirs) == 1:  # Recursively add sub-directories
+                    self.lowercase_intrinsics = config_dict.get("lowercase_intrinsics", self.lowercase_intrinsics)
+            except:
+                self.post_messages.append([1, "Error while parsing '.fortls' settings file"])
+        # Load intrinsics
+        if self.lowercase_intrinsics:
+            set_lowercase_intrinsics()
+        self.statements, self.keywords, self.intrinsic_funs, self.intrinsic_mods = load_intrinsics()
+        for module in self.intrinsic_mods:
+            self.obj_tree[module.FQSN] = [module, None]
+        # Recursively add sub-directories
+        if len(self.mod_dirs) == 1:
             self.mod_dirs = []
             for dirName, subdirList, fileList in os.walk(self.root_path):
                 if self.excl_paths.count(dirName) > 0:
@@ -604,7 +608,7 @@ class LangServer:
             if inc_globals:
                 for key, obj in self.obj_tree.items():
                     var_list.append(obj[0])
-                var_list += self.intrinsics
+                var_list += self.intrinsic_funs
             # Filter by prefix if necessary
             if var_prefix == '':
                 return var_list
@@ -687,6 +691,9 @@ class LangServer:
                         return 4, var_prefix, None
                     if PROCEDURE_STMNT_REGEX.match(test_str) is not None:
                         return 6, var_prefix, None
+            # Only thing on line?
+            if INT_STMNT_REGEX.match(line) is not None:
+                return 9, var_prefix, None
             # Default context
             if type_def:
                 return -1, var_prefix, None
@@ -812,11 +819,16 @@ class LangServer:
                 key_context = 2
             elif enc_scope_type == 4:
                 key_context = 3
-            for candidate in get_keywords(key_context):
+            for candidate in get_keywords(self.statements, self.keywords, key_context):
                 if candidate.name.lower().startswith(var_prefix):
                     item_list.append(build_comp(candidate))
             req_dict["items"] = item_list
             return req_dict
+        elif line_context == 9:
+            # First word -> default context plus Fortran statements
+            for candidate in get_keywords(self.statements, self.keywords, 0):
+                if candidate.name.lower().startswith(var_prefix):
+                    item_list.append(build_comp(candidate))
         for candidate in get_candidates(scope_list, var_prefix, include_globals, public_only, abstract_only):
             # Skip module names (only valid in USE)
             candidate_type = candidate.get_type()
@@ -883,7 +895,7 @@ class LangServer:
             key = def_name.lower()
             if key in self.obj_tree:
                 return self.obj_tree[key][0]
-            for obj in self.intrinsics:
+            for obj in self.intrinsic_funs:
                 if obj.name.lower() == key:
                     return obj
         else:
@@ -895,7 +907,7 @@ class LangServer:
             nLine = len(line)
             line_grouped = tokenize_line(line)
             if len(line_grouped) < 2:
-                return None, None
+                return None, None, None
             lowest_level = -1
             for i, level in enumerate(line_grouped):
                 if level[-1][0][-1][-1] == nLine:
@@ -904,9 +916,10 @@ class LangServer:
                 arg_string = ''
                 for char_group in line_grouped[lowest_level]:
                     arg_string += char_group[-1]
-                return line_grouped[lowest_level-1][0][1].strip(), arg_string.split(',')
+                return line_grouped[lowest_level-1][0][1].strip(), arg_string.split(','), \
+                    line_grouped[lowest_level-1][0][0][-1][1]
             else:
-                return None, None
+                return None, None, None
 
         def check_optional(arg, params):
             opt_split = arg.split("=")
@@ -945,7 +958,7 @@ class LangServer:
             if (line_prefix.count("'") % 2 == 1) or \
                (line_prefix.count('"') % 2 == 1):
                 return req_dict
-            sub_name, arg_strings = get_sub_name(line_prefix)
+            sub_name, arg_strings, sub_end = get_sub_name(line_prefix)
             var_stack = get_var_stack(sub_name)
             is_member = (len(var_stack) > 1)
         except:
@@ -972,10 +985,17 @@ class LangServer:
             if key in self.obj_tree:
                 var_obj = self.obj_tree[key][0]
             else:
-                for obj in self.intrinsics:
+                for obj in self.intrinsic_funs:
                     if obj.name.lower() == key:
                         var_obj = obj
                         break
+        # Check keywords
+        if (var_obj is None) and (INT_STMNT_REGEX.match(line_prefix[:sub_end]) is not None):
+            key = sub_name.lower()
+            for candidate in get_keywords(self.statements, self.keywords, 0):
+                if candidate.name.lower() == key:
+                    var_obj = candidate
+                    break
         if var_obj is None:
             return req_dict
         # Build signature

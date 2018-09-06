@@ -93,6 +93,8 @@ Configuration
 Project specific settings can be specified by placing a JSON file named ``.fortls`` (example below)
 in the ``root_dir`` directory.
 
+* ``lowercase_intrinsics`` Use lowercase for intrinsics and keywords in autocomplete requests (default: false)
+
 **Setup module search paths:**
 
 By default all files with the suffix ``F,F77,F90,F95,F03,F08,FOR,FPP`` (case-insensitive) in the
@@ -112,7 +114,8 @@ be specified manually as it is always included.
 
     {
       "mod_dirs": ["subdir1", "subdir2"],
-      "excl_paths": ["subdir3", "subdir1/file_to_skip.F90"]
+      "excl_paths": ["subdir3", "subdir1/file_to_skip.F90"],
+      "lowercase_intrinsics": false
     }
 
 Bug reports

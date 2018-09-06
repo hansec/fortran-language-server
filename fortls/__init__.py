@@ -225,7 +225,11 @@ def main():
                             active_mark = '*'
                         else:
                             active_mark = ' '
-                        print('{2}     {0} :: {1}'.format(obj['documentation'], obj['label'], active_mark))
+                        arg_desc = obj.get('documentation')
+                        if arg_desc is not None:
+                            print('{2}     {0} :: {1}'.format(arg_desc, obj['label'], active_mark))
+                        else:
+                            print('{1}     {0}'.format(obj['label'], active_mark))
         #
         if args.debug_definition:
             print('\nTesting "textDocument/definition" request:')

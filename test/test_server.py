@@ -216,9 +216,9 @@ def test_comp():
         [2, "a", "COMPLEX(8)"],
         [1, "n", "INTEGER(4)"],
         [2, "a", "REAL(8)"],
-        [3, "res0", "INTEGER"],
-        [4, "res0", "INTEGER"],
-        [5, "res0", "INTEGER"]
+        [7, "READ", "STATEMENT"],
+        [8, "READ", "STATEMENT"],
+        [9, "READ", "STATEMENT"]
     )
     assert len(exp_results)+1 == len(results)
     for i in range(len(exp_results)):
