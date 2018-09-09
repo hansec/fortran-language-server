@@ -1,3 +1,10 @@
+## 0.8.3
+
+### Improvements
+* Add support for generating debug logs
+* Add Fortran statements to autocomplete suggestions
+* Add support for explicit dimension specifications, fixes [#37](https://github.com/hansec/fortran-language-server/issues/37)
+
 ## 0.8.2
 
 ### Improvements
