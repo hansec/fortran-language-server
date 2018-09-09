@@ -64,6 +64,7 @@ def read_file_split(filepath):
                 contents = re.sub(r'\t', r'  ', fhandle.read())
                 contents_split = contents.splitlines()
     except:
+        log.error("Could not read/decode file %s", filepath, exc_info=True)
         return None, 'Could not read/decode file'
     else:
         return contents_split, None
@@ -79,6 +80,7 @@ def init_file(filepath):
         fixed_flag = detect_fixed_format(contents_split)
         ast_new = process_file(contents_split, True, filepath, fixed_flag)
     except:
+        log.error("Error while parsing file %s", filepath, exc_info=True)
         return None, 'Error during parsing'
     # Construct new file object and add to workspace
     tmp_obj = {
@@ -274,14 +276,14 @@ def get_line(line, character, file_obj):
 
 def apply_change(contents_split, change):
     """Apply a change to the document."""
-    text = change['text']
+    text = change.get('text', "")
     change_range = change.get('range')
     if len(text) == 0:
         text_split = [""]
     else:
         text_split = text.splitlines()
         # Check for ending newline
-        if text[-1] == "\n" or text[-1] == "\r":
+        if (text[-1] == "\n") or (text[-1] == "\r"):
             text_split.append("")
 
     if change_range is None:
@@ -298,7 +300,7 @@ def apply_change(contents_split, change):
         return contents_split + text_split, -1
 
     # Check for single line edit
-    if start_line == end_line and len(text_split) == 1:
+    if (start_line == end_line) and (len(text_split) == 1):
         prev_line = contents_split[start_line]
         contents_split[start_line] = prev_line[:start_col] + text + prev_line[end_col:]
         return contents_split, start_line
@@ -306,7 +308,7 @@ def apply_change(contents_split, change):
     # Apply standard change to document
     new_contents = []
     for i, line in enumerate(contents_split):
-        if i < start_line or i > end_line:
+        if (i < start_line) or (i > end_line):
             new_contents.append(line)
             continue
 
@@ -323,7 +325,7 @@ def apply_change(contents_split, change):
 
 
 class LangServer:
-    def __init__(self, conn, logLevel=0, settings={}):
+    def __init__(self, conn, debugLog=False, settings={}):
         self.conn = conn
         self.running = True
         self.root_path = None
@@ -335,10 +337,7 @@ class LangServer:
         self.excl_paths = []
         self.post_messages = []
         self.streaming = True
-        if logLevel == 0:
-            logging.basicConfig(level=logging.ERROR)
-        elif logLevel == 1:
-            logging.basicConfig(level=logging.DEBUG)
+        self.debugLog = debugLog
         # Get launch settings
         self.symbol_include_mem = settings.get("symbol_include_mem", True)
         self.sync_type = settings.get("sync_type", 1)
@@ -373,7 +372,7 @@ class LangServer:
         def noop(request):
             return None
         # Request handler
-        log.info("REQUEST %s %s", request.get("id"), request.get("method"))
+        log.debug("REQUEST %s %s", request.get("id"), request.get("method"))
         handler = {
             "initialize": self.serve_initialize,
             "textDocument/documentSymbol": self.serve_document_symbols,
@@ -386,6 +385,8 @@ class LangServer:
             "textDocument/didSave": self.serve_onSave,
             "textDocument/didClose": self.serve_onSave,
             "textDocument/didChange": self.serve_onChange,
+            "initialized": noop,
+            "workspace/didChangeWatchedFiles": noop,
             "$/cancelRequest": noop,
             "shutdown": noop,
             "exit": self.serve_exit,
@@ -407,8 +408,8 @@ class LangServer:
         except JSONRPC2Error as e:
             self.conn.write_error(
                 request["id"], code=e.code, message=e.message, data=e.data)
+            log.warning("RPC error handling request %s", request, exc_info=True)
         except Exception as e:
-            log.warning("handler for %s failed", request, exc_info=True)
             self.conn.write_error(
                 request["id"],
                 code=-32603,
@@ -426,6 +427,11 @@ class LangServer:
         self.root_path = path_from_uri(
             params.get("rootUri") or params.get("rootPath") or "")
         self.mod_dirs.append(self.root_path)
+        # Setup logging
+        if self.debugLog and (self.root_path != ""):
+            logging.basicConfig(filename=os.path.join(self.root_path, "fortls_debug.log"),
+                                level=logging.DEBUG, filemode='w')
+            log.debug("REQUEST %s %s", request.get("id"), request.get("method"))
         # Check for config file
         config_path = os.path.join(self.root_path, ".fortls")
         config_exists = os.path.isfile(config_path)
@@ -1175,9 +1181,11 @@ class LangServer:
                         new_contents, line_tmp = apply_change(old_contents, change)
                 except:
                     self.post_message('Change request failed for file "{0}": Could not apply change'.format(path))
+                    log.error('Change request failed for file "%s": Could not apply change', path, exc_info=True)
                     return
             else:
                 self.post_message('Change request failed for unknown file "{0}"'.format(path))
+                log.error('Change request failed for unknown file "%s"', path)
                 return
         # Parse newly updated file
         err_str = self.update_workspace_file(new_contents, path, update_links=True)
@@ -1225,6 +1233,7 @@ class LangServer:
             fixed_flag = detect_fixed_format(contents_split)
             ast_new = process_file(contents_split, True, filepath, fixed_flag)
         except:
+            log.error("Error while parsing file %s", filepath, exc_info=True)
             return 'Error during parsing'  # Error during parsing
         # Remove old objects from tree
         if filepath in self.workspace:

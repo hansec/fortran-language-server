@@ -47,6 +47,10 @@ def main():
         '--variable_hover', action="store_true",
         help="Show hover information for variables (default: subroutines/functions only)"
     )
+    parser.add_argument(
+        '--debug_log', action="store_true",
+        help="Generate debug log in project root folder"
+    )
     group = parser.add_argument_group("DEBUG", "Options for debugging language server")
     group.add_argument(
         '--debug_parser', action="store_true",
@@ -134,7 +138,7 @@ def main():
         tmpin = os.fdopen(prb, 'rb')
         tmpout = os.fdopen(pwb, 'wb')
         s = LangServer(conn=JSONRPC2Connection(ReadWriter(tmpin, tmpout)),
-                       logLevel=0, settings=settings)
+                       debugLog=args.debug_log, settings=settings)
         #
         if args.debug_rootpath:
             dir_exists = os.path.isdir(args.debug_rootpath)
@@ -284,7 +288,7 @@ def main():
     else:
         stdin, stdout = _binary_stdio()
         s = LangServer(conn=JSONRPC2Connection(ReadWriter(stdin, stdout)),
-                       logLevel=0, settings=settings)
+                       debugLog=args.debug_log, settings=settings)
         s.run()
 
 
