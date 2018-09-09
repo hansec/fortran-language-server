@@ -325,7 +325,7 @@ def apply_change(contents_split, change):
 
 
 class LangServer:
-    def __init__(self, conn, debugLog=False, settings={}):
+    def __init__(self, conn, debug_log=False, settings={}):
         self.conn = conn
         self.running = True
         self.root_path = None
@@ -337,7 +337,7 @@ class LangServer:
         self.excl_paths = []
         self.post_messages = []
         self.streaming = True
-        self.debugLog = debugLog
+        self.debug_log = debug_log
         # Get launch settings
         self.symbol_include_mem = settings.get("symbol_include_mem", True)
         self.sync_type = settings.get("sync_type", 1)
@@ -427,11 +427,6 @@ class LangServer:
         self.root_path = path_from_uri(
             params.get("rootUri") or params.get("rootPath") or "")
         self.mod_dirs.append(self.root_path)
-        # Setup logging
-        if self.debugLog and (self.root_path != ""):
-            logging.basicConfig(filename=os.path.join(self.root_path, "fortls_debug.log"),
-                                level=logging.DEBUG, filemode='w')
-            log.debug("REQUEST %s %s", request.get("id"), request.get("method"))
         # Check for config file
         config_path = os.path.join(self.root_path, ".fortls")
         config_exists = os.path.isfile(config_path)
@@ -445,8 +440,15 @@ class LangServer:
                     for mod_dir in config_dict.get("mod_dirs", []):
                         self.mod_dirs.append(os.path.join(self.root_path, mod_dir))
                     self.lowercase_intrinsics = config_dict.get("lowercase_intrinsics", self.lowercase_intrinsics)
+                    self.debug_log = config_dict.get("debug_log", self.debug_log)
             except:
                 self.post_messages.append([1, "Error while parsing '.fortls' settings file"])
+        # Setup logging
+        if self.debug_log and (self.root_path != ""):
+            logging.basicConfig(filename=os.path.join(self.root_path, "fortls_debug.log"),
+                                level=logging.DEBUG, filemode='w')
+            log.debug("REQUEST %s %s", request.get("id"), request.get("method"))
+            self.post_messages.append([3, "FORTLS debugging enabled"])
         # Load intrinsics
         if self.lowercase_intrinsics:
             set_lowercase_intrinsics()

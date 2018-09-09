@@ -138,7 +138,7 @@ def main():
         tmpin = os.fdopen(prb, 'rb')
         tmpout = os.fdopen(pwb, 'wb')
         s = LangServer(conn=JSONRPC2Connection(ReadWriter(tmpin, tmpout)),
-                       debugLog=args.debug_log, settings=settings)
+                       debug_log=args.debug_log, settings=settings)
         #
         if args.debug_rootpath:
             dir_exists = os.path.isdir(args.debug_rootpath)
@@ -288,7 +288,7 @@ def main():
     else:
         stdin, stdout = _binary_stdio()
         s = LangServer(conn=JSONRPC2Connection(ReadWriter(stdin, stdout)),
-                       debugLog=args.debug_log, settings=settings)
+                       debug_log=args.debug_log, settings=settings)
         s.run()
 
 

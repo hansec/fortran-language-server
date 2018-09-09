@@ -95,6 +95,7 @@ Project specific settings can be specified by placing a JSON file named ``.fortl
 in the ``root_dir`` directory.
 
 * ``lowercase_intrinsics`` Use lowercase for intrinsics and keywords in autocomplete requests (default: false)
+* ``debug_log`` Write debug information to ``root_dir/fortls_debug.log`` (default: false)
 
 **Setup module search paths:**
 
@@ -116,7 +117,8 @@ be specified manually as it is always included.
     {
       "mod_dirs": ["subdir1", "subdir2"],
       "excl_paths": ["subdir3", "subdir1/file_to_skip.F90"],
-      "lowercase_intrinsics": false
+      "lowercase_intrinsics": false,
+      "debug_log": false
     }
 
 Bug reports
