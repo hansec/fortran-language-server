@@ -385,7 +385,7 @@ class LangServer:
             "textDocument/hover": self.serve_hover,
             "textDocument/didOpen": self.serve_onSave,
             "textDocument/didSave": self.serve_onSave,
-            "textDocument/didClose": self.serve_onSave,
+            "textDocument/didClose": self.serve_onClose,
             "textDocument/didChange": self.serve_onChange,
             "initialized": noop,
             "workspace/didChangeWatchedFiles": noop,
@@ -1208,11 +1208,16 @@ class LangServer:
         #     self.obj_tree[key][0].resolve_inherit(self.obj_tree)
         #     self.obj_tree[key][0].resolve_link(self.obj_tree)
 
-    def serve_onSave(self, request):
+    def serve_onClose(self, request):
+        self.serve_onSave(request, test_exist=True)
+
+    def serve_onSave(self, request, test_exist=False):
         # Update workspace from file on disk
         params = request["params"]
         uri = params["textDocument"]["uri"]
         filepath = path_from_uri(uri)
+        if test_exist and (not os.path.isfile(filepath)):
+            return
         err_str = self.add_file(filepath)
         if err_str is not None:
             self.post_message('Save request failed for file "{0}": {1}'.format(filepath, err_str))
