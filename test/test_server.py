@@ -78,6 +78,13 @@ def test_change():
     string += write_rpc_notification("textDocument/didChange", {
         "textDocument": {"uri": file_path},
         "contentChanges": [{
+            "text": " unicode test",
+            "range": {
+                "start": {"line": 3, "character": 3},
+                "end": {"line": 3, "character": 3}
+            }
+        },
+        {
             "text": "",
             "range": {
                 "start": {"line": 6, "character": 0},

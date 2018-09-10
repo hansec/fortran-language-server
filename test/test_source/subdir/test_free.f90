@@ -1,7 +1,7 @@
 MODULE test_free
 USE, INTRINSIC :: iso_fortran_env, ONLY: error_unit
 IMPLICIT NONE
-!
+! ą
 TYPE :: scale_type
   REAL(8) :: val = 1.d0
 END TYPE scale_type

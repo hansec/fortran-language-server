@@ -276,7 +276,7 @@ def get_line(line, character, file_obj):
 
 def apply_change(contents_split, change):
     """Apply a change to the document."""
-    text = change.get('text', "")
+    text = change.get('text', "").encode('utf-8')
     change_range = change.get('range')
     if len(text) == 0:
         text_split = [""]
@@ -1173,7 +1173,7 @@ class LangServer:
         path = path_from_uri(uri)
         # Update file contents with changes
         if self.sync_type == 1:
-            new_contents = params["contentChanges"][0]["text"].splitlines()
+            new_contents = params["contentChanges"][0]["text"].encode('utf-8').splitlines()
         else:
             if path in self.workspace:
                 new_contents = self.workspace[path]["contents"]
