@@ -1,3 +1,9 @@
+## 0.8.4
+
+### Fixes
+* Check for existence of file during "textDocument/didClose" requests, [#46](https://github.com/hansec/fortran-language-server/issues/46)
+* Encode text as UTF-8 in change requests, fixes [#41](https://github.com/hansec/fortran-language-server/issues/41)
+
 ## 0.8.3
 
 ### Improvements
