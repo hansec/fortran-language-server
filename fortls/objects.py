@@ -326,7 +326,8 @@ class fortran_scope:
                         continue
                     line_number = child.sline - 1
                     i0, i1 = find_word_in_line(file_contents[line_number].lower(), child.name.lower())
-                    errors.append([1, line_number, i0, i1, child.name])
+                    errors.append([1, line_number, i0, i1, child.name,
+                                   parent_var.file.path, parent_var.sline - 1])
         return errors
 
     def check_use(self, obj_tree, file_contents):
@@ -1166,8 +1167,14 @@ class fortran_file:
                             "end": {"line": error[1], "character": error[3]}
                         },
                         "message": 'Variable "{0}" masks variable in parent scope'.format(error[4]),
-                        "severity": 2
-                    })
+                        "severity": 2,
+                        "relatedInformation": [{"location": {"uri": "file://{0}".format(error[5]),
+                                                             "range": {"start": { "line": error[6], "character": 0},
+                                                                       "end": { "line": error[6], "character": 0}}
+                                                            },
+                                                "message": ""}]
+                        }
+                    )
             for error in scope.check_use(obj_tree, file_contents):
                 # Check preproc if
                 if self.check_ppif(error[0]):
