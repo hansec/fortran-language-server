@@ -1168,11 +1168,15 @@ class fortran_file:
                         },
                         "message": 'Variable "{0}" masks variable in parent scope'.format(error[4]),
                         "severity": 2,
-                        "relatedInformation": [{"location": {"uri": "file://{0}".format(error[5]),
-                                                             "range": {"start": { "line": error[6], "character": 0},
-                                                                       "end": { "line": error[6], "character": 0}}
-                                                            },
-                                                "message": ""}]
+                        "relatedInformation": [{"location": {
+                                                    "uri": "file://{0}".format(error[5]),
+                                                    "range": {
+                                                        "start": { "line": error[6], "character": 0},
+                                                        "end": { "line": error[6], "character": 0}
+                                                    }
+                                                },
+                                                "message": ""
+                                                }]
                         }
                     )
             for error in scope.check_use(obj_tree, file_contents):
