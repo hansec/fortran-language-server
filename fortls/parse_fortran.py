@@ -387,10 +387,12 @@ def read_use_stmt(line):
     else:
         trailing_line = line[use_match.end(0):].lower()
         use_mod = use_match.group(2)
-        only_ind = trailing_line.find('only:')
+        only_ind = trailing_line.find('only')
+        if only_ind > -1:
+            only_ind = trailing_line[only_ind:].find(':')
         only_list = []
         if only_ind > -1:
-            only_split = trailing_line[only_ind+5:].split(',')
+            only_split = trailing_line.split(':', 1)[1].split(',')
             for only_stmt in only_split:
                 only_list.append(only_stmt.split('=>')[0].strip())
         return 'use', [use_mod, only_list]
