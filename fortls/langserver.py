@@ -517,13 +517,13 @@ class LangServer:
             else:
                 return 1
         test_output = []
-        query = request["params"]["query"]
+        query = request["params"]["query"].lower()
         for tmp_path, file_info in self.workspace.items():
             if tmp_path.endswith("__genmod.f90"):
                 continue
             uri = path_to_uri(tmp_path)
             for scope in file_info["ast"].get_scopes():
-                if query not in scope.name:
+                if query not in scope.name.lower():
                     continue
                 if (scope.name[0] == "#") or (scope.get_type() == 8):
                     continue
