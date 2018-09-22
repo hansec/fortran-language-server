@@ -56,9 +56,14 @@ def read_file_split(filepath):
     # Read and add file from disk
     try:
         if PY3K:
-            with open(filepath, 'r', encoding="utf-8") as fhandle:
-                contents = re.sub(r'\t', r'  ', fhandle.read())
-                contents_split = contents.splitlines()
+            try:
+                with open(filepath, 'r', encoding="utf-8") as fhandle:
+                    contents = re.sub(r'\t', r'  ', fhandle.read())
+                    contents_split = contents.splitlines()
+            except UnicodeDecodeError:
+                with open(filepath, 'r', encoding="Windows-1252") as fhandle:
+                    contents = re.sub(r'\t', r'  ', fhandle.read())
+                    contents_split = contents.splitlines()
         else:
             with open(filepath, 'r') as fhandle:
                 contents = re.sub(r'\t', r'  ', fhandle.read())
