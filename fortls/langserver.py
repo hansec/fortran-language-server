@@ -389,6 +389,7 @@ class LangServer:
             "textDocument/didChange": self.serve_onChange,
             "initialized": noop,
             "workspace/didChangeWatchedFiles": noop,
+            "workspace/symbol": self.serve_workspace_symbol,
             "$/cancelRequest": noop,
             "shutdown": noop,
             "exit": self.serve_exit,
@@ -487,6 +488,7 @@ class LangServer:
             "documentSymbolProvider": True,
             "referencesProvider": True,
             "hoverProvider": True,
+            "workspaceSymbolProvider": True,
             "textDocumentSync": self.sync_type
         }
         if self.use_signature_help:
@@ -497,6 +499,79 @@ class LangServer:
         #     "workspaceSymbolProvider": True,
         #     "streaming": False,
         # }
+
+    def serve_workspace_symbol(self, request):
+        def map_types(type):
+            if type == 1:
+                return 2
+            elif type == 2:
+                return 6
+            elif type == 3:
+                return 12
+            elif type == 4:
+                return 5
+            elif type == 5:
+                return 11
+            elif type == 6:
+                return 13
+            elif type == 7:
+                return 6
+            else:
+                return 1
+        test_output = []
+        query = request["params"]["query"].lower()
+        for tmp_path, file_info in self.workspace.items():
+            if tmp_path.endswith("__genmod.f90"):
+                continue
+            uri = path_to_uri(tmp_path)
+            for scope in file_info["ast"].get_scopes():
+                if query not in scope.name.lower():
+                    continue
+                if (scope.name[0] == "#") or (scope.get_type() == 8):
+                    continue
+                scope_tree = scope.FQSN.split("::")
+                if len(scope_tree) > 2:
+                    if scope_tree[1].startswith("#gen_int"):
+                        scope_type = 11
+                    else:
+                        continue
+                else:
+                    scope_type = map_types(scope.get_type())
+                tmp_out = {}
+                tmp_out["name"] = scope.name
+                tmp_out["kind"] = scope_type
+                sline = scope.sline-1
+                eline = sline
+                if scope.eline is not None:
+                    eline = scope.eline-1
+                tmp_out["location"] = {
+                    "uri": uri,
+                    "range": {
+                        "start": {"line": sline, "character": 0},
+                        "end": {"line": eline, "character": 0}
+                    }
+                }
+                # Set containing scope
+                if scope.FQSN.find('::') > 0:
+                    tmp_list = scope.FQSN.split("::")
+                    tmp_out["containerName"] = tmp_list[0]
+                test_output.append(tmp_out)
+                # If class add members
+                if scope.get_type() == 4 and self.symbol_include_mem:
+                    for child in scope.children:
+                        tmp_out = {}
+                        tmp_out["name"] = child.name
+                        tmp_out["kind"] = map_types(child.get_type())
+                        tmp_out["location"] = {
+                            "uri": uri,
+                            "range": {
+                                "start": {"line": child.sline-1, "character": 0},
+                                "end": {"line": child.sline-1, "character": 1}
+                            }
+                        }
+                        tmp_out["containerName"] = scope.name
+                        test_output.append(tmp_out)
+        return test_output
 
     def serve_document_symbols(self, request):
         def map_types(type):
