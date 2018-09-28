@@ -440,7 +440,9 @@ class LangServer:
                     for excl_path in config_dict.get("excl_paths", []):
                         self.excl_paths.append(os.path.join(self.root_path, excl_path))
                     for mod_dir in config_dict.get("mod_dirs", []):
-                        self.mod_dirs.append(os.path.join(self.root_path, mod_dir))
+                        dir_path = os.path.join(self.root_path, mod_dir)
+                        if os.path.isdir(dir_path):
+                            self.mod_dirs.append(dir_path)
                     self.lowercase_intrinsics = config_dict.get("lowercase_intrinsics", self.lowercase_intrinsics)
                     self.debug_log = config_dict.get("debug_log", self.debug_log)
             except:
