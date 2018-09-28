@@ -389,6 +389,7 @@ class LangServer:
             "textDocument/didChange": self.serve_onChange,
             "initialized": noop,
             "workspace/didChangeWatchedFiles": noop,
+            "workspace/symbol": self.serve_workspace_symbol,
             "$/cancelRequest": noop,
             "shutdown": noop,
             "exit": self.serve_exit,
@@ -487,6 +488,7 @@ class LangServer:
             "documentSymbolProvider": True,
             "referencesProvider": True,
             "hoverProvider": True,
+            "workspaceSymbolProvider": True,
             "textDocumentSync": self.sync_type
         }
         if self.use_signature_help:
@@ -497,6 +499,67 @@ class LangServer:
         #     "workspaceSymbolProvider": True,
         #     "streaming": False,
         # }
+
+    def serve_workspace_symbol(self, request):
+        def map_types(type):
+            if type == 1:
+                return 2
+            elif type == 2:
+                return 6
+            elif type == 3:
+                return 12
+            elif type == 4:
+                return 5
+            elif type == 5:
+                return 11
+            elif type == 6:
+                return 13
+            elif type == 7:
+                return 6
+            else:
+                return 1
+
+        def add_children(mod_obj, query):
+            tmp_list = []
+            if mod_obj.get_type() == 1:
+                for child_obj in mod_obj.get_children():
+                    if not child_obj.name.lower().find(query) > -1:
+                        continue
+                    tmp_list.append(child_obj)
+            return tmp_list
+        matching_symbols = []
+        query = request["params"]["query"].lower()
+        for top_key, obj_packed in self.obj_tree.items():
+            top_obj = obj_packed[0]
+            top_uri = obj_packed[1]
+            if top_uri is None:
+                continue
+            candidates = add_children(top_obj, query)
+            if top_obj.name.lower().find(query) > -1:
+                candidates += [top_obj]
+            for candidate in candidates:
+                tmp_out = {}
+                tmp_out["name"] = candidate.name
+                tmp_out["kind"] = map_types(candidate.get_type())
+                sline = candidate.sline-1
+                if candidate.eline is not None:
+                    eline = candidate.eline-1
+                else:
+                    eline = sline
+                # Set containing scope
+                if candidate.FQSN.find('::') > 0:
+                    tmp_list = candidate.FQSN.split("::")
+                    tmp_out["containerName"] = tmp_list[0]
+                # Set location
+                tmp_out["location"] = {
+                    "uri": path_to_uri(top_uri),
+                    "range": {
+                        "start": {"line": sline, "character": 0},
+                        "end": {"line": eline, "character": 0}
+                    }
+                }
+                matching_symbols.append(tmp_out)
+        return sorted(matching_symbols, key=lambda k: k['name'])
 
     def serve_document_symbols(self, request):
         def map_types(type):

@@ -734,6 +734,7 @@ class fortran_obj:
                    dim_str, enc_scope, link_obj):
         self.file = file_obj
         self.sline = line_number
+        self.eline = None
         self.name = name
         self.desc = var_desc
         self.modifiers = modifiers

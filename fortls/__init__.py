@@ -3,7 +3,7 @@ import sys
 import os
 import argparse
 from multiprocessing import freeze_support
-from .langserver import LangServer
+from .langserver import LangServer, path_from_uri
 from .jsonrpc import JSONRPC2Connection, ReadWriter
 from .parse_fortran import process_file, detect_fixed_format
 __version__ = '0.8.4'
@@ -61,6 +61,10 @@ def main():
         help="Test symbol request for specified file"
     )
     group.add_argument(
+        '--debug_workspace_symbols', type=str,
+        help="Test workspace/symbol request"
+    )
+    group.add_argument(
         '--debug_completion', action="store_true",
         help="Test completion request for specified file and position"
     )
@@ -98,7 +102,8 @@ def main():
         sys.exit(0)
     debug_server = (args.debug_symbols or args.debug_completion
                     or args.debug_signature or args.debug_definition
-                    or args.debug_hover or (args.debug_rootpath is not None))
+                    or args.debug_hover or (args.debug_rootpath is not None)
+                    or (args.debug_workspace_symbols is not None))
     #
     settings = {
         "symbol_include_mem": (not args.symbol_skip_mem),
@@ -181,6 +186,25 @@ def main():
                     parent = "null"
                 print('  line {2:5d}  symbol -> {1:3d}:{0:30} parent = {3}'.format(symbol["name"],
                       symbol["kind"], sline, parent))
+        #
+        if args.debug_workspace_symbols is not None:
+            print('\nTesting "workspace/symbol" request:')
+            if args.debug_rootpath is None:
+                error_exit("'debug_rootpath' not specified for debug request")
+            symbol_results = s.serve_workspace_symbol({
+                "params": {
+                    "query": args.debug_workspace_symbols
+                }
+            })
+            for symbol in symbol_results:
+                path = path_from_uri(symbol["location"]["uri"])
+                sline = symbol["location"]["range"]["start"]["line"]
+                if "containerName" in symbol:
+                    parent = symbol["containerName"]
+                else:
+                    parent = "null"
+                print('  {2}::{3:d}  symbol -> {1:3d}:{0:30} parent = {4}'.format(symbol["name"],
+                      symbol["kind"], os.path.relpath(path, args.debug_rootpath), sline, parent))
         #
         if args.debug_completion:
             print('\nTesting "textDocument/completion" request:')

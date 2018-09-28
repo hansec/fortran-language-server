@@ -154,6 +154,38 @@ def test_symbols():
     check_return(results[1])
 
 
+def test_workspace_symbols():
+    def check_return(result_array):
+        # Expected objects
+        objs = (
+            ["test", 6, 7],
+            ["test_abstract", 2, 0],
+            ["test_free", 2, 0],
+            ["test_mod", 2, 0],
+            ["test_program", 2, 0],
+            ["test_select", 2, 0],
+            ["test_select_sub", 6, 16],
+            ["test_sig_Sub", 6, 67],
+            ["test_str1", 13, 5],
+            ["test_str2", 13, 5],
+            ["test_sub", 6, 8]
+        )
+        assert len(result_array) == len(objs)
+        for i, obj in enumerate(objs):
+            assert result_array[i]["name"] == obj[0]
+            assert result_array[i]["kind"] == obj[1]
+            assert result_array[i]["location"]["range"]["start"]["line"] == obj[2]
+    #
+    string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
+    string += write_rpc_request(2, "workspace/symbol", {
+        "query": "test"
+    })
+    errcode, results = run_request(string)
+    #
+    assert errcode == 0
+    check_return(results[1])
+
+
 def test_comp():
     def check_return(result_array, checks):
         assert len(result_array["items"]) == checks[0]
