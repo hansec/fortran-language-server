@@ -4,7 +4,7 @@ from fortls.objects import map_keywords, fortran_module, fortran_program, \
     fortran_submodule, fortran_subroutine, fortran_function, fortran_block, \
     fortran_select, fortran_type, fortran_int, fortran_obj, fortran_meth, fortran_file
 #
-USE_REGEX = re.compile(r'[ ]*USE([, ]*INTRINSIC)?[ :]*([a-z0-9_]*)', re.I)
+USE_REGEX = re.compile(r'[ ]*USE([, ]+INTRINSIC)?[ :]*([a-z0-9_]*)([, ]+ONLY[ :]+)?', re.I)
 INCLUDE_REGEX = re.compile(r'[ ]*INCLUDE[ :]*[\'\"]([^\'\"]*)', re.I)
 SUB_REGEX = re.compile(r'[ ]*(PURE|ELEMENTAL|RECURSIVE)*[ ]*SUBROUTINE[ ]+([a-z0-9_]+)', re.I)
 END_SUB_REGEX = re.compile(r'[ ]*END[ ]*SUBROUTINE', re.I)
@@ -387,10 +387,9 @@ def read_use_stmt(line):
     else:
         trailing_line = line[use_match.end(0):].lower()
         use_mod = use_match.group(2)
-        only_ind = trailing_line.find('only:')
         only_list = []
-        if only_ind > -1:
-            only_split = trailing_line[only_ind+5:].split(',')
+        if use_match.group(3) is not None:
+            only_split = trailing_line.split(',')
             for only_stmt in only_split:
                 only_list.append(only_stmt.split('=>')[0].strip())
         return 'use', [use_mod, only_list]
