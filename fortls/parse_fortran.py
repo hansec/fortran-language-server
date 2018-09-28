@@ -667,11 +667,12 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 if(debug):
                     print('{1} !!! INCLUDE statement({0})'.format(line_number, line.strip()))
         # Look for visiblity statement
-        match = VIS_REGEX.match(line)
+        match = VIS_REGEX.match(line.strip())
         if (match is not None):
             match_lower = match.group(0).lower()
-            trailing_line = line[match.end(0):]
-            mod_words = WORD_REGEX.findall(trailing_line)
+            trailing_line = line.strip()[match.end(0):]
+            line_no_comment = trailing_line.split('!')[0]
+            mod_words = WORD_REGEX.findall(line_no_comment)
             if len(mod_words) == 0:
                 if match_lower == 'private':
                     file_obj.current_scope.set_default_vis(-1)
