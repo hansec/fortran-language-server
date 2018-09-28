@@ -405,9 +405,23 @@ def read_inc_stmt(line):
         return 'inc', [inc_path]
 
 
+def read_vis_stmnt(line):
+    vis_match = VIS_REGEX.match(line)
+    if vis_match is None:
+        return None
+    else:
+        vis_type = 0
+        if vis_match.group(0).lower() == 'private':
+            vis_type = 1
+        trailing_line = line[vis_match.end(0):].split('!')[0]
+        mod_words = WORD_REGEX.findall(trailing_line)
+        return 'vis', [vis_type, mod_words]
+
+
 def_tests = [read_var_def, read_sub_def, read_fun_def, read_block_def,
              read_select_def, read_type_def, read_use_stmt, read_int_def,
-             read_mod_def, read_prog_def, read_submod_def, read_inc_stmt]
+             read_mod_def, read_prog_def, read_submod_def, read_inc_stmt,
+             read_vis_stmnt]
 
 
 def process_file(file_str, close_open_scopes, path=None, fixed_format=False, debug=False):
@@ -666,24 +680,17 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 file_obj.add_include(obj[0], line_number)
                 if(debug):
                     print('{1} !!! INCLUDE statement({0})'.format(line_number, line.strip()))
-        # Look for visiblity statement
-        match = VIS_REGEX.match(line)
-        if (match is not None):
-            match_lower = match.group(0).lower()
-            trailing_line = line[match.end(0):]
-            mod_words = WORD_REGEX.findall(trailing_line)
-            if len(mod_words) == 0:
-                if match_lower == 'private':
+            elif obj_type == 'vis':
+                if (len(obj[1]) == 0) and (obj[0] == 1):
                     file_obj.current_scope.set_default_vis(-1)
-            else:
-                if match_lower == 'private':
-                    for word in mod_words:
-                        file_obj.add_private(word)
                 else:
-                    for word in mod_words:
-                        file_obj.add_public(word)
-            if(debug):
-                print('{1} !!! Visiblity statement({0})'.format(line_number, line.strip()))
-            continue
+                    if obj[0] == 1:
+                        for word in obj[1]:
+                            file_obj.add_private(word)
+                    else:
+                        for word in obj[1]:
+                            file_obj.add_public(word)
+                if(debug):
+                    print('{1} !!! Visiblity statement({0})'.format(line_number, line.strip()))
     file_obj.close_file(line_number)
     return file_obj
