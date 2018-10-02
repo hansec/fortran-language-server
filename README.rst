@@ -110,7 +110,8 @@ By default all files with the suffix ``F,F77,F90,F95,F03,F08,FOR,FPP`` (case-ins
 the project.
 
 Directories and files can be excluded from the project by specifying their paths (relative to ``root_dir``) in
-the ``excl_paths`` variable in the ``.fortls`` file. Excluded directories also exclude all sub-directories.
+the ``excl_paths`` variable in the ``.fortls`` file. Excluded directories also exclude all sub-directories. Source
+files with a common suffix may also be excluded using the ``excl_suffixes`` variable.
 
 Module directories can also be specified manually by specifying their paths (relative to ``root_dir``) in
 the ``mod_dirs`` variable in the ``.fortls`` file. When ``mod_dirs`` is specified directories are not added
@@ -123,6 +124,7 @@ be specified manually as it is always included.
     {
       "mod_dirs": ["subdir1", "subdir2"],
       "excl_paths": ["subdir3", "subdir1/file_to_skip.F90"],
+      "excl_suffixes": ["_skip.f90"],
       "lowercase_intrinsics": false,
       "debug_log": false
     }

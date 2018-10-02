@@ -337,6 +337,7 @@ class LangServer:
         self.obj_tree = {}
         self.mod_dirs = []
         self.excl_paths = []
+        self.excl_suffixes = []
         self.post_messages = []
         self.streaming = True
         self.debug_log = debug_log
@@ -444,6 +445,7 @@ class LangServer:
                         dir_path = os.path.join(self.root_path, mod_dir)
                         if os.path.isdir(dir_path):
                             self.mod_dirs.append(dir_path)
+                    self.excl_suffixes = config_dict.get("excl_suffixes", [])
                     self.lowercase_intrinsics = config_dict.get("lowercase_intrinsics", self.lowercase_intrinsics)
                     self.debug_log = config_dict.get("debug_log", self.debug_log)
             except:
@@ -1344,7 +1346,13 @@ class LangServer:
                     filepath = os.path.join(mod_dir, filename)
                     if self.excl_paths.count(filepath) > 0:
                         continue
-                    file_list.append(filepath)
+                    inc_file = True
+                    for excl_suffix in self.excl_suffixes:
+                        if filepath.endswith(excl_suffix):
+                            inc_file = False
+                            break
+                    if inc_file:
+                        file_list.append(filepath)
         # Process files
         from multiprocessing import Pool
         pool = Pool(processes=4)
