@@ -1,3 +1,15 @@
+## 0.9.0
+
+### Improvements
+* Add basic support for workspace/symbol requests
+* Add support for excluding source files based on a common suffix
+
+### Fixes
+* Prevent detection of variables starting with "use" as USE statements, [#59](https://github.com/hansec/fortran-language-server/issues/59)
+* Improve parsing of USE ONLY statements, [#53](https://github.com/hansec/fortran-language-server/issues/53)
+* Make sure explicitly specified module directories exist, fixes [#52](https://github.com/hansec/fortran-language-server/issues/52)
+* Fix visibility statements with trailing comments, [#49](https://github.com/hansec/fortran-language-server/issues/49)
+
 ## 0.8.4
 
 ### Fixes
