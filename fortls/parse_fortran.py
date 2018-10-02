@@ -4,7 +4,7 @@ from fortls.objects import map_keywords, fortran_module, fortran_program, \
     fortran_submodule, fortran_subroutine, fortran_function, fortran_block, \
     fortran_select, fortran_type, fortran_int, fortran_obj, fortran_meth, fortran_file
 #
-USE_REGEX = re.compile(r'[ ]*USE([, ]+INTRINSIC)?[ :]*([a-z0-9_]*)([, ]+ONLY[ :]+)?', re.I)
+USE_REGEX = re.compile(r'[ ]*USE([, ]+INTRINSIC)?[ :]+([a-z0-9_]*)([, ]+ONLY[ :]+)?', re.I)
 INCLUDE_REGEX = re.compile(r'[ ]*INCLUDE[ :]*[\'\"]([^\'\"]*)', re.I)
 SUB_REGEX = re.compile(r'[ ]*(PURE|ELEMENTAL|RECURSIVE)*[ ]*SUBROUTINE[ ]+([a-z0-9_]+)', re.I)
 END_SUB_REGEX = re.compile(r'[ ]*END[ ]*SUBROUTINE', re.I)
