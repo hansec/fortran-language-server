@@ -101,15 +101,15 @@ def tokenize_line(line):
             if char == string_char:
                 in_string = False
             continue
-        if char == '(':
+        if (char == '(') or (char == '['):
             paren_list[level].append([i, len(line)])
             level += 1
             if len(paren_list) < level+1:
                 paren_list.append([])
-        elif char == ')':
+        elif (char == ')') or (char == ']'):
             paren_list[level-1][-1][1] = i
             level -= 1
-        elif char == "'" or char == '"':
+        elif (char == "'") or (char == '"'):
             in_string = True
             string_char = char
     return paren_split(line, paren_list[:-1])
@@ -127,7 +127,7 @@ def paren_split(line, paren_list):
             ranges = []
             if len(paren_list) > ilev+1:
                 for lower_group in paren_list[ilev+1]:
-                    if lower_group[0] > i1 and lower_group[1] <= i2:
+                    if (lower_group[0] > i1) and (lower_group[1] <= i2):
                         tmp_str += line[i3:lower_group[0]]
                         ranges.append([i3, lower_group[0]])
                         i3 = lower_group[1] + 1
