@@ -8,7 +8,8 @@ USE_REGEX = re.compile(r'[ ]*USE([, ]+INTRINSIC)?[ :]+([a-z0-9_]*)([, ]+ONLY[ :]
 INCLUDE_REGEX = re.compile(r'[ ]*INCLUDE[ :]*[\'\"]([^\'\"]*)', re.I)
 SUB_REGEX = re.compile(r'[ ]*(PURE|ELEMENTAL|RECURSIVE)*[ ]*SUBROUTINE[ ]+([a-z0-9_]+)', re.I)
 END_SUB_REGEX = re.compile(r'[ ]*END[ ]*SUBROUTINE', re.I)
-FUN_REGEX = re.compile(r'[ ]*(PURE|ELEMENTAL|RECURSIVE)*[ ]*FUNCTION[ ]+([a-z0-9_]+)', re.I)
+FUN_MOD_REGEX = re.compile(r'[ ]*(PURE|ELEMENTAL|RECURSIVE)+', re.I)
+FUN_REGEX = re.compile(r'[ ]*FUNCTION[ ]+([a-z0-9_]+)', re.I)
 RESULT_REGEX = re.compile(r'RESULT[ ]*\(([a-z0-9_]*)\)', re.I)
 END_FUN_REGEX = re.compile(r'[ ]*END[ ]*FUNCTION', re.I)
 MOD_REGEX = re.compile(r'[ ]*MODULE[ ]+([a-z0-9_]+)', re.I)
@@ -187,11 +188,19 @@ def read_var_def(line, type_word=None):
 
 
 def read_fun_def(line, return_type=None, mod_fun=False):
+    fun_mod_match = FUN_MOD_REGEX.match(line)
+    if fun_mod_match is not None:
+        line = line[fun_mod_match.end(0):]
+        tmp_var = read_var_def(line)
+        if tmp_var is not None:
+            if tmp_var[0] == 'fun':
+                return tmp_var
+            return None
     fun_match = FUN_REGEX.match(line)
     if fun_match is None:
         return None
     #
-    name = fun_match.group(2)
+    name = fun_match.group(1)
     trailing_line = line[fun_match.end(0):].split('!')[0]
     trailing_line = trailing_line.strip()
     #
