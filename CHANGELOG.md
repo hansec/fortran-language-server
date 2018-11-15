@@ -1,3 +1,14 @@
+## 0.9.1
+
+### Improvements
+* Add support for generic interfaces in type-bound procedures, [#64](https://github.com/hansec/fortran-language-server/issues/64)
+* Add parent scope information to masked variable errors, [#48](https://github.com/hansec/fortran-language-server/issues/48)
+
+### Fixes
+* Fix parsing deferred length character definitions, [#61](https://github.com/hansec/fortran-language-server/issues/61)
+* Fix parsing function definitions with modifiers before type, [#63](https://github.com/hansec/fortran-language-server/issues/63)
+* Fix parsing with array construction in subroutine/function calls, [#60](https://github.com/hansec/fortran-language-server/issues/60)
+
 ## 0.9.0
 
 ### Improvements
