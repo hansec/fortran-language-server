@@ -29,6 +29,8 @@ END_INT_REGEX = re.compile(r'[ ]*END[ ]*INTERFACE', re.I)
 END_GEN_REGEX = re.compile(r'[ ]*END[ ]*$', re.I)
 TYPE_DEF_REGEX = re.compile(r'[ ]*(TYPE)[, ]+', re.I)
 EXTENDS_REGEX = re.compile(r'EXTENDS[ ]*\(([a-z0-9_]*)\)', re.I)
+GENERIC_PRO_REGEX = re.compile(r'[ ]*(GENERIC)[ ]*::[ ]*[a-z]', re.I)
+GEN_ASSIGN_REGEX = re.compile(r'(ASSIGNMENT|OPERATOR)\(', re.I)
 END_TYPED_REGEX = re.compile(r'[ ]*END[ ]*TYPE', re.I)
 NAT_VAR_REGEX = re.compile(r'[ ]*(INTEGER|REAL|DOUBLE PRECISION|COMPLEX'
                            r'|DOUBLE COMPLEX|CHARACTER|LOGICAL|PROCEDURE'
@@ -320,6 +322,33 @@ def read_type_def(line):
     return 'typ', [name, parent, keywords]
 
 
+def read_generic_def(line):
+    generic_match = GENERIC_PRO_REGEX.match(line)
+    if generic_match is None:
+        return None
+    #
+    trailing_line = line[generic_match.end(0)-1:].split('!')[0].strip()
+    if len(trailing_line) == 0:
+        return None
+    #
+    i1 = trailing_line.find('=>')
+    if i1 < 0:
+        return None
+    bound_name = trailing_line[:i1].strip()
+    if GEN_ASSIGN_REGEX.match(bound_name):
+        return None
+    pro_list = trailing_line[i1+2:].split(',')
+    #
+    pro_out = []
+    for bound_pro in pro_list:
+        if len(bound_pro.strip()) > 0:
+            pro_out.append(bound_pro.strip())
+    if len(pro_out) == 0:
+        return None
+    #
+    return 'gen', [bound_name, pro_out]
+
+
 def read_mod_def(line):
     mod_match = MOD_REGEX.match(line)
     if mod_match is None:
@@ -428,8 +457,8 @@ def read_vis_stmnt(line):
 
 def_tests = [read_var_def, read_sub_def, read_fun_def, read_block_def,
              read_select_def, read_type_def, read_use_stmt, read_int_def,
-             read_mod_def, read_prog_def, read_submod_def, read_inc_stmt,
-             read_vis_stmnt]
+             read_generic_def, read_mod_def, read_prog_def, read_submod_def,
+             read_inc_stmt, read_vis_stmnt]
 
 
 def process_file(file_str, close_open_scopes, path=None, fixed_format=False, debug=False):
@@ -671,6 +700,15 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 file_obj.add_scope(new_int, END_INT_REGEX, req_container=True)
                 if(debug):
                     print('{1} !!! INTERFACE statement({0})'.format(line_number, line.strip()))
+            elif obj_type == 'gen':
+                name = obj[0]
+                new_int = fortran_int(file_obj, line_number, name, file_obj.enc_scope_name, False)
+                file_obj.add_scope(new_int, END_INT_REGEX, req_container=True)
+                for pro_link in obj[1]:
+                    file_obj.add_int_member(pro_link)
+                file_obj.end_scope(line_number)
+                if(debug):
+                    print('{1} !!! GENERIC statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'int_pro':
                 if file_obj.current_scope is None:
                     continue

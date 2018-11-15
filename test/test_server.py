@@ -161,6 +161,8 @@ def test_workspace_symbols():
             ["test", 6, 7],
             ["test_abstract", 2, 0],
             ["test_free", 2, 0],
+            ["test_gen_type", 5, 1],
+            ["test_generic", 2, 0],
             ["test_mod", 2, 0],
             ["test_program", 2, 0],
             ["test_select", 2, 0],
@@ -231,6 +233,8 @@ def test_comp():
     string += comp_request(file_path, 2, 2)
     string += comp_request(file_path, 5, 4)
     string += comp_request(file_path, 8, 6)
+    file_path = os.path.join(test_dir, "subdir", "test_generic.f90")
+    string += comp_request(file_path, 13, 10)
     errcode, results = run_request(string)
     assert errcode == 0
     #
@@ -257,7 +261,8 @@ def test_comp():
         [2, "a", "REAL(8)"],
         [7, "READ", "STATEMENT"],
         [8, "READ", "STATEMENT"],
-        [9, "READ", "STATEMENT"]
+        [9, "READ", "STATEMENT"],
+        [2, "my_gen", "SUBROUTINE my_gen(self, a, b)"]
     )
     assert len(exp_results)+1 == len(results)
     for i in range(len(exp_results)):
