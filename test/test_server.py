@@ -7,8 +7,8 @@ except:
     from io import StringIO
 root_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.insert(0, root_dir)
-from fortls.jsonrpc import write_rpc_request, write_rpc_notification, read_rpc_messages
-from fortls.langserver import path_to_uri
+from fortls.jsonrpc import write_rpc_request, write_rpc_notification, \
+    read_rpc_messages, path_to_uri
 
 run_command = os.path.join(root_dir, "fortls.py --incrmental_sync --use_signature_help")
 test_dir = os.path.join(root_dir, "test", "test_source")

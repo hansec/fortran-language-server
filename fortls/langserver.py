@@ -3,12 +3,8 @@ import sys
 import os
 import traceback
 import re
-try:
-    from urllib.parse import unquote, quote
-except ImportError:
-    from urllib2 import quote
-    from urlparse import unquote
 # Local modules
+from fortls.jsonrpc import path_to_uri, path_from_uri
 from fortls.parse_fortran import process_file, read_use_stmt, read_var_def, \
     detect_fixed_format, detect_comment_start
 from fortls.objects import find_in_scope, get_use_tree
@@ -31,25 +27,6 @@ END_REGEX = re.compile(r'[ ]*(END)( |MODULE|PROGRAM|SUBROUTINE|FUNCTION|TYPE|DO|
 IMPORT_REGEX = re.compile(r'[ ]*IMPORT[ ]+', re.I)
 FIXED_CONT_REGEX = re.compile(r'(     [\S])')
 FREE_OPT_CONT_REGEX = re.compile(r'([ ]*&)')
-
-
-def path_from_uri(uri):
-    # Convert file uri to path (strip html like head part)
-    if not uri.startswith("file://"):
-        return uri
-    if os.name == "nt":
-        _, path = uri.split("file:///", 1)
-    else:
-        _, path = uri.split("file://", 1)
-    return unquote(path)
-
-
-def path_to_uri(path):
-    # Convert path to file uri (add html like head part)
-    if os.name == "nt":
-        return "file:///" + quote(path)
-    else:
-        return "file://" + quote(path)
 
 
 def read_file_split(filepath):

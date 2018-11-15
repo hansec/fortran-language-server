@@ -6,8 +6,33 @@ except ImportError:
     import queue as Queue
 import threading
 from collections import deque
+import os
+try:
+    from urllib.parse import unquote, quote
+except ImportError:
+    from urllib2 import quote
+    from urlparse import unquote
 
 log = logging.getLogger(__name__)
+
+
+def path_from_uri(uri):
+    # Convert file uri to path (strip html like head part)
+    if not uri.startswith("file://"):
+        return uri
+    if os.name == "nt":
+        _, path = uri.split("file:///", 1)
+    else:
+        _, path = uri.split("file://", 1)
+    return unquote(path)
+
+
+def path_to_uri(path):
+    # Convert path to file uri (add html like head part)
+    if os.name == "nt":
+        return "file:///" + quote(path)
+    else:
+        return "file://" + quote(path)
 
 
 class JSONRPC2ProtocolError(Exception):
