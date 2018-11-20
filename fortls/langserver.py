@@ -12,6 +12,8 @@ from fortls.intrinsics import get_keywords, load_intrinsics, set_lowercase_intri
 
 log = logging.getLogger(__name__)
 PY3K = sys.version_info >= (3, 0)
+if not PY3K:
+    import io
 # Global regexes
 FORTRAN_EXT_REGEX = re.compile(r'^\.F(77|90|95|03|08|OR|PP)?$', re.I)
 OBJBREAK_REGEX = re.compile(r'[\/\-(.,+*<>=$: ]', re.I)
@@ -33,11 +35,11 @@ def read_file_split(filepath):
     # Read and add file from disk
     try:
         if PY3K:
-            with open(filepath, 'r', encoding="utf-8") as fhandle:
+            with open(filepath, 'r', encoding='utf-8', errors='replace') as fhandle:
                 contents = re.sub(r'\t', r'  ', fhandle.read())
                 contents_split = contents.splitlines()
         else:
-            with open(filepath, 'r') as fhandle:
+            with io.open(filepath, 'r', encoding='utf-8', errors='replace') as fhandle:
                 contents = re.sub(r'\t', r'  ', fhandle.read())
                 contents_split = contents.splitlines()
     except:
