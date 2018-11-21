@@ -1,3 +1,11 @@
+## 0.9.2
+
+### Improvements
+* Improve handling of different file encodings, [PR #57](https://github.com/hansec/fortran-language-server/pull/57)
+
+### Fixes
+* Fix autocomplete results for inherited members of user-defined types when the member type definition is only available in parent type's scope
+
 ## 0.9.1
 
 ### Improvements
