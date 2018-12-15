@@ -1049,7 +1049,7 @@ class fortran_file:
             return self.scope_list
         scope_list = []
         for scope in self.scope_list:
-            if line_number >= scope.sline and line_number <= scope.eline:
+            if (line_number >= scope.sline) and (scope.eline is None or line_number <= scope.eline):
                 scope_list.append(scope)
                 for ancestor in scope.get_ancestors():
                     scope_list.append(ancestor)
@@ -1062,7 +1062,7 @@ class fortran_file:
         curr_scope = None
         for scope in self.scope_list:
             if scope.sline > scope_sline:
-                if (line_number >= scope.sline) and (line_number <= scope.eline):
+                if (line_number >= scope.sline) and (scope.eline is None or line_number <= scope.eline):
                     curr_scope = scope
                     scope_sline = scope.sline
         if (curr_scope is None) and (self.none_scope is not None):
