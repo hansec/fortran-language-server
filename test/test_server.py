@@ -213,9 +213,11 @@ def test_comp():
     string += comp_request(file_path, 21, 42)
     string += comp_request(file_path, 23, 26)
     file_path = os.path.join(test_dir, "subdir", "test_submod.F90")
-    string += comp_request(file_path, 16, 12)
-    string += comp_request(file_path, 17, 8)
-    string += comp_request(file_path, 17, 23)
+    string += comp_request(file_path, 25, 12)
+    string += comp_request(file_path, 26, 8)
+    string += comp_request(file_path, 26, 23)
+    string += comp_request(file_path, 30, 12)
+    string += comp_request(file_path, 31, 46)
     file_path = os.path.join(test_dir, "test_inc.f90")
     string += comp_request(file_path, 10, 2)
     file_path = os.path.join(test_dir, "subdir", "test_inc2.f90")
@@ -242,6 +244,7 @@ def test_comp():
     assert errcode == 0
     #
     exp_results = (
+        # test_prog.f08
         [1, "myfun", "DOUBLE PRECISION FUNCTION myfun(n, xval)"],
         [4, "glob_sub", "SUBROUTINE glob_sub(n, xval, yval)"],
         [1, "bound_nopass", "SUBROUTINE bound_nopass(a, b)"],
@@ -250,22 +253,33 @@ def test_comp():
         [6, "scale", "TYPE(scale_type)"],
         [2, "n", "INTEGER(4)"],
         [1, "val", "REAL(8)"],
+        # subdir/test_submod.F90
         [1, "point", "TYPE"],
         [1, "distance", "REAL"],
         [2, "x", "REAL"],
+        [1, "point", "TYPE"],
+        [2, "x", "REAL"],
+        # test_inc.f90
         [2, "val1", "REAL(8)"],
+        # subdir/test_inc2.f90
         [2, "val1", "REAL(8)"],
+        # subdir/test_abstract.f90
         [1, "abs_interface", "SUBROUTINE"],
+        # subdir/test_free.f90
         [1, "DIMENSION(:)", "KEYWORD"],
         [3, "INTENT(IN)", "KEYWORD"],
+        # subdir/test_select.f90
         [2, "a", "REAL(8)"],
         [2, "a", "COMPLEX(8)"],
         [1, "n", "INTEGER(4)"],
         [2, "a", "REAL(8)"],
+        # test_block.f08
         [7, "READ", "STATEMENT"],
         [8, "READ", "STATEMENT"],
         [9, "READ", "STATEMENT"],
+        # subdir/test_generic.f90
         [2, "my_gen", "SUBROUTINE my_gen(self, a, b)"],
+        # subdir/test_inherit.f90
         [1, "val", "REAL(8)"]
     )
     assert len(exp_results)+1 == len(results)
@@ -330,7 +344,8 @@ def test_def():
     string += def_request(file_path, 21, 42)
     string += def_request(file_path, 23, 26)
     file_path = os.path.join(test_dir, "subdir", "test_submod.F90")
-    string += def_request(file_path, 16, 12)
+    string += def_request(file_path, 25, 12)
+    string += def_request(file_path, 30, 12)
     file_path = os.path.join(test_dir, "test_inc.f90")
     string += def_request(file_path, 10, 2)
     file_path = os.path.join(test_dir, "subdir", "test_inc2.f90")
@@ -341,14 +356,19 @@ def test_def():
     fixed_path = os.path.join(test_dir, "subdir", "test_fixed.f")
     free_path = os.path.join(test_dir, "subdir", "test_free.f90")
     exp_results = (
+        # test_prog.f08
         [0, 0, fixed_path],
         [20, 20, fixed_path],
         [10, 10, os.path.join(test_dir, "test_prog.f08")],
         [21, 21, free_path],
         [14, 14, free_path],
         [5, 5, free_path],
+        # subdir/test_submod.F90
         [1, 1, os.path.join(test_dir, "subdir", "test_submod.F90")],
+        [1, 1, os.path.join(test_dir, "subdir", "test_submod.F90")],
+        # test_inc.f90
         [0, 0, os.path.join(test_dir, "subdir", "test_inc2.f90")],
+        # subdir/test_inc2.f90
         [4, 4, os.path.join(test_dir, "test_inc.f90")]
     )
     assert len(exp_results)+1 == len(results)

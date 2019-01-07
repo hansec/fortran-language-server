@@ -140,7 +140,7 @@ def get_var_dims(test_str):
         return None
 
 
-def read_var_def(line, type_word=None):
+def read_var_def(line, type_word=None, fun_only=False):
     if type_word is None:
         type_match = NAT_VAR_REGEX.match(line)
         if type_match is None:
@@ -170,7 +170,7 @@ def read_var_def(line, type_word=None):
     keywords, trailing_line = parse_keywords(trailing_line)
     # Check if function
     fun_def = read_fun_def(trailing_line, [type_word, keywords])
-    if fun_def is not None:
+    if (fun_def is not None) or fun_only:
         return fun_def
     #
     line_split = trailing_line.split('::')
@@ -193,11 +193,9 @@ def read_fun_def(line, return_type=None, mod_fun=False):
     fun_mod_match = FUN_MOD_REGEX.match(line)
     if fun_mod_match is not None:
         line = line[fun_mod_match.end(0):]
-        tmp_var = read_var_def(line)
+        tmp_var = read_var_def(line, fun_only=True)
         if tmp_var is not None:
-            if tmp_var[0] == 'fun':
-                return tmp_var
-            return None
+            return tmp_var
     fun_match = FUN_REGEX.match(line)
     if fun_match is None:
         return None
@@ -367,6 +365,10 @@ def read_mod_def(line):
         sub_res = read_sub_def(trailing_line, mod_sub=True)
         if sub_res is not None:
             return sub_res
+        fun_res = read_var_def(trailing_line, fun_only=True)
+        if fun_res is not None:
+            fun_res[1][3] = True
+            return fun_res
         fun_res = read_fun_def(trailing_line, mod_fun=True)
         if fun_res is not None:
             return fun_res
