@@ -17,7 +17,7 @@ available for `Atom <https://atom.io/packages/ide-fortran>`_,
 `Visual Studio Code <https://marketplace.visualstudio.com/items?itemName=hansec.fortran-ls>`_,
 `Visual Studio <https://github.com/michaelkonecny/vs-fortran-ls-client>`_,
 `(Neo)vim <https://github.com/hansec/fortran-language-server/wiki/Using-forts-with-vim>`_,
-and `Emacs <https://github.com/MagB93/lsp-fortran>`_.
+and `Emacs <https://github.com/emacs-lsp/lsp-mode>`_.
 
 **Note: This language server is currently in the early stages of development.
 Not all features are supported or planned.**
