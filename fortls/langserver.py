@@ -528,10 +528,7 @@ class LangServer:
                 tmp_out["name"] = candidate.name
                 tmp_out["kind"] = map_types(candidate.get_type())
                 sline = candidate.sline-1
-                if candidate.eline is not None:
-                    eline = candidate.eline-1
-                else:
-                    eline = sline
+                eline = candidate.eline-1
                 # Set containing scope
                 if candidate.FQSN.find('::') > 0:
                     tmp_list = candidate.FQSN.split("::")
@@ -590,9 +587,7 @@ class LangServer:
             tmp_out["name"] = scope.name
             tmp_out["kind"] = scope_type
             sline = scope.sline-1
-            eline = sline
-            if scope.eline is not None:
-                eline = scope.eline-1
+            eline = scope.eline-1
             tmp_out["location"] = {
                 "uri": uri,
                 "range": {

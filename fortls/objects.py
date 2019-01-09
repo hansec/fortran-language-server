@@ -195,7 +195,7 @@ class fortran_scope:
     def base_setup(self, file_obj, sline, name, enc_scope=None):
         self.file = file_obj
         self.sline = sline
-        self.eline = None
+        self.eline = sline
         self.name = name
         self.children = []
         self.members = []
@@ -736,7 +736,7 @@ class fortran_obj:
                    dim_str, enc_scope, link_obj):
         self.file = file_obj
         self.sline = line_number
-        self.eline = None
+        self.eline = line_number
         self.name = name
         self.desc = var_desc
         self.modifiers = modifiers
@@ -1049,7 +1049,7 @@ class fortran_file:
             return self.scope_list
         scope_list = []
         for scope in self.scope_list:
-            if line_number >= scope.sline and line_number <= scope.eline:
+            if (line_number >= scope.sline) and (line_number <= scope.eline):
                 scope_list.append(scope)
                 for ancestor in scope.get_ancestors():
                     scope_list.append(ancestor)
@@ -1126,9 +1126,8 @@ class fortran_file:
 
     def close_file(self, line_number):
         # Close open scopes
-        while len(self.scope_stack) > 0:
-            scope = self.scope_stack.pop()
-            scope.end(line_number)
+        while self.current_scope is not None:
+            self.end_scope(line_number)
         # Close and delist none_scope
         if self.none_scope is not None:
             self.none_scope.end(line_number)
