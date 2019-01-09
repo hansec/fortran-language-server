@@ -49,7 +49,7 @@ Hover:
 
 Find references:
 
-*Note:* Currently for global and top level module objects only.
+*Note:* For global and top level module objects only.
 
 .. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_refs.png
 
@@ -58,6 +58,8 @@ Diagnostics:
 - Multiple use of the same variable name
 - Unknown module in USE statement
 - Variable masking definition from parent scope
+- Unclosed blocks/scopes
+- Invalid scope nesting
 
 .. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_diag.png
 

@@ -347,6 +347,9 @@ class fortran_scope:
                 errors.append([line_number, i0, i0+len(use_mod), use_mod])
         return errors
 
+    def check_valid_parent(self):
+        return True
+
 
 class fortran_module(fortran_scope):
     def get_type(self):
@@ -354,6 +357,11 @@ class fortran_module(fortran_scope):
 
     def get_desc(self):
         return 'MODULE'
+
+    def check_valid_parent(self):
+        if self.parent is not None:
+            return False
+        return True
 
 
 class fortran_program(fortran_module):
@@ -527,6 +535,13 @@ class fortran_subroutine(fortran_scope):
         call_sig, _ = self.get_snippet()
         return call_sig, None, arg_sigs
 
+    def check_valid_parent(self):
+        if self.parent is not None:
+            parent_type = self.parent.get_type()
+            if (parent_type == 4) or (parent_type >= 8):
+                return False
+        return True
+
 
 class fortran_function(fortran_subroutine):
     def __init__(self, file_obj, line_number, name, enc_scope=None, args="",
@@ -652,6 +667,15 @@ class fortran_type(fortran_scope):
             for child in inherit_var.children:
                 if child.name.lower() not in child_names:
                     self.in_children.append(child)
+
+    def check_valid_parent(self):
+        if self.parent is None:
+            return False
+        else:
+            parent_type = self.parent.get_type()
+            if (parent_type == 4) or (parent_type >= 8):
+                return False
+        return True
 
 
 class fortran_block(fortran_scope):
@@ -1194,6 +1218,15 @@ class fortran_file:
                 "severity": 1
             })
         for scope in tmp_list:
+            if not scope.check_valid_parent():
+                errors.append({
+                    "range": {
+                        "start": {"line": scope.sline-1, "character": 0},
+                        "end": {"line": scope.sline-1, "character": 0}
+                    },
+                    "message": 'Invalid parent for "{0}" declaration'.format(scope.get_desc()),
+                    "severity": 1
+                })
             for error in scope.check_double_def(file_contents, obj_tree):
                 # Check preproc if
                 if self.check_ppif(error[1]):
