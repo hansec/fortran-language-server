@@ -299,6 +299,9 @@ class fortran_scope:
     def is_abstract(self):
         return False
 
+    def req_named_end(self):
+        return False
+
     def end(self, line_number):
         self.eline = line_number
 
@@ -664,8 +667,44 @@ class fortran_block(fortran_scope):
     def get_children(self, public_only=False):
         return self.children
 
+    def req_named_end(self):
+        return True
 
-class fortran_select(fortran_scope):
+
+class fortran_do(fortran_block):
+    def __init__(self, file_obj, line_number, name, enc_scope=None):
+        self.base_setup(file_obj, line_number, name, enc_scope)
+
+    def get_type(self):
+        return 10
+
+    def get_desc(self):
+        return 'DO'
+
+
+class fortran_where(fortran_block):
+    def __init__(self, file_obj, line_number, name, enc_scope=None):
+        self.base_setup(file_obj, line_number, name, enc_scope)
+
+    def get_type(self):
+        return 11
+
+    def get_desc(self):
+        return 'WHERE'
+
+
+class fortran_if(fortran_block):
+    def __init__(self, file_obj, line_number, name, enc_scope=None):
+        self.base_setup(file_obj, line_number, name, enc_scope)
+
+    def get_type(self):
+        return 12
+
+    def get_desc(self):
+        return 'IF'
+
+
+class fortran_select(fortran_block):
     def __init__(self, file_obj, line_number, name, select_info, enc_scope=None):
         self.base_setup(file_obj, line_number, name, enc_scope)
         self.type = select_info[0]
@@ -686,10 +725,7 @@ class fortran_select(fortran_scope):
         return 9
 
     def get_desc(self):
-        return r'SELECT'
-
-    def get_children(self, public_only=False):
-        return self.children
+        return 'SELECT'
 
 
 class fortran_int(fortran_scope):
@@ -956,10 +992,11 @@ class fortran_file:
         self.end_stack = []
         self.pp_if = []
         self.include_stmnts = []
+        self.end_errors = []
         self.none_scope = None
         self.inc_scope = None
         self.current_scope = None
-        self.END_REGEX = None
+        self.END_SCOPE_WORD = None
         self.enc_scope_name = None
 
     def create_none_scope(self):
@@ -973,7 +1010,7 @@ class fortran_file:
             return None
         return self.current_scope.FQSN
 
-    def add_scope(self, new_scope, END_SCOPE_REGEX, exportable=True, req_container=False):
+    def add_scope(self, new_scope, END_SCOPE_WORD, exportable=True, req_container=False):
         self.scope_list.append(new_scope)
         if self.current_scope is None:
             if req_container:
@@ -987,10 +1024,10 @@ class fortran_file:
         else:
             self.current_scope.add_child(new_scope)
             self.scope_stack.append(self.current_scope)
-        if self.END_REGEX is not None:
-            self.end_stack.append(self.END_REGEX)
+        if self.END_SCOPE_WORD is not None:
+            self.end_stack.append(self.END_SCOPE_WORD)
         self.current_scope = new_scope
-        self.END_REGEX = END_SCOPE_REGEX
+        self.END_SCOPE_WORD = END_SCOPE_WORD
         self.enc_scope_name = self.get_enc_scope_name()
 
     def end_scope(self, line_number):
@@ -1000,9 +1037,9 @@ class fortran_file:
         else:
             self.current_scope = None
         if len(self.end_stack) > 0:
-            self.END_REGEX = self.end_stack.pop()
+            self.END_SCOPE_WORD = self.end_stack.pop()
         else:
-            self.END_REGEX = None
+            self.END_SCOPE_WORD = None
         self.enc_scope_name = self.get_enc_scope_name()
 
     def add_variable(self, new_var):
@@ -1147,6 +1184,15 @@ class fortran_file:
         tmp_list = self.scope_list
         if self.none_scope is not None:
             tmp_list += [self.none_scope]
+        for error in self.end_errors:
+            errors.append({
+                "range": {
+                    "start": {"line": error[1]-1, "character": 0},
+                    "end": {"line": error[1]-1, "character": 0}
+                },
+                "message": 'Unexpected end of scope at line {0}'.format(error[0]),
+                "severity": 1
+            })
         for scope in tmp_list:
             for error in scope.check_double_def(file_contents, obj_tree):
                 # Check preproc if

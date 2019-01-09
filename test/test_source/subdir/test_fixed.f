@@ -12,8 +12,7 @@ c
 c
       myfun = xval
       do 10 i = 1, n
-         myfun = myfun + xval
-   10    continue
+   10    myfun = myfun + xval
       return
 c
       end

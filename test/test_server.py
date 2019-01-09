@@ -358,7 +358,7 @@ def test_def():
     exp_results = (
         # test_prog.f08
         [0, 0, fixed_path],
-        [20, 20, fixed_path],
+        [19, 19, fixed_path],
         [10, 10, os.path.join(test_dir, "test_prog.f08")],
         [21, 21, free_path],
         [14, 14, free_path],

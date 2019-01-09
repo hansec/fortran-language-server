@@ -630,7 +630,7 @@ class LangServer:
                 return type
 
         def set_type_mask(def_value):
-            return [def_value for i in range(10)]
+            return [def_value if i < 8 else True for i in range(12)]
 
         def get_candidates(scope_list, var_prefix, inc_globals=True, public_only=False, abstract_only=False):
             #
@@ -815,8 +815,6 @@ class LangServer:
         type_mask = set_type_mask(False)
         type_mask[1] = True
         type_mask[4] = True
-        type_mask[8] = True
-        type_mask[9] = True
         if line_context == 1:
             # Use statement module part (modules only)
             for key in self.obj_tree:
