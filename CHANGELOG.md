@@ -1,3 +1,10 @@
+## 0.9.3
+
+### Fixes
+* Fix detection of function definitions with leading module and variable statements, fixes [#66](https://github.com/hansec/fortran-language-server/issues/66)
+* Properly close remaining open scopes at end of file
+* Initialize scope "eline" property, [PR #67](https://github.com/hansec/fortran-language-server/pull/67)
+
 ## 0.9.2
 
 ### Improvements
