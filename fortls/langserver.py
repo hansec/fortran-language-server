@@ -1154,7 +1154,7 @@ class LangServer:
         def create_hover(string, highlight):
             if highlight:
                 return {
-                    "language": "fortran",
+                    "language": "fortran90",
                     "value": string
                 }
             else:
