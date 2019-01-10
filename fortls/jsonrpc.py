@@ -211,12 +211,12 @@ class JSONRPC2Connection:
 
 
 def deque_find_and_pop(d, f):
-    idx = None
+    idx = -1
     for i, v in enumerate(d):
         if f(v):
             idx = i
             break
-    if idx is None:
+    if idx < 0:
         return None
     d.rotate(-idx)
     v = d.popleft()
