@@ -17,13 +17,13 @@ MOD_REGEX = re.compile(r'[ ]*MODULE[ ]+([a-z0-9_]+)', re.I)
 END_MOD_WORD = r'MODULE'
 SUBMOD_REGEX = re.compile(r'[ ]*SUBMODULE[ ]*\(', re.I)
 END_SMOD_WORD = r'SUBMODULE'
-BLOCK_REGEX = re.compile(r'[ ]*([a-z_][a-z0-9_]*[ ]*:)?[ ]*BLOCK(?![a-z0-9_])', re.I)
+BLOCK_REGEX = re.compile(r'[ ]*([a-z_][a-z0-9_]*[ ]*:[ ]*)?BLOCK(?![a-z0-9_])', re.I)
 END_BLOCK_WORD = r'BLOCK'
-DO_REGEX = re.compile(r'[ ]*(?:[a-z_][a-z0-9_]*[ ]*:)?[ ]*DO([ ]+[0-9]*|$)', re.I)
+DO_REGEX = re.compile(r'[ ]*(?:[a-z_][a-z0-9_]*[ ]*:[ ]*)?DO([ ]+[0-9]*|$)', re.I)
 END_DO_WORD = r'DO'
 WHERE_REGEX = re.compile(r'[ ]*WHERE[ ]*\(', re.I)
 END_WHERE_WORD = r'WHERE'
-IF_REGEX = re.compile(r'[ ]*IF[ ]*\(', re.I)
+IF_REGEX = re.compile(r'[ ]*(?:[a-z_][a-z0-9_]*[ ]*:[ ]*)?IF[ ]*\(', re.I)
 THEN_REGEX = re.compile(r'\)[ ]*THEN$', re.I)
 END_IF_WORD = r'IF'
 END_FIXED_REGEX = re.compile(r'[ ]*([0-9]*)[ ]*CONTINUE', re.I)
@@ -35,7 +35,7 @@ PROG_REGEX = re.compile(r'[ ]*PROGRAM[ ]+([a-z0-9_]+)', re.I)
 END_PROG_WORD = r'PROGRAM'
 INT_REGEX = re.compile(r'[ ]*(ABSTRACT)?[ ]*INTERFACE[ ]*([a-z0-9_]*)', re.I)
 END_INT_WORD = r'INTERFACE'
-END_WORD_REGEX = re.compile(r'[ ]*END([ ]*[a-z]*|$)', re.I)
+END_WORD_REGEX = re.compile(r'[ ]*END[ ]*([a-z]*|$)', re.I)
 TYPE_DEF_REGEX = re.compile(r'[ ]*(TYPE)[, ]+', re.I)
 EXTENDS_REGEX = re.compile(r'EXTENDS[ ]*\(([a-z0-9_]*)\)', re.I)
 GENERIC_PRO_REGEX = re.compile(r'[ ]*(GENERIC)[ ]*::[ ]*[a-z]', re.I)
@@ -57,6 +57,7 @@ SUB_PAREN_MATCH = re.compile(r'\([a-z0-9_, ]*\)', re.I)
 KIND_SPEC_MATCH = re.compile(r'\([a-z0-9_, =*]*\)', re.I)
 SQ_STRING_REGEX = re.compile(r'\'[^\']*\'', re.I)
 DQ_STRING_REGEX = re.compile(r'\"[^\"]*\"', re.I)
+LINE_LABEL_REGEX = re.compile(r'[ ]*([0-9]+)[ ]+', re.I)
 #
 FIXED_COMMENT_LINE_MATCH = re.compile(r'(!|c|d|\*)', re.I)
 FIXED_CONT_REGEX = re.compile(r'(     [\S])')
@@ -98,9 +99,28 @@ def detect_comment_start(line, fixed_format=False):
     return -1
 
 
-def strip_strings(in_str):
-    out_str = SQ_STRING_REGEX.sub('', in_str)
-    out_str = DQ_STRING_REGEX.sub('', out_str)
+def strip_line_label(line):
+    match = LINE_LABEL_REGEX.match(line)
+    if match is None:
+        return line, None
+    else:
+        line_label = match.group(1)
+        out_str = line[:match.start(1)] + ' '*len(line_label) + line[match.end(1):]
+        return out_str, line_label
+
+
+def strip_strings(in_str, maintain_len=False):
+    def repl_sq(m):
+        return "'{0}'".format(' '*(len(m.group())-2))
+
+    def repl_dq(m):
+        return '"{0}"'.format(' '*(len(m.group())-2))
+    if maintain_len:
+        out_str = SQ_STRING_REGEX.sub(repl_sq, in_str)
+        out_str = DQ_STRING_REGEX.sub(repl_dq, out_str)
+    else:
+        out_str = SQ_STRING_REGEX.sub('', in_str)
+        out_str = DQ_STRING_REGEX.sub('', out_str)
     return out_str
 
 
@@ -259,7 +279,8 @@ def read_block_def(line):
             name = name.replace(':', ' ').strip()
         return 'block', [name]
     #
-    do_match = DO_REGEX.match(line)
+    line_no_comment = line.split('!')[0].rstrip()
+    do_match = DO_REGEX.match(line_no_comment)
     if do_match is not None:
         return 'do', [do_match.group(1).strip()]
     #
@@ -269,7 +290,6 @@ def read_block_def(line):
     #
     if_match = IF_REGEX.match(line)
     if if_match is not None:
-        line_no_comment = line.split('!')[0].rstrip()
         then_match = THEN_REGEX.search(line_no_comment)
         if then_match is not None:
             return 'if', None
@@ -533,6 +553,8 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
         if (match is not None):
             file_obj.end_ppif(line_number)
             continue
+        # Get line label
+        line, line_label = strip_line_label(line)
         # Merge lines with continuations
         if fixed_format:
             if line_ind < len(file_str):
@@ -546,12 +568,13 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                     line_ind += 1
                     cont_match = CONT_REGEX.match(next_line)
         else:
-            iAmper = line.find('&')
-            iComm = line.find('!')
+            line_stripped = strip_strings(line, maintain_len=True)
+            iAmper = line_stripped.find('&')
+            iComm = line_stripped.find('!')
             if iComm < 0:
                 iComm = iAmper + 1
             while (iAmper >= 0 and iAmper < iComm):
-                split_line = line.split('&')
+                line_prefix = line[:iAmper]
                 next_line = file_str[line_ind]
                 line_ind += 1
                 if next_line == '':
@@ -562,13 +585,15 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 match = COMMENT_LINE_MATCH.match(next_line)
                 if (match is not None):
                     continue
-                cont_match = CONT_REGEX.match(next_line)
+                next_stripped = strip_strings(next_line, maintain_len=True)
+                cont_match = CONT_REGEX.match(next_stripped)
                 if cont_match is not None:
                     next_line = next_line[cont_match.end(0):]
                 next_line_num += 1
-                line = split_line[0].rstrip() + ' ' + next_line.strip()
-                iAmper = line.find('&')
-                iComm = line.find('!')
+                line = line_prefix.rstrip() + ' ' + next_line.strip()
+                line_stripped = strip_strings(line, maintain_len=True)
+                iAmper = line_stripped.find('&')
+                iComm = line_stripped.find('!')
                 if iComm < 0:
                     iComm = iAmper + 1
             next_line = None
@@ -577,7 +602,15 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
         if file_obj.END_SCOPE_WORD is not None:
             line_no_comment = line.split('!')[0]
             match = END_WORD_REGEX.match(line_no_comment)
-            if (match is not None):
+            end_found = False
+            # Check for variable assignment ("end" used as variable)
+            if match is not None:
+                if match.end(0) >= len(line_no_comment)-1:
+                    end_found = True
+                elif (line_no_comment[match.end(0)] != '='):
+                    end_found = True
+            # Handle end statement
+            if end_found:
                 end_scope_word = match.group(1).strip().upper()
                 if end_scope_word != file_obj.END_SCOPE_WORD:
                     if file_obj.current_scope.req_named_end() or end_scope_word != '':
@@ -588,9 +621,10 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 if(debug):
                     print('{1} !!! END "{2}" scope({0})'.format(line_number, line.strip(), match.group(1).upper()))
                 continue
-            if fixed_format and (file_obj.END_SCOPE_WORD in 'DO'):
+            # Look for old-style end of DO loops with line labels
+            if (file_obj.END_SCOPE_WORD == 'DO') and (line_label is not None):
                 did_close = False
-                while len(block_id_stack) and line_no_comment.lstrip().startswith(block_id_stack[-1]):
+                while (len(block_id_stack) > 0) and (line_label == block_id_stack[-1]):
                     file_obj.end_scope(line_number)
                     block_id_stack.pop()
                     did_close = True
