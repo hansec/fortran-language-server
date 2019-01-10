@@ -57,6 +57,10 @@ def main():
         help="Test source code parser on specified file"
     )
     group.add_argument(
+        '--debug_diagnostics', action="store_true",
+        help="Test diagnostic notifications for specified file"
+    )
+    group.add_argument(
         '--debug_symbols', action="store_true",
         help="Test symbol request for specified file"
     )
@@ -100,9 +104,10 @@ def main():
     if args.version:
         print("{0}".format(__version__))
         sys.exit(0)
-    debug_server = (args.debug_symbols or args.debug_completion
-                    or args.debug_signature or args.debug_definition
-                    or args.debug_hover or (args.debug_rootpath is not None)
+    debug_server = (args.debug_diagnostics or args.debug_symbols
+                    or args.debug_completion or args.debug_signature
+                    or args.debug_definition or args.debug_hover
+                    or (args.debug_rootpath is not None)
                     or (args.debug_workspace_symbols is not None))
     #
     settings = {
@@ -164,6 +169,28 @@ def main():
             print("  Found module directories:")
             for mod_dir in s.mod_dirs:
                 print("    {0}".format(mod_dir))
+        #
+        if args.debug_diagnostics:
+            print('\nTesting "textDocument/publishDiagnostics" notification:')
+            check_request_params(args, loc_needed=False)
+            s.serve_onSave({
+                "params": {
+                    "textDocument": {"uri": args.debug_filepath}
+                }
+            })
+            diag_results, diag_exp = s.get_diagnostics(args.debug_filepath)
+            if diag_results is not None:
+                sev_map = ["", "ERROR", "WARNING"]
+                if len(diag_results) == 0:
+                    print("\nNo errors or warnings")
+                else:
+                    print("\nReported errors or warnings:")
+                for diag in diag_results:
+                    sline = diag["range"]["start"]["line"]
+                    message = diag["message"]
+                    sev = sev_map[diag["severity"]]
+                    print('  {0:5d}:{1}  "{2}"'.format(sline,
+                          sev, message))
         #
         if args.debug_symbols:
             print('\nTesting "textDocument/documentSymbol" request:')

@@ -90,6 +90,7 @@ The following settings can be used to perform `standalone debug tests <https://g
 * ``--debug_line=DEBUG_FILEPATH`` Line position for language server tests (1-indexed)
 * ``--debug_char=DEBUG_ROOTPATH`` Character position for language server tests (1-indexed)
 * ``--debug_parser`` Test source code parser on specified file
+* ``--debug_diagnostics`` Test diagnostic notifications for specified file
 * ``--debug_symbols`` Test symbol request for specified file
 * ``--debug_workspace_symbols=QUERY_STRING`` Test workspace/symbol request for project-wide search
 * ``--debug_completion`` Test completion request for specified file and position

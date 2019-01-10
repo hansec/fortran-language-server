@@ -1191,6 +1191,22 @@ class LangServer:
         else:
             return None
 
+    def send_diagnostics(self, uri):
+        diag_results, diag_exp = self.get_diagnostics(uri)
+        if diag_results is not None:
+            self.conn.send_notification("textDocument/publishDiagnostics", {
+                "uri": uri,
+                "diagnostics": diag_results
+            })
+        elif diag_exp is not None:
+            self.conn.write_error(
+                -1,
+                code=-32603,
+                message=str(diag_exp),
+                data={
+                    "traceback": traceback.format_exc(),
+                })
+
     def get_diagnostics(self, uri):
         filepath = path_from_uri(uri)
         if filepath in self.workspace:
@@ -1199,18 +1215,10 @@ class LangServer:
             try:
                 diags = file_obj.check_file(self.obj_tree, file_contents)
             except Exception as e:
-                self.conn.write_error(
-                    -1,
-                    code=-32603,
-                    message=str(e),
-                    data={
-                        "traceback": traceback.format_exc(),
-                    })
+                return None, e
             else:
-                self.conn.send_notification("textDocument/publishDiagnostics", {
-                    "uri": uri,
-                    "diagnostics": diags
-                })
+                return diags, None
+        return None, None
 
     def serve_onChange(self, request):
         # Update workspace from file sent by editor
@@ -1274,7 +1282,7 @@ class LangServer:
         for key in self.obj_tree:
             self.obj_tree[key][0].resolve_inherit(self.obj_tree)
             self.obj_tree[key][0].resolve_link(self.obj_tree)
-        self.get_diagnostics(uri)
+        self.send_diagnostics(uri)
 
     def add_file(self, filepath):
         # Read and add file from disk
