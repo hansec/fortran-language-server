@@ -1269,6 +1269,6 @@ class fortran_file:
                         "end": {"line": error[0], "character": error[2]}
                     },
                     "message": 'Module "{0}" not found in project'.format(error[3]),
-                    "severity": 2
+                    "severity": 3
                 })
         return errors
