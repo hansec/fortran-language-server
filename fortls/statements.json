@@ -3,6 +3,7 @@
     "CHARACTER": { "args": "LEN=len" },
     "CLASS": { "args": "name" },
     "COMPLEX": { "args": "KIND=kind" },
+    "DOUBLE COMPLEX": { },
     "DOUBLE PRECISION": { },
     "INTEGER": { "args": "KIND=kind" },
     "LOGICAL": { "args": "KIND=kind" },
