@@ -51,7 +51,7 @@ KEYWORD_LIST_REGEX = re.compile(r'[ ]*,[ ]*(PUBLIC|PRIVATE|ALLOCATABLE|'
                                 r'PASS\([a-z0-9_]*\)|SAVE|PARAMETER|'
                                 r'CONTIGUOUS)', re.I)
 TATTR_LIST_REGEX = re.compile(r'[ ]*,[ ]*(PUBLIC|PRIVATE|ABSTRACT|EXTENDS\([a-z0-9_]*\))', re.I)
-VIS_REGEX = re.compile(r'(PUBLIC|PRIVATE)', re.I)
+VIS_REGEX = re.compile(r'[ ]*(PUBLIC|PRIVATE)', re.I)
 WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
 SUB_PAREN_MATCH = re.compile(r'\([a-z0-9_, ]*\)', re.I)
 KIND_SPEC_MATCH = re.compile(r'\([a-z0-9_, =*]*\)', re.I)
@@ -493,7 +493,7 @@ def read_vis_stmnt(line):
         return None
     else:
         vis_type = 0
-        if vis_match.group(0).lower() == 'private':
+        if vis_match.group(1).lower() == 'private':
             vis_type = 1
         trailing_line = line[vis_match.end(0):].split('!')[0]
         mod_words = WORD_REGEX.findall(trailing_line)
