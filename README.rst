@@ -1,5 +1,5 @@
-Fortran Language Server (beta)
-==============================
+Fortran Language Server
+=======================
 
 .. image:: https://travis-ci.org/hansec/fortran-language-server.svg?branch=master
      :target: https://travis-ci.org/hansec/fortran-language-server
@@ -18,9 +18,6 @@ available for `Atom <https://atom.io/packages/ide-fortran>`_,
 `Visual Studio <https://github.com/michaelkonecny/vs-fortran-ls-client>`_,
 `(Neo)vim <https://github.com/hansec/fortran-language-server/wiki/Using-forts-with-vim>`_,
 and `Emacs <https://github.com/emacs-lsp/lsp-mode>`_.
-
-**Note: This language server is currently in the early stages of development.
-Not all features are supported or planned.**
 
 Language Server Features
 ------------------------
@@ -61,6 +58,8 @@ Diagnostics:
 - Unclosed blocks/scopes
 - Invalid scope nesting
 
+*Note:* Diagnostics are only updated when files are saved or opened/closed
+
 .. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_diag.png
 
 Installation
@@ -74,7 +73,7 @@ Language server settings
 The following global settings can be used when launching the language server.
 
 * ``--symbol_skip_mem`` Do not include type members in document symbol results
-* ``--incremental_sync`` Use incremental document synchronization (beta)
+* ``--incremental_sync`` Use incremental document synchronization
 * ``--autocomplete_no_prefix`` Do not filter autocomplete results by variable prefix
 * ``--lowercase_intrinsics`` Use lowercase for intrinsics and keywords in autocomplete requests
 * ``--use_signature_help`` Use signature help instead of snippets for subroutines/functions
