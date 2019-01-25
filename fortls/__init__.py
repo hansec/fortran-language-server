@@ -6,7 +6,7 @@ from multiprocessing import freeze_support
 from .langserver import LangServer
 from .jsonrpc import JSONRPC2Connection, ReadWriter, path_from_uri
 from .parse_fortran import process_file, detect_fixed_format
-__version__ = '0.9.3'
+__version__ = '1.0.0'
 
 
 def error_exit(error_str):

@@ -1,3 +1,17 @@
+## 1.0.0
+
+### Improvements
+* Add parsing of DO/IF/WHERE blocks and report scope end errors
+* Detect and report errors with invalid parent for scope definitions
+* Improve highlighting for hover requests in VSCode
+* Downgrade missing use warnings to information level
+* Add intrinsic declaration statement "double complex" ([#70](https://github.com/hansec/fortran-language-server/pull/70))
+
+### Fixes
+* Fix bug with leading whitespace on visibility statements, fixes [#69](https://github.com/hansec/fortran-language-server/issues/69)
+* Fix parsing errors when "&" and "!" characters are present inside string literals
+* Fix parsing bug with multiple leading function/subroutine modifiers (PURE, ELEMENTAL, etc.)
+
 ## 0.9.3
 
 ### Fixes
