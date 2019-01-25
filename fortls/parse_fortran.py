@@ -7,9 +7,9 @@ from fortls.objects import map_keywords, fortran_module, fortran_program, \
 #
 USE_REGEX = re.compile(r'[ ]*USE([, ]+INTRINSIC)?[ :]+([a-z0-9_]*)([, ]+ONLY[ :]+)?', re.I)
 INCLUDE_REGEX = re.compile(r'[ ]*INCLUDE[ :]*[\'\"]([^\'\"]*)', re.I)
-SUB_REGEX = re.compile(r'[ ]*(PURE|ELEMENTAL|RECURSIVE)*[ ]*SUBROUTINE[ ]+([a-z0-9_]+)', re.I)
+SUB_MOD_REGEX = re.compile(r'[ ]*(PURE|ELEMENTAL|RECURSIVE)+', re.I)
+SUB_REGEX = re.compile(r'[ ]*SUBROUTINE[ ]+([a-z0-9_]+)', re.I)
 END_SUB_WORD = r'SUBROUTINE'
-FUN_MOD_REGEX = re.compile(r'[ ]*(PURE|ELEMENTAL|RECURSIVE)+', re.I)
 FUN_REGEX = re.compile(r'[ ]*FUNCTION[ ]+([a-z0-9_]+)', re.I)
 RESULT_REGEX = re.compile(r'RESULT[ ]*\(([a-z0-9_]*)\)', re.I)
 END_FUN_WORD = r'FUNCTION'
@@ -219,9 +219,13 @@ def read_var_def(line, type_word=None, fun_only=False):
 
 
 def read_fun_def(line, return_type=None, mod_fun=False):
-    fun_mod_match = FUN_MOD_REGEX.match(line)
-    if fun_mod_match is not None:
-        line = line[fun_mod_match.end(0):]
+    mod_match = SUB_MOD_REGEX.match(line)
+    mods_found = False
+    while mod_match is not None:
+        mods_found = True
+        line = line[mod_match.end(0):]
+        mod_match = SUB_MOD_REGEX.match(line)
+    if mods_found:
         tmp_var = read_var_def(line, fun_only=True)
         if tmp_var is not None:
             return tmp_var
@@ -252,11 +256,15 @@ def read_fun_def(line, return_type=None, mod_fun=False):
 
 
 def read_sub_def(line, mod_sub=False):
+    mod_match = SUB_MOD_REGEX.match(line)
+    while mod_match is not None:
+        line = line[mod_match.end(0):]
+        mod_match = SUB_MOD_REGEX.match(line)
     sub_match = SUB_REGEX.match(line)
     if sub_match is None:
         return None
     #
-    name = sub_match.group(2)
+    name = sub_match.group(1)
     trailing_line = line[sub_match.end(0):].split('!')[0]
     trailing_line = trailing_line.strip()
     #
