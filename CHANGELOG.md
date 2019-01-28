@@ -1,3 +1,8 @@
+## 1.0.1
+
+### Fixes
+* Detect and support associate statements, fixes [#72](https://github.com/hansec/fortran-language-server/issues/72)
+
 ## 1.0.0
 
 ### Improvements
