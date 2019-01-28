@@ -3,7 +3,7 @@ import re
 from fortls.objects import map_keywords, fortran_module, fortran_program, \
     fortran_submodule, fortran_subroutine, fortran_function, fortran_block, \
     fortran_select, fortran_type, fortran_int, fortran_obj, fortran_meth, \
-    fortran_do, fortran_where, fortran_if, fortran_file
+    fortran_associate, fortran_do, fortran_where, fortran_if, fortran_file
 #
 USE_REGEX = re.compile(r'[ ]*USE([, ]+INTRINSIC)?[ :]+([a-z0-9_]*)([, ]+ONLY[ :]+)?', re.I)
 INCLUDE_REGEX = re.compile(r'[ ]*INCLUDE[ :]*[\'\"]([^\'\"]*)', re.I)
@@ -26,6 +26,8 @@ END_WHERE_WORD = r'WHERE'
 IF_REGEX = re.compile(r'[ ]*(?:[a-z_][a-z0-9_]*[ ]*:[ ]*)?IF[ ]*\(', re.I)
 THEN_REGEX = re.compile(r'\)[ ]*THEN$', re.I)
 END_IF_WORD = r'IF'
+ASSOCIATE_REGEX = re.compile(r'[ ]*ASSOCIATE[ ]*\(', re.I)
+END_ASSOCIATE_WORD = r'ASSOCIATE'
 END_FIXED_REGEX = re.compile(r'[ ]*([0-9]*)[ ]*CONTINUE', re.I)
 SELECT_REGEX = re.compile(r'[ ]*SELECT[ ]+(CASE|TYPE)[ ]*\(([a-z0-9_=> ]*)', re.I)
 SELECT_TYPE_REGEX = re.compile(r'[ ]*(TYPE|CLASS)[ ]+IS[ ]*\(([a-z0-9_ ]*)', re.I)
@@ -295,6 +297,10 @@ def read_block_def(line):
     where_match = WHERE_REGEX.match(line)
     if where_match is not None:
         return 'where', None
+    #
+    assoc_match = ASSOCIATE_REGEX.match(line)
+    if assoc_match is not None:
+        return 'assoc', None
     #
     if_match = IF_REGEX.match(line)
     if if_match is not None:
@@ -747,6 +753,13 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 file_obj.add_scope(new_do, END_WHERE_WORD, req_container=True)
                 if(debug):
                     print('{1} !!! WHERE statement({0})'.format(line_number, line.strip()))
+            elif obj_type == 'assoc':
+                block_counter += 1
+                name = '#ASSOC{0}'.format(block_counter)
+                new_assoc = fortran_associate(file_obj, line_number, name, file_obj.enc_scope_name)
+                file_obj.add_scope(new_assoc, END_ASSOCIATE_WORD, req_container=True)
+                if(debug):
+                    print('{1} !!! ASSOCIATE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'if':
                 if_counter += 1
                 name = '#IF{0}'.format(if_counter)

@@ -20,4 +20,8 @@ END DO outer
 IF(res0>10)THEN
   i=res0
 END IF
+!
+ASSOCIATE( x=>1 )
+  i=i+x
+END ASSOCIATE
 END SUBROUTINE block_sub
