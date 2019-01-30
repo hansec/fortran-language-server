@@ -1,3 +1,9 @@
+## 1.0.2
+
+### Fixes
+* Fix discrimination between end statements and variables with underscores, fixes [#73](https://github.com/hansec/fortran-language-server/issues/73)
+* Detect enum definitions, fixes [#74](https://github.com/hansec/fortran-language-server/issues/74)
+
 ## 1.0.1
 
 ### Fixes
