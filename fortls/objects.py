@@ -739,6 +739,17 @@ class fortran_associate(fortran_block):
         return 'ASSOCIATE'
 
 
+class fortran_enum(fortran_block):
+    def __init__(self, file_obj, line_number, name, enc_scope=None):
+        self.base_setup(file_obj, line_number, name, enc_scope)
+
+    def get_type(self):
+        return 14
+
+    def get_desc(self):
+        return 'ENUM'
+
+
 class fortran_select(fortran_block):
     def __init__(self, file_obj, line_number, name, select_info, enc_scope=None):
         self.base_setup(file_obj, line_number, name, enc_scope)

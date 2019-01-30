@@ -2,8 +2,9 @@ from __future__ import print_function
 import re
 from fortls.objects import map_keywords, fortran_module, fortran_program, \
     fortran_submodule, fortran_subroutine, fortran_function, fortran_block, \
-    fortran_select, fortran_type, fortran_int, fortran_obj, fortran_meth, \
-    fortran_associate, fortran_do, fortran_where, fortran_if, fortran_file
+    fortran_select, fortran_type, fortran_enum, fortran_int, fortran_obj, \
+    fortran_meth, fortran_associate, fortran_do, fortran_where, fortran_if, \
+    fortran_file
 #
 USE_REGEX = re.compile(r'[ ]*USE([, ]+INTRINSIC)?[ :]+([a-z0-9_]*)([, ]+ONLY[ :]+)?', re.I)
 INCLUDE_REGEX = re.compile(r'[ ]*INCLUDE[ :]*[\'\"]([^\'\"]*)', re.I)
@@ -43,6 +44,8 @@ EXTENDS_REGEX = re.compile(r'EXTENDS[ ]*\(([a-z0-9_]*)\)', re.I)
 GENERIC_PRO_REGEX = re.compile(r'[ ]*(GENERIC)[ ]*::[ ]*[a-z]', re.I)
 GEN_ASSIGN_REGEX = re.compile(r'(ASSIGNMENT|OPERATOR)\(', re.I)
 END_TYPED_WORD = r'TYPE'
+ENUM_DEF_REGEX = re.compile(r'[ ]*ENUM[, ]+', re.I)
+END_ENUMD_WORD = r'ENUM'
 NAT_VAR_REGEX = re.compile(r'[ ]*(INTEGER|REAL|DOUBLE PRECISION|COMPLEX'
                            r'|DOUBLE COMPLEX|CHARACTER|LOGICAL|PROCEDURE'
                            r'|CLASS|TYPE)', re.I)
@@ -377,6 +380,13 @@ def read_type_def(line):
     return 'typ', [name, parent, keywords]
 
 
+def read_enum_def(line):
+    enum_match = ENUM_DEF_REGEX.match(line)
+    if enum_match is not None:
+        return 'enum', None
+    return None
+
+
 def read_generic_def(line):
     generic_match = GENERIC_PRO_REGEX.match(line)
     if generic_match is None:
@@ -515,9 +525,9 @@ def read_vis_stmnt(line):
 
 
 def_tests = [read_var_def, read_sub_def, read_fun_def, read_block_def,
-             read_select_def, read_type_def, read_use_stmt, read_int_def,
-             read_generic_def, read_mod_def, read_prog_def, read_submod_def,
-             read_inc_stmt, read_vis_stmnt]
+             read_select_def, read_type_def, read_enum_def, read_use_stmt,
+             read_int_def, read_generic_def, read_mod_def, read_prog_def,
+             read_submod_def, read_inc_stmt, read_vis_stmnt]
 
 
 def process_file(file_str, close_open_scopes, path=None, fixed_format=False, debug=False):
@@ -804,6 +814,13 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 file_obj.add_scope(new_type, END_TYPED_WORD, req_container=True)
                 if(debug):
                     print('{1} !!! TYPE statement({0})'.format(line_number, line.strip()))
+            elif obj_type == 'enum':
+                block_counter += 1
+                name = '#ENUM{0}'.format(block_counter)
+                new_enum = fortran_enum(file_obj, line_number, name, file_obj.enc_scope_name)
+                file_obj.add_scope(new_enum, END_ENUMD_WORD, req_container=True)
+                if(debug):
+                    print('{1} !!! ENUM statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'int':
                 abstract = obj[1]
                 name = obj[0]
