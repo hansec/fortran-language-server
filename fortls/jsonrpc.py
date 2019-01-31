@@ -24,7 +24,7 @@ def path_from_uri(uri):
         _, path = uri.split("file:///", 1)
     else:
         _, path = uri.split("file://", 1)
-    return unquote(path)
+    return os.path.normpath(unquote(path))
 
 
 def path_to_uri(path):

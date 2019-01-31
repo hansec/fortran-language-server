@@ -5,7 +5,7 @@ try:
     import StringIO.StringIO as StringIO
 except:
     from io import StringIO
-root_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, root_dir)
 from fortls.jsonrpc import write_rpc_request, write_rpc_notification, \
     read_rpc_messages, path_to_uri

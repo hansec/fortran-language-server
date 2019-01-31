@@ -1110,8 +1110,6 @@ class fortran_file:
         self.current_scope.add_use(mod_word, line_number, only_list)
 
     def add_include(self, path, line_number):
-        if os.name == "nt":
-            path = path.replace("/", "\\")
         self.include_stmnts.append([line_number, path, []])
 
     def start_ppif(self, line_number):
@@ -1185,7 +1183,7 @@ class fortran_file:
     def resolve_includes(self, workspace, path=None):
         file_dir = os.path.dirname(self.path)
         for include_path in self.include_stmnts:
-            file_path = os.path.join(file_dir, include_path[1])
+            file_path = os.path.normpath(os.path.join(file_dir, include_path[1]))
             if path is not None:
                 if not (path == file_path):
                     continue

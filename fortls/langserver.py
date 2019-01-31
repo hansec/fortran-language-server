@@ -1328,7 +1328,7 @@ class LangServer:
             for filename in os.listdir(mod_dir):
                 basename, ext = os.path.splitext(os.path.basename(filename))
                 if FORTRAN_EXT_REGEX.match(ext):
-                    filepath = os.path.join(mod_dir, filename)
+                    filepath = os.path.normpath(os.path.join(mod_dir, filename))
                     if self.excl_paths.count(filepath) > 0:
                         continue
                     inc_file = True
