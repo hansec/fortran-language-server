@@ -38,7 +38,7 @@ PROG_REGEX = re.compile(r'[ ]*PROGRAM[ ]+([a-z0-9_]+)', re.I)
 END_PROG_WORD = r'PROGRAM'
 INT_REGEX = re.compile(r'[ ]*(ABSTRACT)?[ ]*INTERFACE[ ]*([a-z0-9_]*)', re.I)
 END_INT_WORD = r'INTERFACE'
-END_WORD_REGEX = re.compile(r'[ ]*END[ ]*([_a-z]*|$)', re.I)
+END_WORD_REGEX = re.compile(r'[ ]*END[ ]*([_a-z]*|$)[ ]*', re.I)
 TYPE_DEF_REGEX = re.compile(r'[ ]*(TYPE)[, ]+', re.I)
 EXTENDS_REGEX = re.compile(r'EXTENDS[ ]*\(([a-z0-9_]*)\)', re.I)
 GENERIC_PRO_REGEX = re.compile(r'[ ]*(GENERIC)[ ]*::[ ]*[a-z]', re.I)
@@ -631,7 +631,7 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
             if match is not None:
                 if match.end(0) >= len(line_no_comment)-1:
                     end_found = True
-                elif (line_no_comment[match.end(0)] != '='):
+                elif (line_no_comment[match.end(0)] not in ('=', ':')):
                     end_found = True
             # Handle end statement
             if end_found:
