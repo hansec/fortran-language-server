@@ -630,7 +630,7 @@ class LangServer:
                 return type
 
         def set_type_mask(def_value):
-            return [def_value if i < 8 else True for i in range(13)]
+            return [def_value if i < 8 else True for i in range(15)]
 
         def get_candidates(scope_list, var_prefix, inc_globals=True, public_only=False, abstract_only=False):
             #
