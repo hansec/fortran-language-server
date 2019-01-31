@@ -180,7 +180,7 @@ def main():
             })
             diag_results, diag_exp = s.get_diagnostics(args.debug_filepath)
             if diag_results is not None:
-                sev_map = ["", "ERROR", "WARNING"]
+                sev_map = ["ERROR", "WARNING", "INFO"]
                 if len(diag_results) == 0:
                     print("\nNo errors or warnings")
                 else:
@@ -188,7 +188,7 @@ def main():
                 for diag in diag_results:
                     sline = diag["range"]["start"]["line"]
                     message = diag["message"]
-                    sev = sev_map[diag["severity"]]
+                    sev = sev_map[diag["severity"]-1]
                     print('  {0:5d}:{1}  "{2}"'.format(sline,
                           sev, message))
         #
