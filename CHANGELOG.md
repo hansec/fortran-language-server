@@ -1,3 +1,10 @@
+## 1.0.3
+
+### Fixes
+* Further improve discrimination between end statements and variables/block labels, ref [#73](https://github.com/hansec/fortran-language-server/issues/73)
+* Fix autocomplete errors when ASSOCIATE and ENUM statements are present
+* Fix severity reporting with "debug_diagnostics" command line option
+
 ## 1.0.2
 
 ### Fixes
