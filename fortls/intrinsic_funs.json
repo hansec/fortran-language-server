@@ -199,8 +199,8 @@
     "type": 3
   },
   "COUNT": {
-    "args": "ARRAY,DIM=dim,MASK=mask",
-    "doc": "COUNT(ARRAY,DIM=dim,MASK=mask) counts the number of .TRUE. elements of ARRAY along  dimension DIM if the corresponding element in MASK is TRUE.",
+    "args": "MASK,DIM=dim,KIND=kind",
+    "doc": "COUNT(MASK,DIM=dim,KIND=kind) Count the number of true elements of MASK along dimension DIM.",
     "type": 3
   },
   "CPU_TIME": {
