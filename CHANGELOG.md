@@ -1,3 +1,9 @@
+## 1.0.4
+
+### Fixes
+* Normalize file paths when storing/accessing file index, fixes [#75](https://github.com/hansec/fortran-language-server/issues/75)
+* Fix intrinsic statement "COUNT" ([#76](https://github.com/hansec/fortran-language-server/pull/76))
+
 ## 1.0.3
 
 ### Fixes
