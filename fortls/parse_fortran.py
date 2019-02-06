@@ -483,7 +483,7 @@ def read_int_def(line):
         if int_name == '':
             return 'int', [None, is_abstract]
         if int_name == 'assignment' or int_name == 'operator':
-            return None
+            return 'int', [None, False]
         return 'int', [int_match.group(2), is_abstract]
 
 
