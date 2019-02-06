@@ -1,3 +1,11 @@
+## 1.0.5
+
+### Fixes
+* Add support for named "SELECT" statements, fixes [#80](https://github.com/hansec/fortran-language-server/issues/80)
+* Track scopes for "ASSIGNMENT" and "OPERATOR" interface statements, fixes [#79](https://github.com/hansec/fortran-language-server/issues/79)
+* Fix bug in parsing "SELECT" statements with no space, fixes [#77](https://github.com/hansec/fortran-language-server/issues/77)
+* Further improve discrimination between end statements and other items, ref [#73](https://github.com/hansec/fortran-language-server/issues/73)
+
 ## 1.0.4
 
 ### Fixes
