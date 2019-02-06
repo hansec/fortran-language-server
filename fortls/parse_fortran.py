@@ -38,7 +38,9 @@ PROG_REGEX = re.compile(r'[ ]*PROGRAM[ ]+([a-z0-9_]+)', re.I)
 END_PROG_WORD = r'PROGRAM'
 INT_REGEX = re.compile(r'[ ]*(ABSTRACT)?[ ]*INTERFACE[ ]*([a-z0-9_]*)', re.I)
 END_INT_WORD = r'INTERFACE'
-END_WORD_REGEX = re.compile(r'[ ]*END[ ]*([_a-z]*|$)[ ]*', re.I)
+END_WORD_REGEX = re.compile(r'[ ]*END[ ]*(DO|WHERE|IF|BLOCK|ASSOCIATE|SELECT'
+                            r'|TYPE|ENUM|MODULE|SUBMODULE|PROGRAM|INTERFACE'
+                            r'|SUBROUTINE|FUNCTION)?([ ]+|$)', re.I)
 TYPE_DEF_REGEX = re.compile(r'[ ]*(TYPE)[, ]+', re.I)
 EXTENDS_REGEX = re.compile(r'EXTENDS[ ]*\(([a-z0-9_]*)\)', re.I)
 GENERIC_PRO_REGEX = re.compile(r'[ ]*(GENERIC)[ ]*::[ ]*[a-z]', re.I)
@@ -626,24 +628,19 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
         if file_obj.END_SCOPE_WORD is not None:
             line_no_comment = line.split('!')[0]
             match = END_WORD_REGEX.match(line_no_comment)
-            end_found = False
-            # Check for variable assignment ("end" used as variable)
-            if match is not None:
-                if match.end(0) >= len(line_no_comment)-1:
-                    end_found = True
-                elif (line_no_comment[match.end(0)] not in ('=', ':')):
-                    end_found = True
             # Handle end statement
-            if end_found:
-                end_scope_word = match.group(1).strip().upper()
+            if match is not None:
+                end_scope_word = match.group(1)
+                if end_scope_word is not None:
+                    end_scope_word = end_scope_word.strip().upper()
                 if end_scope_word != file_obj.END_SCOPE_WORD:
-                    if file_obj.current_scope.req_named_end() or end_scope_word != '':
+                    if file_obj.current_scope.req_named_end() or end_scope_word is not None:
                         file_obj.end_errors.append([line_number, file_obj.current_scope.sline])
                 if (file_obj.current_scope.get_type() == 9) and (file_obj.current_scope.type in (3, 4)):
                     file_obj.end_scope(line_number)
                 file_obj.end_scope(line_number)
                 if(debug):
-                    print('{1} !!! END "{2}" scope({0})'.format(line_number, line.strip(), match.group(1).upper()))
+                    print('{1} !!! END "{2}" scope({0})'.format(line_number, line.strip(), end_scope_word))
                 continue
             # Look for old-style end of DO loops with line labels
             if (file_obj.END_SCOPE_WORD == 'DO') and (line_label is not None):
