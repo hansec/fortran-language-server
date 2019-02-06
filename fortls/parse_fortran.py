@@ -30,7 +30,7 @@ END_IF_WORD = r'IF'
 ASSOCIATE_REGEX = re.compile(r'[ ]*ASSOCIATE[ ]*\(', re.I)
 END_ASSOCIATE_WORD = r'ASSOCIATE'
 END_FIXED_REGEX = re.compile(r'[ ]*([0-9]*)[ ]*CONTINUE', re.I)
-SELECT_REGEX = re.compile(r'[ ]*SELECT[ ]+(CASE|TYPE)[ ]*\(([a-z0-9_=> ]*)', re.I)
+SELECT_REGEX = re.compile(r'[ ]*SELECT[ ]*(CASE|TYPE)[ ]*\(([a-z0-9_=> ]*)', re.I)
 SELECT_TYPE_REGEX = re.compile(r'[ ]*(TYPE|CLASS)[ ]+IS[ ]*\(([a-z0-9_ ]*)', re.I)
 SELECT_DEFAULT_REGEX = re.compile(r'[ ]*CLASS[ ]+DEFAULT', re.I)
 END_SELECT_WORD = r'SELECT'
