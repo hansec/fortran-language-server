@@ -632,17 +632,18 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
             # Handle end statement
             if match is not None:
                 end_scope_word = match.group(1)
-                if end_scope_word is not None:
-                    end_scope_word = end_scope_word.strip().upper()
-                if end_scope_word != file_obj.END_SCOPE_WORD:
-                    if file_obj.current_scope.req_named_end() or end_scope_word is not None:
-                        file_obj.end_errors.append([line_number, file_obj.current_scope.sline])
-                if (file_obj.current_scope.get_type() == 9) and (file_obj.current_scope.type in (3, 4)):
+                if (end_scope_word is not None) or (match.group(2) == ""):
+                    if end_scope_word is not None:
+                        end_scope_word = end_scope_word.strip().upper()
+                    if end_scope_word != file_obj.END_SCOPE_WORD:
+                        if file_obj.current_scope.req_named_end() or end_scope_word is not None:
+                            file_obj.end_errors.append([line_number, file_obj.current_scope.sline])
+                    if (file_obj.current_scope.get_type() == 9) and (file_obj.current_scope.type in (3, 4)):
+                        file_obj.end_scope(line_number)
                     file_obj.end_scope(line_number)
-                file_obj.end_scope(line_number)
-                if(debug):
-                    print('{1} !!! END "{2}" scope({0})'.format(line_number, line.strip(), end_scope_word))
-                continue
+                    if(debug):
+                        print('{1} !!! END "{2}" scope({0})'.format(line_number, line.strip(), end_scope_word))
+                    continue
             # Look for old-style end of DO loops with line labels
             if (file_obj.END_SCOPE_WORD == 'DO') and (line_label is not None):
                 did_close = False
