@@ -67,7 +67,7 @@ SQ_STRING_REGEX = re.compile(r'\'[^\']*\'', re.I)
 DQ_STRING_REGEX = re.compile(r'\"[^\"]*\"', re.I)
 LINE_LABEL_REGEX = re.compile(r'[ ]*([0-9]+)[ ]+', re.I)
 #
-FIXED_COMMENT_LINE_MATCH = re.compile(r'^(!|c|d|\*)', re.I)
+FIXED_COMMENT_LINE_MATCH = re.compile(r'(!|c|d|\*)', re.I)
 FIXED_CONT_REGEX = re.compile(r'(     [\S])')
 #
 FREE_COMMENT_LINE_MATCH = re.compile(r'([ ]*!)')
