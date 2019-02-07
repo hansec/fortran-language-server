@@ -49,7 +49,7 @@ def read_file_split(filepath):
         return contents_split, None
 
 
-def init_file(filepath):
+def init_file(filepath, pp_defs):
     #
     contents_split, err_str = read_file_split(filepath)
     if contents_split is None:
@@ -57,7 +57,7 @@ def init_file(filepath):
     #
     try:
         fixed_flag = detect_fixed_format(contents_split)
-        ast_new = process_file(contents_split, True, filepath, fixed_flag)
+        ast_new = process_file(contents_split, True, filepath, fixed_flag, pp_defs=pp_defs)
     except:
         log.error("Error while parsing file %s", filepath, exc_info=True)
         return None, 'Error during parsing'
@@ -323,6 +323,7 @@ class LangServer:
         self.excl_paths = []
         self.excl_suffixes = []
         self.post_messages = []
+        self.pp_defs = []
         self.streaming = True
         self.debug_log = debug_log
         # Get launch settings
@@ -432,6 +433,7 @@ class LangServer:
                     self.excl_suffixes = config_dict.get("excl_suffixes", [])
                     self.lowercase_intrinsics = config_dict.get("lowercase_intrinsics", self.lowercase_intrinsics)
                     self.debug_log = config_dict.get("debug_log", self.debug_log)
+                    self.pp_defs = config_dict.get("pp_defs", [])
             except:
                 self.post_messages.append([1, "Error while parsing '.fortls' settings file"])
         # Setup logging
@@ -1295,7 +1297,7 @@ class LangServer:
         # Update workspace from file contents and path
         try:
             fixed_flag = detect_fixed_format(contents_split)
-            ast_new = process_file(contents_split, True, filepath, fixed_flag)
+            ast_new = process_file(contents_split, True, filepath, fixed_flag, pp_defs=self.pp_defs)
         except:
             log.error("Error while parsing file %s", filepath, exc_info=True)
             return 'Error during parsing'  # Error during parsing
@@ -1343,7 +1345,7 @@ class LangServer:
         pool = Pool(processes=4)
         results = {}
         for filepath in file_list:
-            results[filepath] = pool.apply_async(init_file, args=(filepath,))
+            results[filepath] = pool.apply_async(init_file, args=(filepath, self.pp_defs))
         pool.close()
         pool.join()
         for path, result in results.items():

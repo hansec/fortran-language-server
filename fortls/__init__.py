@@ -125,7 +125,19 @@ def main():
         file_exists = os.path.isfile(args.debug_filepath)
         if file_exists is False:
             error_exit("Specified 'debug_filepath' does not exist")
-        filename, ext = os.path.splitext(os.path.basename(args.debug_filepath))
+        # Get preprocessor definitions from config file
+        pp_defs = []
+        if args.debug_rootpath:
+            config_path = os.path.join(args.debug_rootpath, ".fortls")
+            config_exists = os.path.isfile(config_path)
+            if config_exists:
+                try:
+                    import json
+                    with open(config_path, 'r') as fhandle:
+                        config_dict = json.load(fhandle)
+                        pp_defs = config_dict.get("pp_defs", [])
+                except:
+                    print("Error while parsing '.fortls' settings file")
         #
         print('\nTesting parser')
         print('  File = "{0}"'.format(args.debug_filepath))
@@ -134,7 +146,7 @@ def main():
             fixed_flag = detect_fixed_format(contents_split)
             print('  Detected format: {0}'.format("fixed" if fixed_flag else "free"))
             print("\n=========\nParser Output\n=========\n")
-            ast_new = process_file(contents_split, True, fixed_format=fixed_flag, debug=True)
+            ast_new = process_file(contents_split, True, fixed_format=fixed_flag, debug=True, pp_defs=pp_defs)
             print("\n=========\nObject Tree\n=========\n")
             for obj in ast_new.get_scopes():
                 print("{0}: {1}".format(obj.get_type(), obj.FQSN))

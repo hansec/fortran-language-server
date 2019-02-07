@@ -75,8 +75,9 @@ FREE_CONT_REGEX = re.compile(r'([ ]*&)')
 FREE_FORMAT_TEST = re.compile(r'[ ]{1,4}[a-z]', re.I)
 OPENMP_LINE_MATCH = re.compile(r'[ ]*[!|c|\*]\$OMP', re.I)
 #
-PPIF_START_TEST = re.compile(r'#if')
-PPIF_END_TEST = re.compile(r'#endif')
+PP_REGEX = re.compile(r'#(if |ifdef|ifndef|else|elif|endif)')
+PP_DEF_REGEX = re.compile(r'#(define|undef)[ ]*([a-z0-9_]+)', re.I)
+PP_DEF_TEST_REGEX = re.compile(r'(![ ]*)?defined[ ]*\([ ]*([a-z0-9_]*)[ ]*\)$', re.I)
 
 
 def detect_fixed_format(file_lines):
@@ -534,7 +535,67 @@ def_tests = [read_var_def, read_sub_def, read_fun_def, read_block_def,
              read_submod_def, read_inc_stmt, read_vis_stmnt]
 
 
-def process_file(file_str, close_open_scopes, path=None, fixed_format=False, debug=False):
+def process_file(file_str, close_open_scopes, path=None, fixed_format=False, debug=False, pp_defs=[]):
+    def preprocess():
+        # Look for and mark excluded preprocessor paths in file
+        # Initial implementation only looks for "if" and "ifndef" statements.
+        # For "if" statements all blocks are excluded except the "else" block if present
+        # For "ifndef" statements all blocks excluding the first block are exlucded
+        pp_skips = []
+        pp_stack = []
+        defs_tmp = pp_defs[:]
+        for (i, line) in enumerate(file_str):
+            match = PP_REGEX.match(line)
+            if (match is not None):
+                def_name = None
+                def_neg = False
+                if_start = False
+                if match.group(1) == 'if ':
+                    if_start = True
+                    def_match = PP_DEF_TEST_REGEX.match(line[match.end(0):].rstrip())
+                    if def_match is not None:
+                        def_neg = (def_match.group(1) == '!')
+                        def_name = def_match.group(2).strip()
+                elif match.group(1) == 'ifdef':
+                    if_start = True
+                    def_name = line[match.end(0):].strip()
+                elif match.group(1) == 'ifndef':
+                    if_start = True
+                    def_neg = True
+                    def_name = line[match.end(0):].strip()
+                if if_start:
+                    if (def_name is not None) and (def_neg != (def_name in defs_tmp)):
+                        pp_stack.append([-1, -1])
+                    else:
+                        pp_stack.append([i+1, -1])
+                    continue
+                if len(pp_stack) == 0:
+                    continue
+                #
+                if (match.group(1) == 'elif') and (pp_stack[-1][0] < 0):
+                    pp_stack[-1][0] = i+1
+                elif match.group(1) == 'else':
+                    if pp_stack[-1][0] < 0:
+                        pp_stack[-1][0] = i+1
+                    else:
+                        pp_stack[-1][1] = i+1
+                elif match.group(1) == 'endif':
+                    if pp_stack[-1][0] < 0:
+                        pp_stack.pop()
+                        continue
+                    if pp_stack[-1][1] < 0:
+                        pp_stack[-1][1] = i+1
+                    pp_skips.append(pp_stack.pop())
+                continue
+            #
+            match = PP_DEF_REGEX.match(line)
+            if (match is not None) and ((len(pp_stack) == 0) or (pp_stack[-1][0] < 0)):
+                def_name = match.group(2)
+                if (match.group(1) == 'define') and (def_name not in defs_tmp):
+                    defs_tmp.append(def_name)
+                elif (match.group(1) == 'undef') and (def_name in defs_tmp):
+                    defs_tmp.remove(def_name)
+        return pp_skips
     #
     if fixed_format:
         COMMENT_LINE_MATCH = FIXED_COMMENT_LINE_MATCH
@@ -544,6 +605,12 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
         CONT_REGEX = FREE_CONT_REGEX
     #
     file_obj = fortran_file(path)
+    #
+    pp_skips = preprocess()
+    for pp_reg in pp_skips:
+        file_obj.start_ppif(pp_reg[0])
+        file_obj.end_ppif(pp_reg[1])
+    #
     line_number = 0
     next_line_num = 1
     int_counter = 0
@@ -552,7 +619,6 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
     if_counter = 0
     select_counter = 0
     block_id_stack = []
-    # at_eof = False
     next_line = None
     line_ind = 0
     while((line_ind < len(file_str)) or (next_line is not None)):
@@ -571,15 +637,17 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
         match = COMMENT_LINE_MATCH.match(line)
         if (match is not None):
             continue
-        # Start preproccesor if stmt
-        match = PPIF_START_TEST.match(line)
-        if (match is not None):
-            file_obj.start_ppif(line_number)
-            continue
-        # End preproccesor if stmt
-        match = PPIF_END_TEST.match(line)
-        if (match is not None):
-            file_obj.end_ppif(line_number)
+        do_skip = False
+        for pp_reg in pp_skips:
+            if (line_number >= pp_reg[0]) and (line_number <= pp_reg[1]):
+                do_skip = True
+                if debug:
+                    if line_number == pp_reg[0]:
+                        print('{1} !!! Ignored PP region start({0})'.format(line_number, line.strip()))
+                    if line_number == pp_reg[1]:
+                        print('{1} !!! Ignored PP region end({0})'.format(line_number, line.strip()))
+                break
+        if do_skip:
             continue
         # Get line label
         line, line_label = strip_line_label(line)
@@ -607,8 +675,6 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 line_ind += 1
                 if next_line == '':
                     break  # Next line is empty
-                    # at_eof = True
-                    # break # Reached end of file
                 # Skip comment lines
                 match = COMMENT_LINE_MATCH.match(next_line)
                 if (match is not None):

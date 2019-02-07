@@ -120,6 +120,21 @@ the ``mod_dirs`` variable in the ``.fortls`` file. When ``mod_dirs`` is specifie
 recursively, so any nested sub directories must be explicitly listed. However, ``root_dir`` does not need to
 be specified manually as it is always included.
 
+**Preprocessor definitions:**
+
+Preprocessor definitions can be set for each project, to improve support for Fortran files using conditional
+compilation, using the ``pp_defs`` variable in the ``.fortls`` file. In individual source files ``#define``
+and ``#undef`` statements are also tracked. Currently, support for preprocessing is limited to definition
+tests of a single variable only (ie. ``#ifdef HAVE_PACKAGE``, ``#ifndef HAVE_PACKAGE``,
+``#if defined(HAVE_PACKAGE)``, etc.). Preprocessor conditionals using logical operators (``||`` or ``&&``)
+to evaluate multiple conditions are not supported at this time. Additionally, tests of preprocessor
+variable values such as ``#if PACKAGE_VER > 4`` are not supported at this time. Finally, all variables
+must be declared in the project's ``.fortls`` file or in the source file of interest as ``#include``
+files are not supported. 
+
+*Note:* The language server will only analyze code within preprocessor conditional regions if the conditional
+test can be evaluated by the server or if the region is the *default* path (ie. a bare ``#else`` region).
+
 
 ::
 
@@ -127,6 +142,7 @@ be specified manually as it is always included.
       "mod_dirs": ["subdir1", "subdir2"],
       "excl_paths": ["subdir3", "subdir1/file_to_skip.F90"],
       "excl_suffixes": ["_skip.f90"],
+      "pp_defs": ["HAVE_PACKAGE"],
       "lowercase_intrinsics": false,
       "debug_log": false
     }
