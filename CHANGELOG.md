@@ -1,3 +1,12 @@
+## 1.1.0
+
+### Improvements
+* Add initial implementation of simple preprocessor, ref [#78](https://github.com/hansec/fortran-language-server/issues/78)
+
+### Fixes
+* Updated Fixed/Free detection logic using ampersands to check for comment line, fixes [#81](https://github.com/hansec/fortran-language-server/issues/81)
+* Support use of "END" as a variable, fixes [#82](https://github.com/hansec/fortran-language-server/issues/82)
+
 ## 1.0.5
 
 ### Fixes
