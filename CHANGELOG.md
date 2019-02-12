@@ -1,3 +1,8 @@
+## 1.1.1
+
+### Fixes
+* Fix bug with backslash URI separators on Windows, fixes [#83](https://github.com/hansec/fortran-language-server/issues/83)
+
 ## 1.1.0
 
 ### Improvements
