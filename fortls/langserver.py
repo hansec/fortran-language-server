@@ -1114,7 +1114,7 @@ class LangServer:
                     elif comm_start > 0:
                         line = line[:comm_start]
                     for match in NAME_REGEX.finditer(line):
-                        var_def = self.get_definition(file_obj, i, match.start(1))
+                        var_def = self.get_definition(file_obj, i, match.start(1)+1)
                         if var_def is not None:
                             if def_fqsn == var_def.FQSN:
                                 refs.append({

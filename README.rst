@@ -95,6 +95,8 @@ The following settings can be used to perform `standalone debug tests <https://g
 * ``--debug_completion`` Test completion request for specified file and position
 * ``--debug_signature`` Test signatureHelp request for specified file and position
 * ``--debug_definition`` Test definition request for specified file and position
+* ``--debug_hover`` Test hover request for specified file and position
+* ``--debug_references`` Test references request for specified file and position
 
 Configuration
 -------------

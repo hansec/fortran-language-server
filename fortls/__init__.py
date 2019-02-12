@@ -85,6 +85,10 @@ def main():
         help="Test hover request for specified file and position"
     )
     group.add_argument(
+        '--debug_references', action="store_true",
+        help="Test references request for specified file and position"
+    )
+    group.add_argument(
         '--debug_filepath', type=str,
         help="File path for language server tests"
     )
@@ -107,6 +111,7 @@ def main():
     debug_server = (args.debug_diagnostics or args.debug_symbols
                     or args.debug_completion or args.debug_signature
                     or args.debug_definition or args.debug_hover
+                    or args.debug_references
                     or (args.debug_rootpath is not None)
                     or (args.debug_workspace_symbols is not None))
     #
@@ -344,6 +349,30 @@ def main():
                     print(contents['value'])
                 else:
                     print(contents)
+                print('=======')
+        #
+        if args.debug_references:
+            print('\nTesting "textDocument/references" request:')
+            check_request_params(args)
+            s.serve_onSave({
+                "params": {
+                    "textDocument": {"uri": args.debug_filepath}
+                }
+            })
+            ref_results = s.serve_references({
+                "params": {
+                    "textDocument": {"uri": args.debug_filepath},
+                    "position": {"line": args.debug_line-1, "character": args.debug_char-1}
+                }
+            })
+            print('  Result:')
+            if ref_results is None:
+                print('    No result found!')
+            else:
+                print('=======')
+                for result in ref_results:
+                    print('  {0}  ({1}, {2})'.format(result['uri'],
+                          result['range']['start']['line']+1, result['range']['start']['character']+1))
                 print('=======')
         tmpout.close()
         tmpin.close()
