@@ -30,7 +30,7 @@ def path_from_uri(uri):
 def path_to_uri(path):
     # Convert path to file uri (add html like head part)
     if os.name == "nt":
-        return "file:///" + quote(path)
+        return "file:///" + quote(path.replace('\\', '/'))
     else:
         return "file://" + quote(path)
 
