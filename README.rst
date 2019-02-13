@@ -46,7 +46,7 @@ Hover:
 
 Find references:
 
-*Note:* For global and top level module objects only.
+*Note:* Currently not supported for member variables/procedures of user-defined types.
 
 .. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_refs.png
 

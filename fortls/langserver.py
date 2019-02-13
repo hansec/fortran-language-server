@@ -1094,15 +1094,25 @@ class LangServer:
             def_obj = self.get_definition(self.workspace[path], def_line, def_char)
         else:
             return []
-        # Currently only support global and top level module objects
+        # Currently no support for type members
+        restrict_file = None
         if def_obj.FQSN.count(":") > 2:
-            return refs
+            if def_obj.parent.get_type() == 4:
+                return refs
+            else:
+                restrict_file = def_obj.file.path
+                if restrict_file not in self.workspace:
+                    return refs
         # Search through all files
         if def_obj is not None:
             def_name = def_obj.name.lower()
             def_fqsn = def_obj.FQSN
             NAME_REGEX = re.compile(r'(?:\W|^)({0})(?:\W|$)'.format(def_name), re.I)
-            for filename, file_obj in sorted(self.workspace.items()):
+            if restrict_file is None:
+                file_set = self.workspace.items()
+            else:
+                file_set = ((restrict_file, self.workspace.get(restrict_file)), )
+            for filename, file_obj in sorted(file_set):
                 # Search through file line by line
                 for (i, line) in enumerate(file_obj["contents"]):
                     if len(line) == 0:
