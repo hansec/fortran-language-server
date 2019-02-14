@@ -1,3 +1,13 @@
+## 1.2.0
+
+### Improvements
+* Add support for local variables/objects in "textDocument/references" requests, ref [#84](https://github.com/hansec/fortran-language-server/issues/78)
+* Improve preprocessing to handle more types of conditional statements and macro substitution, ref [#78](https://github.com/hansec/fortran-language-server/issues/78)
+* Report diagnostics for excess "END" statements instead of causing parser failure, ref [#78](https://github.com/hansec/fortran-language-server/issues/78)
+
+### Fixes
+* Fix missing "textDocument/references" results when line starts with target object, fixes [#84](https://github.com/hansec/fortran-language-server/issues/84)
+
 ## 1.1.1
 
 ### Fixes
