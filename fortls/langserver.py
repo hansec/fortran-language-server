@@ -57,7 +57,11 @@ def init_file(filepath, pp_defs):
     #
     try:
         fixed_flag = detect_fixed_format(contents_split)
-        ast_new = process_file(contents_split, True, filepath, fixed_flag, pp_defs=pp_defs)
+        _, file_ext = os.path.splitext(os.path.basename(filepath))
+        if file_ext == file_ext.upper():
+            ast_new = process_file(contents_split, True, filepath, fixed_flag, pp_defs=pp_defs)
+        else:
+            ast_new = process_file(contents_split, True, filepath, fixed_flag)
     except:
         log.error("Error while parsing file %s", filepath, exc_info=True)
         return None, 'Error during parsing'
@@ -323,7 +327,7 @@ class LangServer:
         self.excl_paths = []
         self.excl_suffixes = []
         self.post_messages = []
-        self.pp_defs = []
+        self.pp_defs = {}
         self.streaming = True
         self.debug_log = debug_log
         # Get launch settings
@@ -433,7 +437,9 @@ class LangServer:
                     self.excl_suffixes = config_dict.get("excl_suffixes", [])
                     self.lowercase_intrinsics = config_dict.get("lowercase_intrinsics", self.lowercase_intrinsics)
                     self.debug_log = config_dict.get("debug_log", self.debug_log)
-                    self.pp_defs = config_dict.get("pp_defs", [])
+                    self.pp_defs = config_dict.get("pp_defs", {})
+                    if isinstance(self.pp_defs, list):
+                        self.pp_defs = {key: "" for key in self.pp_defs}
             except:
                 self.post_messages.append([1, "Error while parsing '.fortls' settings file"])
         # Setup logging
@@ -1307,7 +1313,11 @@ class LangServer:
         # Update workspace from file contents and path
         try:
             fixed_flag = detect_fixed_format(contents_split)
-            ast_new = process_file(contents_split, True, filepath, fixed_flag, pp_defs=self.pp_defs)
+            _, file_ext = os.path.splitext(os.path.basename(filepath))
+            if file_ext == file_ext.upper():
+                ast_new = process_file(contents_split, True, filepath, fixed_flag, pp_defs=self.pp_defs)
+            else:
+                ast_new = process_file(contents_split, True, filepath, fixed_flag)
         except:
             log.error("Error while parsing file %s", filepath, exc_info=True)
             return 'Error during parsing'  # Error during parsing

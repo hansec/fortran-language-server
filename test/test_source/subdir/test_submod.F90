@@ -19,8 +19,8 @@ contains
     is_point_equal = merge(.true., .false., a%x == b%x .and. a%y == b%y)
   end function is_point_equal
 end module points
-
-submodule (points) points_a
+#define __PARENT_MOD__ points
+submodule (__PARENT_MOD__) points_a
 contains
   module function point_dist
     type(point) :: c

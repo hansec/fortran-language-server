@@ -535,67 +535,153 @@ def_tests = [read_var_def, read_sub_def, read_fun_def, read_block_def,
              read_submod_def, read_inc_stmt, read_vis_stmnt]
 
 
-def process_file(file_str, close_open_scopes, path=None, fixed_format=False, debug=False, pp_defs=[]):
+def process_file(file_str, close_open_scopes, path=None, fixed_format=False, debug=False, pp_defs=None):
     def preprocess():
         # Look for and mark excluded preprocessor paths in file
         # Initial implementation only looks for "if" and "ifndef" statements.
         # For "if" statements all blocks are excluded except the "else" block if present
         # For "ifndef" statements all blocks excluding the first block are exlucded
+        def eval_pp_if(text, defs={}):
+            def replace_ops(expr):
+                expr = expr.replace("&&", " and ")
+                expr = expr.replace("||", " or ")
+                expr = expr.replace("!=", " <> ")
+                expr = expr.replace("!", " not ")
+                expr = expr.replace(" <> ", " != ")
+                return expr
+
+            def replace_defined(line):
+                DEFINED_REGEX = re.compile(r'defined[ ]*\([ ]*([a-z_][a-z0-9_]*)[ ]*\)', re.I)
+                i0 = 0
+                out_line = ""
+                for match in DEFINED_REGEX.finditer(line):
+                    if match.group(1) in defs:
+                        out_line += line[i0:match.start(0)] + "($@)"
+                    else:
+                        out_line += line[i0:match.start(0)] + "($%)"
+                    i0 = match.end(0)
+                if i0 < len(line):
+                    out_line += line[i0:]
+                return out_line
+
+            def replace_vars(line):
+                WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
+                i0 = 0
+                out_line = ""
+                for match in WORD_REGEX.finditer(line):
+                    if match.group(0) in defs:
+                        out_line += line[i0:match.start(0)] + defs[match.group(0)]
+                    else:
+                        out_line += line[i0:match.start(0)] + "False"
+                    i0 = match.end(0)
+                if i0 < len(line):
+                    out_line += line[i0:]
+                out_line = out_line.replace("$@", "True")
+                out_line = out_line.replace("$%", "False")
+                return out_line
+            out_line = replace_defined(text)
+            out_line = replace_vars(out_line)
+            try:
+                line_res = eval(replace_ops(out_line))
+            except:
+                return False
+            else:
+                return line_res
+        #
         pp_skips = []
+        pp_defines = []
         pp_stack = []
-        defs_tmp = pp_defs[:]
+        defs_tmp = pp_defs.copy()
+        output_file = []
         for (i, line) in enumerate(file_str):
             match = PP_REGEX.match(line)
             if (match is not None):
+                output_file.append(line)
                 def_name = None
-                def_neg = False
                 if_start = False
                 if match.group(1) == 'if ':
+                    is_path = eval_pp_if(line[match.end(1):], defs_tmp)
                     if_start = True
-                    def_match = PP_DEF_TEST_REGEX.match(line[match.end(0):].rstrip())
-                    if def_match is not None:
-                        def_neg = (def_match.group(1) == '!')
-                        def_name = def_match.group(2).strip()
                 elif match.group(1) == 'ifdef':
                     if_start = True
                     def_name = line[match.end(0):].strip()
+                    is_path = (def_name in defs_tmp)
                 elif match.group(1) == 'ifndef':
                     if_start = True
-                    def_neg = True
                     def_name = line[match.end(0):].strip()
+                    is_path = not (def_name in defs_tmp)
                 if if_start:
-                    if (def_name is not None) and (def_neg != (def_name in defs_tmp)):
+                    if is_path:
                         pp_stack.append([-1, -1])
+                        if debug:
+                            print('{1} !!! Conditional TRUE({0})'.format(i+1, line.strip()))
                     else:
                         pp_stack.append([i+1, -1])
+                        if debug:
+                            print('{1} !!! Conditional FALSE({0})'.format(i+1, line.strip()))
                     continue
                 if len(pp_stack) == 0:
                     continue
                 #
-                if (match.group(1) == 'elif') and (pp_stack[-1][0] < 0):
-                    pp_stack[-1][0] = i+1
+                inc_start = False
+                exc_start = False
+                if (match.group(1) == 'elif'):
+                    if (pp_stack[-1][0] < 0):
+                        pp_stack[-1][0] = i+1
+                        exc_start = True
+                    else:
+                        if eval_pp_if(line[match.end(1):], defs_tmp):
+                            pp_stack[-1][1] = i-1
+                            pp_stack.append([-1, -1])
+                            inc_start = True
                 elif match.group(1) == 'else':
                     if pp_stack[-1][0] < 0:
                         pp_stack[-1][0] = i+1
+                        exc_start = True
                     else:
                         pp_stack[-1][1] = i+1
+                        inc_start = True
                 elif match.group(1) == 'endif':
                     if pp_stack[-1][0] < 0:
                         pp_stack.pop()
                         continue
                     if pp_stack[-1][1] < 0:
                         pp_stack[-1][1] = i+1
+                        if debug:
+                            print('{1} !!! Conditional FALSE/END({0})'.format(i+1, line.strip()))
                     pp_skips.append(pp_stack.pop())
+                if debug:
+                    if inc_start:
+                        print('{1} !!! Conditional TRUE({0})'.format(i+1, line.strip()))
+                    elif exc_start:
+                        print('{1} !!! Conditional FALSE({0})'.format(i+1, line.strip()))
                 continue
             #
             match = PP_DEF_REGEX.match(line)
             if (match is not None) and ((len(pp_stack) == 0) or (pp_stack[-1][0] < 0)):
+                output_file.append(line)
+                pp_defines.append(i+1)
                 def_name = match.group(2)
                 if (match.group(1) == 'define') and (def_name not in defs_tmp):
-                    defs_tmp.append(def_name)
+                    eq_ind = line[match.end(0):].find(' ')
+                    if eq_ind >= 0:
+                        defs_tmp[def_name] = line[match.end(0)+eq_ind:].strip()
+                    else:
+                        defs_tmp[def_name] = "True"
                 elif (match.group(1) == 'undef') and (def_name in defs_tmp):
-                    defs_tmp.remove(def_name)
-        return pp_skips
+                    defs_tmp.pop(def_name, None)
+                if debug:
+                    print('{1} !!! Define statement({0})'.format(i+1, line.strip()))
+                continue
+            #
+            for def_tmp, value in defs_tmp.items():
+                if line.find(def_tmp) >= 0:
+                    if debug:
+                        print('{1} !!! Macro sub({0}) "{2}" -> "{3}"'.format(i+1,
+                              line.strip(), def_tmp, value))
+                    line = line.replace(def_tmp, value)
+            output_file.append(line)
+        return pp_skips, pp_defines, output_file
     #
     if fixed_format:
         COMMENT_LINE_MATCH = FIXED_COMMENT_LINE_MATCH
@@ -606,10 +692,18 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
     #
     file_obj = fortran_file(path)
     #
-    pp_skips = preprocess()
-    for pp_reg in pp_skips:
-        file_obj.start_ppif(pp_reg[0])
-        file_obj.end_ppif(pp_reg[1])
+    if pp_defs is not None:
+        if debug:
+            print("=== PreProc Pass ===\n")
+        pp_skips, pp_defines, file_str = preprocess()
+        for pp_reg in pp_skips:
+            file_obj.start_ppif(pp_reg[0])
+            file_obj.end_ppif(pp_reg[1])
+        if debug:
+            print("\n=== Parsing Pass ===\n")
+    else:
+        pp_skips = []
+        pp_defines = []
     #
     line_number = 0
     next_line_num = 1
@@ -641,12 +735,9 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
         for pp_reg in pp_skips:
             if (line_number >= pp_reg[0]) and (line_number <= pp_reg[1]):
                 do_skip = True
-                if debug:
-                    if line_number == pp_reg[0]:
-                        print('{1} !!! Ignored PP region start({0})'.format(line_number, line.strip()))
-                    if line_number == pp_reg[1]:
-                        print('{1} !!! Ignored PP region end({0})'.format(line_number, line.strip()))
                 break
+        if line_number in pp_defines:
+            do_skip = True
         if do_skip:
             continue
         # Get line label
