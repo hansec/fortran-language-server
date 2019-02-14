@@ -702,9 +702,10 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 if (end_scope_word is not None) or (match.group(2) == ""):
                     if end_scope_word is not None:
                         end_scope_word = end_scope_word.strip().upper()
-                    if end_scope_word != file_obj.END_SCOPE_WORD:
-                        if file_obj.current_scope.req_named_end() or end_scope_word is not None:
-                            file_obj.end_errors.append([line_number, file_obj.current_scope.sline])
+                    if ((end_scope_word != file_obj.END_SCOPE_WORD)
+                       and (file_obj.current_scope.req_named_end() or (end_scope_word is not None))
+                       and (file_obj.current_scope is not file_obj.none_scope)):
+                        file_obj.end_errors.append([line_number, file_obj.current_scope.sline])
                     if (file_obj.current_scope.get_type() == 9) and (file_obj.current_scope.type in (3, 4)):
                         file_obj.end_scope(line_number)
                     file_obj.end_scope(line_number)

@@ -310,19 +310,26 @@ class fortran_scope:
         if self.parent is not None:
             if self.parent.get_type() == 5:
                 return []
-        FQSN_list = []
+        FQSN_dict = {}
+        for child in self.children:
+            # Check other variables in current scope
+            if child.FQSN in FQSN_dict:
+                if child.sline < FQSN_dict[child.FQSN]:
+                    FQSN_dict[child.FQSN] = child.sline - 1
+            else:
+                FQSN_dict[child.FQSN] = child.sline - 1
         errors = []
         for child in self.children:
             # Check other variables in current scope
-            if FQSN_list.count(child.FQSN) > 0:
+            if child.FQSN in FQSN_dict:
                 line_number = child.sline - 1
-                i0, i1 = find_word_in_line(file_contents[line_number].lower(), child.name.lower())
-                errors.append([0, line_number, i0, i1, child.name])
-            else:
-                FQSN_list.append(child.FQSN)
+                if line_number > FQSN_dict[child.FQSN]:
+                    i0, i1 = find_word_in_line(file_contents[line_number].lower(), child.name.lower())
+                    errors.append([0, line_number, i0, i1, child.name, self.file.path, FQSN_dict[child.FQSN]])
+                    continue
             # Check for masking from parent scope in subroutines, functions, and blocks
             if (self.parent is not None) and (self.get_type() in (2, 3, 8)):
-                parent_var, parent_scope = \
+                parent_var, _ = \
                     find_in_scope(self.parent, child.name, obj_tree)
                 if parent_var is not None:
                     # Ignore if function return variable
@@ -1076,7 +1083,10 @@ class fortran_file:
         self.END_SCOPE_WORD = END_SCOPE_WORD
         self.enc_scope_name = self.get_enc_scope_name()
 
-    def end_scope(self, line_number):
+    def end_scope(self, line_number, check=True):
+        if ((self.current_scope is None) or (self.current_scope is self.none_scope)) and check:
+            self.end_errors.append([-1, line_number])
+            return
         self.current_scope.end(line_number)
         if len(self.scope_stack) > 0:
             self.current_scope = self.scope_stack.pop()
@@ -1208,7 +1218,7 @@ class fortran_file:
     def close_file(self, line_number):
         # Close open scopes
         while self.current_scope is not None:
-            self.end_scope(line_number)
+            self.end_scope(line_number, check=False)
         # Close and delist none_scope
         if self.none_scope is not None:
             self.none_scope.end(line_number)
@@ -1225,16 +1235,20 @@ class fortran_file:
 
     def check_file(self, obj_tree, file_contents):
         errors = []
-        tmp_list = self.scope_list
+        tmp_list = self.scope_list[:]
         if self.none_scope is not None:
             tmp_list += [self.none_scope]
         for error in self.end_errors:
+            if error[0] >= 0:
+                message = 'Unexpected end of scope at line {0}'.format(error[0])
+            else:
+                message = 'Unexpected end statement: No open scopes'
             errors.append({
                 "range": {
                     "start": {"line": error[1]-1, "character": 0},
                     "end": {"line": error[1]-1, "character": 0}
                 },
-                "message": 'Unexpected end of scope at line {0}'.format(error[0]),
+                "message": message,
                 "severity": 1
             })
         for scope in tmp_list:
@@ -1252,33 +1266,31 @@ class fortran_file:
                 if self.check_ppif(error[1]):
                     continue
                 if error[0] == 0:
-                    errors.append({
-                        "range": {
-                            "start": {"line": error[1], "character": error[2]},
-                            "end": {"line": error[1], "character": error[3]}
-                        },
-                        "message": 'Variable "{0}" declared twice in scope'.format(error[4]),
-                        "severity": 1
-                    })
+                    message = 'Variable "{0}" declared twice in scope'.format(error[4])
+                    severity = 1
                 elif error[0] == 1:
-                    errors.append({
-                        "range": {
-                            "start": {"line": error[1], "character": error[2]},
-                            "end": {"line": error[1], "character": error[3]}
+                    message = 'Variable "{0}" masks variable in parent scope'.format(error[4])
+                    severity = 2
+                else:
+                    continue
+                errors.append({
+                    "range": {
+                        "start": {"line": error[1], "character": error[2]},
+                        "end": {"line": error[1], "character": error[3]}
+                    },
+                    "message": message,
+                    "severity": severity,
+                    "relatedInformation": [{
+                        "location": {
+                            "uri": path_to_uri(error[5]),
+                            "range": {
+                                "start": {"line": error[6], "character": 0},
+                                "end": {"line": error[6], "character": 0}
+                            }
                         },
-                        "message": 'Variable "{0}" masks variable in parent scope'.format(error[4]),
-                        "severity": 2,
-                        "relatedInformation": [{
-                            "location": {
-                                "uri": path_to_uri(error[5]),
-                                "range": {
-                                    "start": {"line": error[6], "character": 0},
-                                    "end": {"line": error[6], "character": 0}
-                                }
-                            },
-                            "message": ""
-                        }]
-                    })
+                        "message": ""
+                    }]
+                })
             for error in scope.check_use(obj_tree, file_contents):
                 # Check preproc if
                 if self.check_ppif(error[0]):
