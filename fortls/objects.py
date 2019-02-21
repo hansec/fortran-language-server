@@ -660,7 +660,7 @@ class fortran_type(fortran_scope):
         if self.inherit is None:
             return
         #
-        inherit_var, inherit_scope = \
+        inherit_var, _ = \
             find_in_scope(self.parent, self.inherit, obj_tree)
         if inherit_var is not None:
             inherit_var.resolve_inherit(obj_tree)
@@ -671,7 +671,7 @@ class fortran_type(fortran_scope):
                 child.resolve_inherit(obj_tree)
             # Import for parent objects
             self.in_children = []
-            for child in inherit_var.children:
+            for child in inherit_var.get_children():
                 if child.name.lower() not in child_names:
                     self.in_children.append(child)
 
