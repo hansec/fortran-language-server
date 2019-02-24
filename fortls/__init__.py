@@ -163,7 +163,7 @@ def main():
                 print("{0}: {1}".format(obj.get_type(), obj.FQSN))
                 print_children(obj)
             print("\n=========\nExportable Objects\n=========\n")
-            for key, obj in ast_new.global_dict.items():
+            for _, obj in ast_new.global_dict.items():
                 print("{0}: {1}".format(obj.get_type(), obj.FQSN))
     #
     elif debug_server:
@@ -201,7 +201,7 @@ def main():
                     "textDocument": {"uri": args.debug_filepath}
                 }
             })
-            diag_results, diag_exp = s.get_diagnostics(args.debug_filepath)
+            diag_results, _ = s.get_diagnostics(args.debug_filepath)
             if diag_results is not None:
                 sev_map = ["ERROR", "WARNING", "INFO"]
                 if len(diag_results) == 0:

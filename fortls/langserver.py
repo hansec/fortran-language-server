@@ -190,7 +190,7 @@ def climb_type_tree(var_stack, curr_scope, obj_tree):
     if var_obj is not None:
         type_name = get_type_name(var_obj)
     # Search for type, then next variable in stack and so on
-    for depth in range(30):
+    for _ in range(30):
         # Find variable type in available scopes
         if type_name is None:
             break
@@ -214,6 +214,8 @@ def climb_type_tree(var_stack, curr_scope, obj_tree):
             type_name = get_type_name(var_obj)
         else:
             break
+    else:
+        raise KeyError
     return type_scope
 
 
@@ -469,7 +471,7 @@ class LangServer:
                     continue
                 contains_source = False
                 for filename in fileList:
-                    basename, ext = os.path.splitext(os.path.basename(filename))
+                    _, ext = os.path.splitext(os.path.basename(filename))
                     if FORTRAN_EXT_REGEX.match(ext):
                         contains_source = True
                         break
@@ -528,7 +530,7 @@ class LangServer:
             return tmp_list
         matching_symbols = []
         query = request["params"]["query"].lower()
-        for top_key, obj_packed in self.obj_tree.items():
+        for _, obj_packed in self.obj_tree.items():
             top_obj = obj_packed[0]
             top_uri = obj_packed[1]
             if top_uri is None:
@@ -675,7 +677,7 @@ class LangServer:
                 var_list += child_candidates(scope, only_list, req_abstract=abstract_only)
             # Add globals
             if inc_globals:
-                for key, obj in self.obj_tree.items():
+                for _, obj in self.obj_tree.items():
                     var_list.append(obj[0])
                 var_list += self.intrinsic_funs
             # Filter by prefix if necessary
@@ -956,7 +958,7 @@ class LangServer:
         # Find in available scopes
         var_obj = None
         if curr_scope is not None:
-            var_obj, enc_scope = find_in_scope(curr_scope, def_name, self.obj_tree)
+            var_obj, _ = find_in_scope(curr_scope, def_name, self.obj_tree)
         # Search in global scope
         if var_obj is None:
             key = def_name.lower()
@@ -1045,7 +1047,7 @@ class LangServer:
         # Find in available scopes
         var_obj = None
         if curr_scope is not None:
-            var_obj, enc_scope = find_in_scope(curr_scope, sub_name, self.obj_tree)
+            var_obj, _ = find_in_scope(curr_scope, sub_name, self.obj_tree)
         # Search in global scope
         if var_obj is None:
             key = sub_name.lower()
@@ -1260,7 +1262,7 @@ class LangServer:
                 try:
                     for change in params["contentChanges"]:
                         old_contents = new_contents
-                        new_contents, line_tmp = apply_change(old_contents, change)
+                        new_contents, _ = apply_change(old_contents, change)
                 except:
                     self.post_message('Change request failed for file "{0}": Could not apply change'.format(path))
                     log.error('Change request failed for file "%s": Could not apply change', path, exc_info=True)
@@ -1275,7 +1277,7 @@ class LangServer:
             self.post_message('Change request failed for file "{0}": {1}'.format(path, err_str))
             return
         # Update include statements linking to this file
-        for tmp_path, file_obj in self.workspace.items():
+        for _, file_obj in self.workspace.items():
             file_obj["ast"].resolve_includes(self.workspace, path=path)
         self.workspace[path]["ast"].resolve_includes(self.workspace)
         # Update inheritance (currently only on open/save)
@@ -1298,7 +1300,7 @@ class LangServer:
             self.post_message('Save request failed for file "{0}": {1}'.format(filepath, err_str))
             return
         # Update include statements linking to this file
-        for tmp_path, file_obj in self.workspace.items():
+        for _, file_obj in self.workspace.items():
             file_obj["ast"].resolve_includes(self.workspace, path=filepath)
         self.workspace[filepath]["ast"].resolve_includes(self.workspace)
         # Update inheritance
@@ -1353,7 +1355,7 @@ class LangServer:
         file_list = []
         for mod_dir in self.mod_dirs:
             for filename in os.listdir(mod_dir):
-                basename, ext = os.path.splitext(os.path.basename(filename))
+                _, ext = os.path.splitext(os.path.basename(filename))
                 if FORTRAN_EXT_REGEX.match(ext):
                     filepath = os.path.normpath(os.path.join(mod_dir, filename))
                     if self.excl_paths.count(filepath) > 0:
@@ -1384,7 +1386,7 @@ class LangServer:
             for key in ast_new.global_dict:
                 self.obj_tree[key] = [ast_new.global_dict[key], path]
         # Update include statements
-        for path, file_obj in self.workspace.items():
+        for _, file_obj in self.workspace.items():
             file_obj["ast"].resolve_includes(self.workspace)
         # Update inheritance
         for key in self.obj_tree:
