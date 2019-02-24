@@ -102,7 +102,7 @@ def paren_split(line, paren_list):
     sections = []
     for ilev, level in enumerate(paren_list):
         sections.append([])
-        for igroup, group in enumerate(level):
+        for group in level:
             i1 = group[0]
             i2 = group[1]
             tmp_str = ""
@@ -330,6 +330,11 @@ class LangServer:
         self.pp_defs = {}
         self.streaming = True
         self.debug_log = debug_log
+        # Intrinsic (loaded during initialize)
+        self.statements = []
+        self.keywords = []
+        self.intrinsic_funs = []
+        self.intrinsic_mods = []
         # Get launch settings
         self.symbol_include_mem = settings.get("symbol_include_mem", True)
         self.sync_type = settings.get("sync_type", 1)
@@ -743,7 +748,7 @@ class LangServer:
                 if CALL_REGEX.match(line_grouped[0][0][1]) is not None:
                     return 3, var_prefix, None
             # Test if variable definition using type/class or procedure
-            if len(line_grouped) >= 2:
+            if (len(line_grouped) >= 2) and (len(line_grouped[1][0][0]) > 0):
                 lev2_end = line_grouped[1][0][0][-1][1]
                 if lev2_end < 0:
                     lev2_end = len(line)
