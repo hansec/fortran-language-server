@@ -1,3 +1,9 @@
+## 1.2.1
+
+### Fixes
+* Fix bug in nested user-defined type inheritance, fixes [#85](https://github.com/hansec/fortran-language-server/issues/85)
+* Fix bug in completion requests with empty parenthesis in request line
+
 ## 1.2.0
 
 ### Improvements
