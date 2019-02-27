@@ -476,7 +476,7 @@ class LangServer:
                         contains_source = True
                         break
                 if contains_source:
-                    self.mod_dirs.append(os.path.join(self.root_path, dirName))
+                    self.mod_dirs.append(dirName)
         # Initialize workspace
         self.workspace_init()
         #
