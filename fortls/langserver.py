@@ -1107,46 +1107,47 @@ class LangServer:
             def_obj = self.get_definition(self.workspace[path], def_line, def_char)
         else:
             return []
+        if def_obj is None:
+            return []
         # Currently no support for type members
         restrict_file = None
         if def_obj.FQSN.count(":") > 2:
             if def_obj.parent.get_type() == 4:
-                return refs
+                return []
             else:
                 restrict_file = def_obj.file.path
                 if restrict_file not in self.workspace:
-                    return refs
+                    return []
         # Search through all files
-        if def_obj is not None:
-            def_name = def_obj.name.lower()
-            def_fqsn = def_obj.FQSN
-            NAME_REGEX = re.compile(r'(?:\W|^)({0})(?:\W|$)'.format(def_name), re.I)
-            if restrict_file is None:
-                file_set = self.workspace.items()
-            else:
-                file_set = ((restrict_file, self.workspace.get(restrict_file)), )
-            for filename, file_obj in sorted(file_set):
-                # Search through file line by line
-                for (i, line) in enumerate(file_obj["contents"]):
-                    if len(line) == 0:
-                        continue
-                    # Skip comment lines
-                    comm_start = detect_comment_start(line, file_obj["fixed"])
-                    if (comm_start == 0) or (line[0] == '#'):
-                        continue
-                    elif comm_start > 0:
-                        line = line[:comm_start]
-                    for match in NAME_REGEX.finditer(line):
-                        var_def = self.get_definition(file_obj, i, match.start(1)+1)
-                        if var_def is not None:
-                            if def_fqsn == var_def.FQSN:
-                                refs.append({
-                                    "uri": path_to_uri(filename),
-                                    "range": {
-                                        "start": {"line": i, "character": match.start(1)},
-                                        "end": {"line": i, "character": match.end(1)}
-                                    }
-                                })
+        def_name = def_obj.name.lower()
+        def_fqsn = def_obj.FQSN
+        NAME_REGEX = re.compile(r'(?:\W|^)({0})(?:\W|$)'.format(def_name), re.I)
+        if restrict_file is None:
+            file_set = self.workspace.items()
+        else:
+            file_set = ((restrict_file, self.workspace.get(restrict_file)), )
+        for filename, file_obj in sorted(file_set):
+            # Search through file line by line
+            for (i, line) in enumerate(file_obj["contents"]):
+                if len(line) == 0:
+                    continue
+                # Skip comment lines
+                comm_start = detect_comment_start(line, file_obj["fixed"])
+                if (comm_start == 0) or (line[0] == '#'):
+                    continue
+                elif comm_start > 0:
+                    line = line[:comm_start]
+                for match in NAME_REGEX.finditer(line):
+                    var_def = self.get_definition(file_obj, i, match.start(1)+1)
+                    if var_def is not None:
+                        if def_fqsn == var_def.FQSN:
+                            refs.append({
+                                "uri": path_to_uri(filename),
+                                "range": {
+                                    "start": {"line": i, "character": match.start(1)},
+                                    "end": {"line": i, "character": match.end(1)}
+                                }
+                            })
         return refs
 
     def serve_definition(self, request):
@@ -1161,19 +1162,18 @@ class LangServer:
             var_obj = self.get_definition(self.workspace[path], def_line, def_char)
         else:
             return None
-        # Construct link reference
-        if var_obj is not None:
-            if var_obj.file.path is not None:
-                sline = var_obj.sline-1
-                return {
-                    "uri": path_to_uri(var_obj.file.path),
-                    "range": {
-                        "start": {"line": sline, "character": 0},
-                        "end": {"line": sline, "character": 1}
-                    }
-                }
-        else:
+        if var_obj is None:
             return None
+        # Construct link reference
+        if var_obj.file.path is not None:
+            sline = var_obj.sline-1
+            return {
+                "uri": path_to_uri(var_obj.file.path),
+                "range": {
+                    "start": {"line": sline, "character": 0},
+                    "end": {"line": sline, "character": 1}
+                }
+            }
 
     def serve_hover(self, request):
         def create_hover(string, highlight):
@@ -1195,26 +1195,25 @@ class LangServer:
             var_obj = self.get_definition(self.workspace[path], def_line, def_char)
         else:
             return None
-        # Construct hover information
-        if var_obj is not None:
-            var_type = var_obj.get_type()
-            hover_str = None
-            if var_type == 2 or var_type == 3:
-                hover_str, highlight = var_obj.get_documentation(long=True)
-            elif var_type == 5:
-                hover_array = []
-                for member in var_obj.mems:
-                    hover_str, highlight = member.get_documentation(long=True)
-                    if hover_str is not None:
-                        hover_array.append(create_hover(hover_str, highlight))
-                return {"contents": hover_array}
-            elif var_type == 6 and self.variable_hover:
-                hover_str, highlight = var_obj.get_documentation()
-            #
-            if hover_str is not None:
-                return {"contents": create_hover(hover_str, highlight)}
-        else:
+        if var_obj is None:
             return None
+        # Construct hover information
+        var_type = var_obj.get_type()
+        hover_str = None
+        if var_type == 2 or var_type == 3:
+            hover_str, highlight = var_obj.get_documentation(long=True)
+        elif var_type == 5:
+            hover_array = []
+            for member in var_obj.mems:
+                hover_str, highlight = member.get_documentation(long=True)
+                if hover_str is not None:
+                    hover_array.append(create_hover(hover_str, highlight))
+            return {"contents": hover_array}
+        elif var_type == 6 and self.variable_hover:
+            hover_str, highlight = var_obj.get_documentation()
+        #
+        if hover_str is not None:
+            return {"contents": create_hover(hover_str, highlight)}
 
     def send_diagnostics(self, uri):
         diag_results, diag_exp = self.get_diagnostics(uri)
