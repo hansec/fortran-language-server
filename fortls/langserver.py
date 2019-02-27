@@ -1111,9 +1111,10 @@ class LangServer:
             return []
         # Currently no support for type members
         restrict_file = None
+        type_mem = False
         if def_obj.FQSN.count(":") > 2:
             if def_obj.parent.get_type() == 4:
-                return []
+                type_mem = True
             else:
                 restrict_file = def_obj.file.path
                 if restrict_file not in self.workspace:
@@ -1126,6 +1127,7 @@ class LangServer:
             file_set = self.workspace.items()
         else:
             file_set = ((restrict_file, self.workspace.get(restrict_file)), )
+        override_cache = []
         for filename, file_obj in sorted(file_set):
             # Search through file line by line
             for (i, line) in enumerate(file_obj["contents"]):
@@ -1140,7 +1142,16 @@ class LangServer:
                 for match in NAME_REGEX.finditer(line):
                     var_def = self.get_definition(file_obj, i, match.start(1)+1)
                     if var_def is not None:
-                        if def_fqsn == var_def.FQSN:
+                        ref_match = False
+                        if (def_fqsn == var_def.FQSN) or (var_def.FQSN in override_cache):
+                            ref_match = True
+                        elif type_mem and (var_def.parent.get_type() == 4):
+                            for inherit_def in var_def.parent.get_overriden(def_name):
+                                if def_fqsn == inherit_def.FQSN:
+                                    ref_match = True
+                                    override_cache.append(var_def.FQSN)
+                                    break
+                        if ref_match:
                             refs.append({
                                 "uri": path_to_uri(filename),
                                 "range": {

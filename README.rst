@@ -46,8 +46,6 @@ Hover:
 
 Find references:
 
-*Note:* Currently not supported for member variables/procedures of user-defined types.
-
 .. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_refs.png
 
 Diagnostics:

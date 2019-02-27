@@ -639,6 +639,7 @@ class fortran_type(fortran_scope):
         self.in_children = []
         self.modifiers = modifiers
         self.inherit = None
+        self.inherit_var = None
         for modifier in self.modifiers:
             if modifier == 4:
                 self.vis = 1
@@ -660,10 +661,10 @@ class fortran_type(fortran_scope):
         if self.inherit is None:
             return
         #
-        inherit_var, _ = \
+        self.inherit_var, _ = \
             find_in_scope(self.parent, self.inherit, obj_tree)
-        if inherit_var is not None:
-            inherit_var.resolve_inherit(obj_tree)
+        if self.inherit_var is not None:
+            self.inherit_var.resolve_inherit(obj_tree)
             # Get current fields
             child_names = []
             for child in self.children:
@@ -671,9 +672,20 @@ class fortran_type(fortran_scope):
                 child.resolve_inherit(obj_tree)
             # Import for parent objects
             self.in_children = []
-            for child in inherit_var.get_children():
+            for child in self.inherit_var.get_children():
                 if child.name.lower() not in child_names:
                     self.in_children.append(child)
+
+    def get_overriden(self, field_name):
+        ret_list = []
+        field_name = field_name.lower()
+        for child in self.children:
+            if field_name == child.name.lower():
+                ret_list.append(child)
+                break
+        if self.inherit_var is not None:
+            ret_list += self.inherit_var.get_overriden(field_name)
+        return ret_list
 
     def check_valid_parent(self):
         if self.parent is None:
