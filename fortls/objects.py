@@ -204,6 +204,7 @@ class fortran_scope:
         self.parent = None
         self.vis = 0
         self.def_vis = 0
+        self.contains_start = None
         if enc_scope is not None:
             self.FQSN = enc_scope.lower() + "::" + self.name.lower()
         else:
@@ -234,6 +235,11 @@ class fortran_scope:
 
     def set_parent(self, parent_obj):
         self.parent = parent_obj
+
+    def mark_contains(self, line_number):
+        if self.contains_start is not None:
+            raise ValueError
+        self.contains_start = line_number
 
     def add_child(self, child):
         self.children.append(child)
@@ -958,8 +964,12 @@ class fortran_meth(fortran_obj):
 
     def set_parent(self, parent_obj):
         self.parent = parent_obj
-        if (self.parent.get_type() == 4) and (self.modifiers.count(6) == 0):
-            self.drop_arg = 0
+        if self.parent.get_type() == 4:
+            if self.modifiers.count(6) == 0:
+                self.drop_arg = 0
+            if (self.parent.contains_start is not None) and \
+               (self.sline > self.parent.contains_start) and (self.link_name is None):
+                self.link_name = self.name.lower()
 
     def get_snippet(self, name_replace=None, drop_arg=-1):
         name = self.name
@@ -1058,6 +1068,7 @@ class fortran_file:
         self.pp_if = []
         self.include_stmnts = []
         self.end_errors = []
+        self.parse_errors = []
         self.none_scope = None
         self.inc_scope = None
         self.current_scope = None
@@ -1250,6 +1261,15 @@ class fortran_file:
         tmp_list = self.scope_list[:]
         if self.none_scope is not None:
             tmp_list += [self.none_scope]
+        for error in self.parse_errors:
+            errors.append({
+                "range": {
+                    "start": {"line": error["line"]-1, "character": error["schar"]},
+                    "end": {"line": error["line"]-1, "character": error["echar"]}
+                },
+                "message": error["mess"],
+                "severity": error["sev"]
+            })
         for error in self.end_errors:
             if error[0] >= 0:
                 message = 'Unexpected end of scope at line {0}'.format(error[0])

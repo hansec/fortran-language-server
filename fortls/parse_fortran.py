@@ -8,6 +8,7 @@ from fortls.objects import map_keywords, fortran_module, fortran_program, \
 #
 USE_REGEX = re.compile(r'[ ]*USE([, ]+INTRINSIC)?[ :]+([a-z0-9_]*)([, ]+ONLY[ :]+)?', re.I)
 INCLUDE_REGEX = re.compile(r'[ ]*INCLUDE[ :]*[\'\"]([^\'\"]*)', re.I)
+CONTAINS_REGEX = re.compile(r'[ ]*(CONTAINS)[ ]*$', re.I)
 SUB_MOD_REGEX = re.compile(r'[ ]*(PURE|ELEMENTAL|RECURSIVE)+', re.I)
 SUB_REGEX = re.compile(r'[ ]*SUBROUTINE[ ]+([a-z0-9_]+)', re.I)
 END_SUB_WORD = r'SUBROUTINE'
@@ -782,9 +783,9 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                     iComm = iAmper + 1
             next_line = None
         line = line.rstrip()
+        line_no_comment = line.split('!')[0]
         # Test for scope end
         if file_obj.END_SCOPE_WORD is not None:
-            line_no_comment = line.split('!')[0]
             match = END_WORD_REGEX.match(line_no_comment)
             # Handle end statement
             if match is not None:
@@ -813,6 +814,28 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                         print('{1} !!! END "DO" scope({0})'.format(line_number, line.strip()))
                 if did_close:
                     continue
+        # Mark contains statement
+        match = CONTAINS_REGEX.match(line_no_comment)
+        if match is not None:
+            err_message = None
+            try:
+                if file_obj.current_scope is None:
+                    err_message = "Contains statement without enclosing scope"
+                else:
+                    file_obj.current_scope.mark_contains(line_number)
+            except ValueError:
+                err_message = "Multiple contains statements in scope"
+            if err_message is not None:
+                file_obj.parse_errors.append({
+                    "line": line_number,
+                    "schar": match.start(1),
+                    "echar": match.end(1),
+                    "mess": err_message,
+                    "sev": 1
+                })
+            if(debug):
+                print('{1} !!! CONTAINS statement({0})'.format(line_number, line.strip()))
+            continue
         # Loop through tests
         obj_read = None
         for test in def_tests:
