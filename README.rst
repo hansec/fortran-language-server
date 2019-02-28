@@ -22,41 +22,54 @@ and `Emacs <https://github.com/emacs-lsp/lsp-mode>`_.
 Language Server Features
 ------------------------
 
-Document Symbols:
+- Document symbols (``textDocument/documentSymbol``)
+- Auto-complete (``textDocument/completion``)
+- Signature help (``textDocument/signatureHelp``)
+- Goto/Peek definition (``textDocument/definition``)
+- Hover (``textDocument/hover``)
+- Find/Peek references (``textDocument/references``)
+- Project-wide symbol search (``workspace/symbol``)
+- Diagnostics (limited)
+
+  - Multiple use of the same variable name
+  - Unknown module in USE statement
+  - Variable masking definition from parent scope
+  - Unclosed blocks/scopes
+  - Invalid scope nesting
+  - Contains statement errors
+
+**Notes/Limitations:**
+
+- Signature help is not available for overloaded subroutines/functions
+- Diagnostics are only updated when files are saved or opened/closed
+
+**Editor examples (Atom):**
+
+Document symbols (``textDocument/documentSymbol``):
 
 .. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_outline.png
 
-Auto Completion:
+Auto-complete (``textDocument/completion``):
 
 .. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_autocomplete.gif
 
-Signature Help:
-
-*Note:* Not available for overloaded subroutines/functions.
+Signature help (``textDocument/signatureHelp``):
 
 .. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_sigHelp.gif
 
-Go to definition:
+Goto definition (``textDocument/definition``):
 
 .. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_gotodef.gif
 
-Hover:
+Hover (``textDocument/hover``):
 
 .. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_hover.gif
 
-Find references:
+Find references (``textDocument/references``):
 
 .. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_refs.png
 
 Diagnostics:
-
-- Multiple use of the same variable name
-- Unknown module in USE statement
-- Variable masking definition from parent scope
-- Unclosed blocks/scopes
-- Invalid scope nesting
-
-*Note:* Diagnostics are only updated when files are saved or opened/closed
 
 .. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_diag.png
 
