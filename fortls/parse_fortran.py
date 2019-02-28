@@ -764,11 +764,10 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 line_prefix = line[:iAmper]
                 next_line = file_str[line_ind]
                 line_ind += 1
-                if next_line == '':
-                    break  # Next line is empty
-                # Skip comment lines
+                # Skip empty or comment lines
                 match = COMMENT_LINE_MATCH.match(next_line)
-                if (match is not None):
+                if (next_line.rstrip() == '') or (match is not None):
+                    next_line_num += 1
                     continue
                 next_stripped = strip_strings(next_line, maintain_len=True)
                 cont_match = CONT_REGEX.match(next_stripped)
