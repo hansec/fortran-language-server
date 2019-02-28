@@ -1,3 +1,16 @@
+## 1.3.0
+
+### Improvements
+* Add support for user-defined type members in "textDocument/references" requests, fixes [#88](https://github.com/hansec/fortran-language-server/issues/88)
+* Link type-bound procedures with no explicit link to matching named scope in module, fixes [#89](https://github.com/hansec/fortran-language-server/issues/89)
+* Report diagnostics related to misplaced "CONTAINS" statements
+* Restructure README for improved clarity on capabilities/limitations
+
+### Fixes
+* Fix bug with blank/empty lines in free-format continuations, fixes [#91](https://github.com/hansec/fortran-language-server/issues/91)
+* Fix exception in "textDocument/references" requests when no object is found, fixes [#86](https://github.com/hansec/fortran-language-server/issues/86)
+* Fix bug when relative path is used for --debug_rootpath, fixes [#87](https://github.com/hansec/fortran-language-server/issues/87)
+
 ## 1.2.1
 
 ### Fixes
