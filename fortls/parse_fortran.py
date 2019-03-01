@@ -305,7 +305,10 @@ def read_block_def(line):
     #
     where_match = WHERE_REGEX.match(line)
     if where_match is not None:
-        return 'where', None
+        if (line.count(')') == 0) or (WORD_REGEX.match(line.split(')')[-1].strip()) is None):
+            return 'where', True
+        else:
+            return 'where', False
     #
     assoc_match = ASSOCIATE_REGEX.match(line)
     if assoc_match is not None:
@@ -937,10 +940,12 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 if(debug):
                     print('{1} !!! DO statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'where':
-                do_counter += 1
-                name = '#WHERE{0}'.format(do_counter)
-                new_do = fortran_where(file_obj, line_number, name, file_obj.enc_scope_name)
-                file_obj.add_scope(new_do, END_WHERE_WORD, req_container=True)
+                # Add block if WHERE is not single line
+                if not obj:
+                    do_counter += 1
+                    name = '#WHERE{0}'.format(do_counter)
+                    new_do = fortran_where(file_obj, line_number, name, file_obj.enc_scope_name)
+                    file_obj.add_scope(new_do, END_WHERE_WORD, req_container=True)
                 if(debug):
                     print('{1} !!! WHERE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'assoc':
