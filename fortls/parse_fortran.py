@@ -305,7 +305,7 @@ def read_block_def(line):
     #
     where_match = WHERE_REGEX.match(line)
     if where_match is not None:
-        if (line.count(')') == 0) or (WORD_REGEX.match(line.split(')')[-1].strip()) is None):
+        if (line.count(')') == 0) or (WORD_REGEX.match(line.split(')')[-1].strip()) is not None):
             return 'where', True
         else:
             return 'where', False
