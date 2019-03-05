@@ -958,6 +958,9 @@ class LangServer:
         # Find in available scopes
         var_obj = None
         if curr_scope is not None:
+            if (curr_scope.get_type() == 4) and (not is_member) and \
+               line_prefix.lstrip().lower().startswith('procedure') and (line_prefix.count("=>") > 0):
+                curr_scope = curr_scope.parent
             var_obj, _ = find_in_scope(curr_scope, def_name, self.obj_tree)
         # Search in global scope
         if var_obj is None:
@@ -1109,7 +1112,7 @@ class LangServer:
             return []
         if def_obj is None:
             return []
-        # Currently no support for type members
+        #
         restrict_file = None
         type_mem = False
         if def_obj.FQSN.count(":") > 2:
@@ -1145,12 +1148,19 @@ class LangServer:
                         ref_match = False
                         if (def_fqsn == var_def.FQSN) or (var_def.FQSN in override_cache):
                             ref_match = True
-                        elif type_mem and (var_def.parent.get_type() == 4):
-                            for inherit_def in var_def.parent.get_overriden(def_name):
-                                if def_fqsn == inherit_def.FQSN:
-                                    ref_match = True
-                                    override_cache.append(var_def.FQSN)
-                                    break
+                        elif var_def.parent.get_type() == 4:
+                            if type_mem:
+                                for inherit_def in var_def.parent.get_overriden(def_name):
+                                    if def_fqsn == inherit_def.FQSN:
+                                        ref_match = True
+                                        override_cache.append(var_def.FQSN)
+                                        break
+                            if (var_def.sline-1 == i) and (var_def.file.path == filename) and (line.count("=>") == 0):
+                                try:
+                                    if var_def.link_obj is def_obj:
+                                        ref_match = True
+                                except:
+                                    pass
                         if ref_match:
                             refs.append({
                                 "uri": path_to_uri(filename),
