@@ -480,7 +480,7 @@
   },
   "MAX": {
     "args": "A1,A2",
-    "doc": "MAX(A1,A2,...) returns the argument with the smallest (most negative) value.",
+    "doc": "MAX(A1,A2,...) returns the argument with the largest (most positive) value.",
     "type": 3
   },
   "MAXEXPONENT": {
@@ -505,7 +505,7 @@
   },
   "MIN": {
     "args": "A1,A2",
-    "doc": "MIN(A1,A2,...) returns the argument with the largest (most positive) value.",
+    "doc": "MIN(A1,A2,...) returns the argument with the smallest (most negative) value.",
     "type": 3
   },
   "MINEXPONENT": {
