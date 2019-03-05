@@ -85,6 +85,10 @@ def main():
         help="Test hover request for specified file and position"
     )
     group.add_argument(
+        '--debug_implementation', action="store_true",
+        help="Test implementation request for specified file and position"
+    )
+    group.add_argument(
         '--debug_references', action="store_true",
         help="Test references request for specified file and position"
     )
@@ -111,7 +115,7 @@ def main():
     debug_server = (args.debug_diagnostics or args.debug_symbols
                     or args.debug_completion or args.debug_signature
                     or args.debug_definition or args.debug_hover
-                    or args.debug_references
+                    or args.debug_implementation or args.debug_references
                     or (args.debug_rootpath is not None)
                     or (args.debug_workspace_symbols is not None))
     #
@@ -309,20 +313,31 @@ def main():
                         else:
                             print('{1}     {0}'.format(obj['label'], active_mark))
         #
-        if args.debug_definition:
-            print('\nTesting "textDocument/definition" request:')
+        if args.debug_definition or args.debug_implementation:
+            if args.debug_definition:
+                print('\nTesting "textDocument/definition" request:')
+            elif args.debug_implementation:
+                print('\nTesting "textDocument/implementation" request:')
             check_request_params(args)
             s.serve_onSave({
                 "params": {
                     "textDocument": {"uri": args.debug_filepath}
                 }
             })
-            definition_results = s.serve_definition({
-                "params": {
-                    "textDocument": {"uri": args.debug_filepath},
-                    "position": {"line": args.debug_line-1, "character": args.debug_char-1}
-                }
-            })
+            if args.debug_definition:
+                definition_results = s.serve_definition({
+                    "params": {
+                        "textDocument": {"uri": args.debug_filepath},
+                        "position": {"line": args.debug_line-1, "character": args.debug_char-1}
+                    }
+                })
+            elif args.debug_implementation:
+                definition_results = s.serve_implementation({
+                    "params": {
+                        "textDocument": {"uri": args.debug_filepath},
+                        "position": {"line": args.debug_line-1, "character": args.debug_char-1}
+                    }
+                })
             print('  Result:')
             if definition_results is None:
                 print('    No result found!')

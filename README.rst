@@ -25,8 +25,9 @@ Language Server Features
 - Document symbols (``textDocument/documentSymbol``)
 - Auto-complete (``textDocument/completion``)
 - Signature help (``textDocument/signatureHelp``)
-- Goto/Peek definition (``textDocument/definition``)
+- GoTo/Peek definition (``textDocument/definition``)
 - Hover (``textDocument/hover``)
+- GoTo implementation (``textDocument/implementation``)
 - Find/Peek references (``textDocument/references``)
 - Project-wide symbol search (``workspace/symbol``)
 - Diagnostics (limited)
@@ -107,6 +108,7 @@ The following settings can be used to perform `standalone debug tests <https://g
 * ``--debug_signature`` Test signatureHelp request for specified file and position
 * ``--debug_definition`` Test definition request for specified file and position
 * ``--debug_hover`` Test hover request for specified file and position
+* ``--debug_implementation`` Test implementation request for specified file and position
 * ``--debug_references`` Test references request for specified file and position
 
 Configuration

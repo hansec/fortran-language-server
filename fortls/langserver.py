@@ -380,6 +380,7 @@ class LangServer:
             "textDocument/definition": self.serve_definition,
             "textDocument/references": self.serve_references,
             "textDocument/hover": self.serve_hover,
+            "textDocument/implementation": self.serve_implementation,
             "textDocument/didOpen": self.serve_onSave,
             "textDocument/didSave": self.serve_onSave,
             "textDocument/didClose": self.serve_onClose,
@@ -489,6 +490,7 @@ class LangServer:
             "documentSymbolProvider": True,
             "referencesProvider": True,
             "hoverProvider": True,
+            "implementationProvider": True,
             "workspaceSymbolProvider": True,
             "textDocumentSync": self.sync_type
         }
@@ -1195,6 +1197,7 @@ class LangServer:
                     "end": {"line": sline, "character": 1}
                 }
             }
+        return None
 
     def serve_hover(self, request):
         def create_hover(string, highlight):
@@ -1235,6 +1238,35 @@ class LangServer:
         #
         if hover_str is not None:
             return {"contents": create_hover(hover_str, highlight)}
+        return None
+
+    def serve_implementation(self, request):
+        # Get parameters from request
+        params = request["params"]
+        uri = params["textDocument"]["uri"]
+        def_line = params["position"]["line"]
+        def_char = params["position"]["character"]
+        path = path_from_uri(uri)
+        # Find object
+        if path in self.workspace:
+            var_obj = self.get_definition(self.workspace[path], def_line, def_char)
+        else:
+            return None
+        if var_obj is None:
+            return None
+        # Construct implementation reference
+        if var_obj.parent.get_type() == 4:
+            impl_obj = var_obj.link_obj
+            if (impl_obj is not None) and (impl_obj.file.path is not None):
+                sline = impl_obj.sline-1
+                return {
+                    "uri": path_to_uri(impl_obj.file.path),
+                    "range": {
+                        "start": {"line": sline, "character": 0},
+                        "end": {"line": sline, "character": 1}
+                    }
+                }
+        return None
 
     def send_diagnostics(self, uri):
         diag_results, diag_exp = self.get_diagnostics(uri)
