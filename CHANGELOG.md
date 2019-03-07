@@ -1,3 +1,15 @@
+## 1.4.0
+
+### Improvements
+* Add support for "textDocument/implementation" requests, ref [#94](https://github.com/hansec/fortran-language-server/issues/94)
+* Add option to preserve keyword ordering, ref [#97](https://github.com/hansec/fortran-language-server/issues/97)
+
+### Fixes
+* Fix parsing bug with single line WHERE statements, fixes [#92](https://github.com/hansec/fortran-language-server/issues/92)
+* Fix bug with keyword parsing with nested parenthesis, fixes [#97](https://github.com/hansec/fortran-language-server/issues/97)
+* Differentiate between type-bound procedures and implementations in "textDocument/references" requests, fixes [#94](https://github.com/hansec/fortran-language-server/issues/94)
+* Fix typos in MAX and MIN intrinsic functions, ref [#96](https://github.com/hansec/fortran-language-server/pull/96)
+
 ## 1.3.0
 
 ### Improvements
