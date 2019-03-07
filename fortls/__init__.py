@@ -48,6 +48,10 @@ def main():
         help="Show hover information for variables (default: subroutines/functions only)"
     )
     parser.add_argument(
+        '--preserve_keyword_order', action="store_true",
+        help="Display variable keywords information in original order (default: sort to consistent ordering)"
+    )
+    parser.add_argument(
         '--debug_log', action="store_true",
         help="Generate debug log in project root folder"
     )
@@ -125,7 +129,8 @@ def main():
         "autocomplete_no_prefix": args.autocomplete_no_prefix,
         "lowercase_intrinsics": args.lowercase_intrinsics,
         "use_signature_help": args.use_signature_help,
-        "variable_hover": args.variable_hover
+        "variable_hover": args.variable_hover,
+        "sort_keywords": (not args.preserve_keyword_order)
     }
     #
     if args.debug_parser:

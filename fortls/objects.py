@@ -4,6 +4,12 @@ import os
 from fortls.jsonrpc import path_to_uri
 WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
 CLASS_VAR_REGEX = re.compile(r'(TYPE|CLASS)[ ]*\(', re.I)
+sort_keywords = True
+
+
+def set_keyword_ordering(sorted):
+    global sort_keywords
+    sort_keywords = sorted
 
 
 def map_keywords(keywords):
@@ -51,7 +57,8 @@ def map_keywords(keywords):
             i2 = key_lower.rfind(')')
             if i1 > -1 and i2 > i1:
                 pass_name = key_lower[i1+1:i2]
-    modifiers.sort()
+    if sort_keywords:
+        modifiers.sort()
     return modifiers, dim_str, pass_name
 
 

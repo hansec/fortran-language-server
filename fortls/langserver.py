@@ -7,7 +7,7 @@ import re
 from fortls.jsonrpc import path_to_uri, path_from_uri
 from fortls.parse_fortran import process_file, read_use_stmt, read_var_def, \
     detect_fixed_format, detect_comment_start
-from fortls.objects import find_in_scope, get_use_tree
+from fortls.objects import find_in_scope, get_use_tree, set_keyword_ordering
 from fortls.intrinsics import get_keywords, load_intrinsics, set_lowercase_intrinsics
 
 log = logging.getLogger(__name__)
@@ -332,11 +332,8 @@ class LangServer:
         self.pp_defs = {}
         self.streaming = True
         self.debug_log = debug_log
-        # Intrinsic (loaded during initialize)
-        self.statements = []
-        self.keywords = []
-        self.intrinsic_funs = []
-        self.intrinsic_mods = []
+        # Intrinsic (re-loaded during initialize)
+        self.statements, self.keywords, self.intrinsic_funs, self.intrinsic_mods = load_intrinsics()
         # Get launch settings
         self.symbol_include_mem = settings.get("symbol_include_mem", True)
         self.sync_type = settings.get("sync_type", 1)
@@ -344,6 +341,9 @@ class LangServer:
         self.lowercase_intrinsics = settings.get("lowercase_intrinsics", False)
         self.use_signature_help = settings.get("use_signature_help", False)
         self.variable_hover = settings.get("variable_hover", False)
+        self.sort_keywords = settings.get("sort_keywords", True)
+        # Set object settings
+        set_keyword_ordering(self.sort_keywords)
 
     def post_message(self, message, type=1):
         self.conn.send_notification("window/showMessage", {
@@ -457,11 +457,14 @@ class LangServer:
             log.debug("REQUEST %s %s", request.get("id"), request.get("method"))
             self.post_messages.append([3, "FORTLS debugging enabled"])
         # Load intrinsics
+        set_keyword_ordering(True)  # Always sort intrinsics
         if self.lowercase_intrinsics:
             set_lowercase_intrinsics()
         self.statements, self.keywords, self.intrinsic_funs, self.intrinsic_mods = load_intrinsics()
         for module in self.intrinsic_mods:
             self.obj_tree[module.FQSN] = [module, None]
+        # Set object settings
+        set_keyword_ordering(self.sort_keywords)
         # Recursively add sub-directories
         if len(self.mod_dirs) == 1:
             self.mod_dirs = []
