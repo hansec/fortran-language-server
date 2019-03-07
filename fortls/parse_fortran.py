@@ -53,9 +53,9 @@ END_ENUMD_WORD = r'ENUM'
 NAT_VAR_REGEX = re.compile(r'[ ]*(INTEGER|REAL|DOUBLE PRECISION|COMPLEX'
                            r'|DOUBLE COMPLEX|CHARACTER|LOGICAL|PROCEDURE'
                            r'|CLASS|TYPE)', re.I)
-KIND_SPEC_REGEX = re.compile(r'([ ]*\([a-z0-9_ =*:]*\)|\*[0-9:]*)', re.I)
+KIND_SPEC_REGEX = re.compile(r'([ ]*\([ ]*[a-z0-9_*:]|\*[0-9:]*)', re.I)
 KEYWORD_LIST_REGEX = re.compile(r'[ ]*,[ ]*(PUBLIC|PRIVATE|ALLOCATABLE|'
-                                r'POINTER|TARGET|DIMENSION\([a-z0-9_:, ]*\)|'
+                                r'POINTER|TARGET|DIMENSION\(|'
                                 r'OPTIONAL|INTENT\([inout]*\)|DEFERRED|NOPASS|'
                                 r'PASS\([a-z0-9_]*\)|SAVE|PARAMETER|'
                                 r'CONTIGUOUS)', re.I)
@@ -160,20 +160,41 @@ def separate_def_list(test_str):
     return def_list
 
 
+def find_paren_match(test_str):
+    paren_count = 1
+    ind = -1
+    for (i, char) in enumerate(test_str):
+        if char == '(':
+            paren_count += 1
+        elif char == ')':
+            paren_count -= 1
+        if paren_count == 0:
+            return i
+    return ind
+
+
 def parse_keywords(test_str):
     keyword_match = KEYWORD_LIST_REGEX.match(test_str)
     keywords = []
     while (keyword_match is not None):
         tmp_str = re.sub(r'^[, ]*', '', keyword_match.group(0))
-        keywords.append(tmp_str.strip().upper())
         test_str = test_str[keyword_match.end(0):]
+        if tmp_str.lower().startswith('dimension'):
+            match_char = find_paren_match(test_str)
+            if match_char < 0:
+                break  # Incomplete dimension statement
+            else:
+                tmp_str += test_str[:match_char+1]
+                test_str = test_str[match_char+1:]
+        tmp_str = re.sub(r'^[, ]*', '', tmp_str)
+        keywords.append(tmp_str.strip().upper())
         keyword_match = KEYWORD_LIST_REGEX.match(test_str)
     return keywords, test_str
 
 
 def get_var_dims(test_str):
     i1 = test_str.find('(')
-    i2 = test_str.find(')')
+    i2 = test_str.rfind(')')
     if i1 > -1 and i2 > i1:
         return test_str[i1+1:i2]
     else:
@@ -197,8 +218,16 @@ def read_var_def(line, type_word=None, fun_only=False):
     #
     kind_match = KIND_SPEC_REGEX.match(trailing_line)
     if kind_match is not None:
-        type_word += kind_match.group(0).strip().lower()
+        kind_str = kind_match.group(0).strip().lower()
+        type_word += kind_str
         trailing_line = trailing_line[kind_match.end(0):]
+        if kind_str[0] == '(':
+            match_char = find_paren_match(trailing_line)
+            if match_char < 0:
+                return None  # Incomplete type spec
+            else:
+                type_word += trailing_line[:match_char+1].strip().lower()
+                trailing_line = trailing_line[match_char+1:]
     else:
         # Class and Type statements need a kind spec
         if type_word.lower() == 'class' or type_word.lower() == 'type':
@@ -861,7 +890,7 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                             print('{1} !!! INTERFACE-PRO statement({0})'.format(line_number, line.strip()))
                         continue
                     i1 = obj[0].find('(')
-                    i2 = obj[0].find(')')
+                    i2 = obj[0].rfind(')')
                     if i1 > -1 and i2 > -1:
                         link_name = obj[0][i1+1:i2]
                 for var_name in obj[2]:

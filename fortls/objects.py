@@ -42,13 +42,13 @@ def map_keywords(keywords):
             modifiers.append(103)
         elif key_lower.startswith('dimension'):
             i1 = key_lower.find('(')
-            i2 = key_lower.find(')')
+            i2 = key_lower.rfind(')')
             if i1 > -1 and i2 > i1:
                 dim_str = key_lower[i1+1:i2]
                 modifiers.append(20)
         elif key_lower.startswith('pass'):
             i1 = key_lower.find('(')
-            i2 = key_lower.find(')')
+            i2 = key_lower.rfind(')')
             if i1 > -1 and i2 > i1:
                 pass_name = key_lower[i1+1:i2]
     modifiers.sort()
@@ -958,7 +958,7 @@ class fortran_meth(fortran_obj):
         self.pass_name = pass_name
         if link_obj is None:
             open_paren = var_desc.find('(')
-            close_paren = var_desc.find(')')
+            close_paren = var_desc.rfind(')')
             if (open_paren > 0) and (close_paren > open_paren):
                 self.link_name = var_desc[open_paren+1:close_paren].lower()
 

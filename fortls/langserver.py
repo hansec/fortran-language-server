@@ -176,7 +176,7 @@ def climb_type_tree(var_stack, curr_scope, obj_tree):
     def get_type_name(var_obj):
         type_desc = var_obj.get_desc()
         i1 = type_desc.find('(')
-        i2 = type_desc.find(')')
+        i2 = type_desc.rfind(')')
         if i1 >= 0 and i2 >= 0:
             return type_desc[i1+1:i2].strip().lower()
         else:
