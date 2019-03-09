@@ -199,7 +199,7 @@ def main():
                     print("    {0}".format(message[1]))
             # Print module directories
             print("  Found module directories:")
-            for mod_dir in s.mod_dirs:
+            for mod_dir in s.source_dirs:
                 print("    {0}".format(mod_dir))
         #
         if args.debug_diagnostics:

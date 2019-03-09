@@ -325,7 +325,7 @@ class LangServer:
         self.all_symbols = None
         self.workspace = {}
         self.obj_tree = {}
-        self.mod_dirs = []
+        self.source_dirs = []
         self.excl_paths = []
         self.excl_suffixes = []
         self.post_messages = []
@@ -427,7 +427,7 @@ class LangServer:
         params = request["params"]
         self.root_path = path_from_uri(
             params.get("rootUri") or params.get("rootPath") or "")
-        self.mod_dirs.append(self.root_path)
+        self.source_dirs.append(self.root_path)
         # Check for config file
         config_path = os.path.join(self.root_path, ".fortls")
         config_exists = os.path.isfile(config_path)
@@ -438,10 +438,14 @@ class LangServer:
                     config_dict = json.load(fhandle)
                     for excl_path in config_dict.get("excl_paths", []):
                         self.excl_paths.append(os.path.join(self.root_path, excl_path))
-                    for mod_dir in config_dict.get("mod_dirs", []):
-                        dir_path = os.path.join(self.root_path, mod_dir)
+                    source_dirs = config_dict.get("source_dirs", [])
+                    # Legacy definition
+                    if len(source_dirs) == 0:
+                        source_dirs = config_dict.get("mod_dirs", [])
+                    for source_dir in source_dirs:
+                        dir_path = os.path.join(self.root_path, source_dir)
                         if os.path.isdir(dir_path):
-                            self.mod_dirs.append(dir_path)
+                            self.source_dirs.append(dir_path)
                     self.excl_suffixes = config_dict.get("excl_suffixes", [])
                     self.lowercase_intrinsics = config_dict.get("lowercase_intrinsics", self.lowercase_intrinsics)
                     self.debug_log = config_dict.get("debug_log", self.debug_log)
@@ -466,8 +470,8 @@ class LangServer:
         # Set object settings
         set_keyword_ordering(self.sort_keywords)
         # Recursively add sub-directories
-        if len(self.mod_dirs) == 1:
-            self.mod_dirs = []
+        if len(self.source_dirs) == 1:
+            self.source_dirs = []
             for dirName, subdirList, fileList in os.walk(self.root_path):
                 if self.excl_paths.count(dirName) > 0:
                     while(len(subdirList) > 0):
@@ -480,7 +484,7 @@ class LangServer:
                         contains_source = True
                         break
                 if contains_source:
-                    self.mod_dirs.append(dirName)
+                    self.source_dirs.append(dirName)
         # Initialize workspace
         self.workspace_init()
         #
@@ -1408,11 +1412,11 @@ class LangServer:
     def workspace_init(self):
         # Get filenames
         file_list = []
-        for mod_dir in self.mod_dirs:
-            for filename in os.listdir(mod_dir):
+        for source_dir in self.source_dirs:
+            for filename in os.listdir(source_dir):
                 _, ext = os.path.splitext(os.path.basename(filename))
                 if FORTRAN_EXT_REGEX.match(ext):
-                    filepath = os.path.normpath(os.path.join(mod_dir, filename))
+                    filepath = os.path.normpath(os.path.join(source_dir, filename))
                     if self.excl_paths.count(filepath) > 0:
                         continue
                     inc_file = True
