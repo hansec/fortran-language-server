@@ -381,6 +381,7 @@ class LangServer:
             "textDocument/references": self.serve_references,
             "textDocument/hover": self.serve_hover,
             "textDocument/implementation": self.serve_implementation,
+            "textDocument/rename": self.serve_rename,
             "textDocument/didOpen": self.serve_onSave,
             "textDocument/didSave": self.serve_onSave,
             "textDocument/didClose": self.serve_onClose,
@@ -498,6 +499,7 @@ class LangServer:
             "referencesProvider": True,
             "hoverProvider": True,
             "implementationProvider": True,
+            "renameProvider": True,
             "workspaceSymbolProvider": True,
             "textDocumentSync": self.sync_type
         }
@@ -1274,6 +1276,23 @@ class LangServer:
                     }
                 }
         return None
+
+    def serve_rename(self, request):
+        all_refs = self.serve_references(request)
+        if all_refs is None:
+            self.post_message('Rename failed: No usages found to rename', type=2)
+            return None
+        params = request["params"]
+        new_name = params["newName"]
+        changes = {}
+        for ref in all_refs:
+            if ref["uri"] not in changes:
+                changes[ref["uri"]] = []
+            changes[ref["uri"]].append({
+                "range": ref["range"],
+                "newText": new_name
+            })
+        return {"changes": changes}
 
     def send_diagnostics(self, uri):
         diag_results, diag_exp = self.get_diagnostics(uri)

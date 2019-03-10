@@ -97,6 +97,10 @@ def main():
         help="Test references request for specified file and position"
     )
     group.add_argument(
+        '--debug_rename', type=str,
+        help="Test rename request for specified file and position"
+    )
+    group.add_argument(
         '--debug_filepath', type=str,
         help="File path for language server tests"
     )
@@ -120,6 +124,7 @@ def main():
                     or args.debug_completion or args.debug_signature
                     or args.debug_definition or args.debug_hover
                     or args.debug_implementation or args.debug_references
+                    or (args.debug_rename is not None)
                     or (args.debug_rootpath is not None)
                     or (args.debug_workspace_symbols is not None))
     #
@@ -399,6 +404,33 @@ def main():
                 for result in ref_results:
                     print('  {0}  ({1}, {2})'.format(result['uri'],
                           result['range']['start']['line']+1, result['range']['start']['character']+1))
+                print('=======')
+        #
+        if (args.debug_rename is not None):
+            print('\nTesting "textDocument/rename" request:')
+            check_request_params(args)
+            s.serve_onSave({
+                "params": {
+                    "textDocument": {"uri": args.debug_filepath}
+                }
+            })
+            ref_results = s.serve_rename({
+                "params": {
+                    "textDocument": {"uri": args.debug_filepath},
+                    "position": {"line": args.debug_line-1, "character": args.debug_char-1},
+                    "newName": args.debug_rename
+                }
+            })
+            print('  Result:')
+            if ref_results is None:
+                print('    No changes found!')
+            else:
+                print('=======')
+                for uri, result in ref_results["changes"].items():
+                    print('    {0}:'.format(uri))
+                    for change in result:
+                        print('      ({0}, {1})'.format(change['range']['start']['line']+1,
+                              change['range']['start']['character']+1))
                 print('=======')
         tmpout.close()
         tmpin.close()
