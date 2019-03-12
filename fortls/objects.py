@@ -212,6 +212,7 @@ class fortran_scope:
         self.vis = 0
         self.def_vis = 0
         self.contains_start = None
+        self.doc_str = None
         if enc_scope is not None:
             self.FQSN = enc_scope.lower() + "::" + self.name.lower()
         else:
@@ -263,6 +264,9 @@ class fortran_scope:
     def add_member(self, member):
         self.members.append(member)
 
+    def add_doc(self, doc_str):
+        self.doc_str = doc_str
+
     def get_type(self):
         return -1
 
@@ -272,10 +276,13 @@ class fortran_scope:
     def get_snippet(self, name_replace=None, drop_arg=-1):
         return None, None
 
-    def get_documentation(self, long=False):
+    def get_documentation(self):
+        return self.doc_str
+
+    def get_hover(self, long=False, include_doc=True, drop_arg=-1):
         return None, False
 
-    def get_signature(self):
+    def get_signature(self, drop_arg=-1):
         return None, None, None
 
     def get_children(self, public_only=False):
@@ -524,23 +531,29 @@ class fortran_subroutine(fortran_scope):
     def get_desc(self):
         return 'SUBROUTINE'
 
-    def get_documentation(self, long=False):
-        sub_sig, _ = self.get_snippet()
+    def get_hover(self, long=False, include_doc=True, drop_arg=-1):
+        sub_sig, _ = self.get_snippet(drop_arg=drop_arg)
+        hover_array = ["SUBROUTINE " + sub_sig]
+        doc_str = self.get_documentation()
+        if include_doc and (doc_str is not None):
+            hover_array[0] += "\n" + doc_str
         if long:
-            hover_array = ["SUBROUTINE " + sub_sig]
-            for arg_obj in self.arg_objs:
-                if arg_obj is None:
+            for (i, arg_obj) in enumerate(self.arg_objs):
+                if (arg_obj is None) or (i == drop_arg):
                     continue
-                arg_doc, _ = arg_obj.get_documentation()
-                hover_array.append(" {0} :: {1}".format(arg_doc, arg_obj.name))
-            return "\n".join(hover_array), True
-        else:
-            return "SUBROUTINE " + sub_sig, False
+                arg_doc, _ = arg_obj.get_hover(include_doc=False)
+                hover_array.append("{0} :: {1}".format(arg_doc, arg_obj.name))
+                doc_str = arg_obj.get_documentation()
+                if include_doc and (doc_str is not None):
+                    hover_array += doc_str.splitlines()
+        return "\n ".join(hover_array), long
 
-    def get_signature(self):
+    def get_signature(self, drop_arg=-1):
         arg_sigs = []
         arg_list = self.args.split(",")
-        for i, arg_obj in enumerate(self.arg_objs):
+        for (i, arg_obj) in enumerate(self.arg_objs):
+            if i == drop_arg:
+                continue
             if arg_obj is None:
                 arg_sigs.append({"label": arg_list[i]})
             else:
@@ -550,10 +563,10 @@ class fortran_subroutine(fortran_scope):
                     label = arg_obj.name.lower()
                 arg_sigs.append({
                     "label": label,
-                    "documentation": arg_obj.get_documentation()[0]
+                    "documentation": arg_obj.get_hover()[0]
                 })
         call_sig, _ = self.get_snippet()
-        return call_sig, None, arg_sigs
+        return call_sig, self.get_documentation(), arg_sigs
 
     def check_valid_parent(self):
         if self.parent is not None:
@@ -626,23 +639,27 @@ class fortran_function(fortran_subroutine):
     def is_callable(self):
         return False
 
-    def get_documentation(self, long=False):
-        fun_sig, _ = self.get_snippet()
+    def get_hover(self, long=False, include_doc=True, drop_arg=-1):
+        fun_sig, _ = self.get_snippet(drop_arg=drop_arg)
         fun_return = ""
         if self.result_obj is not None:
-            fun_return, _ = self.result_obj.get_documentation()
+            fun_return, _ = self.result_obj.get_hover(include_doc=False)
         if self.return_type is not None:
             fun_return = self.return_type
+        hover_array = ["{0} FUNCTION {1}".format(fun_return, fun_sig)]
+        doc_str = self.get_documentation()
+        if include_doc and (doc_str is not None):
+            hover_array[0] += "\n" + doc_str
         if long:
-            hover_array = ["{0} FUNCTION {1}".format(fun_return, fun_sig)]
-            for arg_obj in self.arg_objs:
-                if arg_obj is None:
+            for (i, arg_obj) in enumerate(self.arg_objs):
+                if (arg_obj is None) or (i == drop_arg):
                     continue
-                arg_doc, _ = arg_obj.get_documentation()
-                hover_array.append(" {0} :: {1}".format(arg_doc, arg_obj.name))
-            return "\n".join(hover_array), True
-        else:
-            return "{0} FUNCTION {1}".format(fun_return, fun_sig) + fun_sig, False
+                arg_doc, _ = arg_obj.get_hover(include_doc=False)
+                hover_array.append("{0} :: {1}".format(arg_doc, arg_obj.name))
+                doc_str = arg_obj.get_documentation()
+                if include_doc and (doc_str is not None):
+                    hover_array += doc_str.splitlines()
+        return "\n ".join(hover_array), long
 
 
 class fortran_type(fortran_scope):
@@ -855,6 +872,7 @@ class fortran_obj:
         self.desc = var_desc
         self.modifiers = modifiers
         self.dim_str = dim_str
+        self.doc_str = None
         self.callable = (CLASS_VAR_REGEX.match(var_desc) is not None)
         self.children = []
         self.use = []
@@ -877,6 +895,9 @@ class fortran_obj:
 
     def set_parent(self, parent_obj):
         self.parent = parent_obj
+
+    def add_doc(self, doc_str):
+        self.doc_str = doc_str
 
     def update_fqsn(self, enc_scope=None):
         if enc_scope is not None:
@@ -924,14 +945,17 @@ class fortran_obj:
         # Normal variable
         return None, None
 
-    def get_documentation(self, long=False):
-        doc_str = self.desc
-        if len(self.modifiers) > 0:
-            doc_str += ", "
-            doc_str += ", ".join(get_keywords(self.modifiers, self.dim_str))
-        return doc_str, True
+    def get_documentation(self):
+        return self.doc_str
 
-    def get_signature(self):
+    def get_hover(self, long=False, include_doc=True, drop_arg=-1):
+        doc_str = self.get_documentation()
+        hover_str = ", ".join([self.desc] + get_keywords(self.modifiers, self.dim_str))
+        if include_doc and (doc_str is not None):
+            hover_str += "\n {0}".format('\n '.join(doc_str.splitlines()))
+        return hover_str, True
+
+    def get_signature(self, drop_arg=-1):
         return None, None, None
 
     def get_children(self, public_only=False):
@@ -979,10 +1003,11 @@ class fortran_meth(fortran_obj):
                 self.link_name = self.name.lower()
 
     def get_snippet(self, name_replace=None, drop_arg=-1):
-        name = self.name
-        if name_replace is not None:
-            name = name_replace
         if self.link_obj is not None:
+            if name_replace is None:
+                name = self.name
+            else:
+                name = name_replace
             return self.link_obj.get_snippet(name, self.drop_arg)
         return None, None
 
@@ -992,54 +1017,51 @@ class fortran_meth(fortran_obj):
         # Generic
         return 7
 
-    def get_documentation(self, long=False):
+    def get_documentation(self):
+        if (self.link_obj is not None) and (self.doc_str is None):
+            return self.link_obj.get_documentation()
+        return self.doc_str
+
+    def get_hover(self, long=False, include_doc=True, drop_arg=-1):
+        doc_str = self.get_documentation()
         if long:
-            sub_sig, _ = self.get_snippet()
-            hover_str = "{0} {1}\n".format(self.get_desc(), sub_sig)
-            if self.link_obj is not None:
-                link_hover, _ = self.link_obj.get_documentation(long=True)
+            if self.link_obj is None:
+                sub_sig, _ = self.get_snippet()
+                hover_str = "{0} {1}".format(self.get_desc(), sub_sig)
+                if include_doc and (doc_str is not None):
+                    hover_str += "\n{0}".format(doc_str)
+            else:
+                link_hover, _ = self.link_obj.get_hover(long=True, include_doc=include_doc, drop_arg=self.drop_arg)
                 hover_split = link_hover.splitlines()
                 call_sig = hover_split[0]
                 paren_start = call_sig.rfind('(')
                 link_name_len = len(self.link_obj.name)
                 call_sig = call_sig[:paren_start-link_name_len] + self.name + call_sig[paren_start:]
-                paren_start += len(self.name) - link_name_len
                 hover_split = hover_split[1:]
-                if (self.drop_arg >= 0) and (self.drop_arg < len(hover_split)):
-                    paren_end = call_sig.rfind(')')
-                    args = call_sig[paren_start+1:paren_end].split(',')
-                    del args[self.drop_arg]
-                    del hover_split[self.drop_arg]
-                    call_sig = call_sig[:paren_start] + '(' + (','.join(args)).strip() + ')'
+                if include_doc and (doc_str is not None):
+                    # Replace linked documentation with current object
+                    if (self.doc_str is not None) and (hover_split[0].count('!!') > 0):
+                        for (i, hover_line) in enumerate(hover_split):
+                            if hover_line.count('!!') == 0:
+                                hover_split = hover_split[i:]
+                                break
+                        else:
+                            hover_split = []
+                        hover_split = [self.doc_str] + hover_split
                 hover_str = '\n'.join([call_sig] + hover_split)
             return hover_str, True
         else:
-            doc_str = self.desc
-            if len(self.modifiers) > 0:
-                doc_str += ", "
-                doc_str += ", ".join(get_keywords(self.modifiers))
-            return doc_str, True
+            hover_str = ", ".join([self.desc] + get_keywords(self.modifiers))
+            if include_doc and (doc_str is not None):
+                hover_str += "\n{0}".format(doc_str)
+            return hover_str, True
 
-    def get_signature(self):
-        arg_sigs = []
-        var_obj = self.link_obj
-        arg_list = var_obj.args.split(",")
-        for i, arg_obj in enumerate(var_obj.arg_objs):
-            if self.drop_arg == i:
-                continue
-            if arg_obj is None:
-                arg_sigs.append({"label": arg_list[i]})
-            else:
-                if arg_obj.is_optional():
-                    label = "{0}={0}".format(arg_obj.name.lower())
-                else:
-                    label = arg_obj.name.lower()
-                arg_sigs.append({
-                    "label": label,
-                    "documentation": arg_obj.get_documentation()[0]
-                })
-        call_sig, _ = self.get_snippet()
-        return call_sig, None, arg_sigs
+    def get_signature(self, drop_arg=-1):
+        if self.link_obj is not None:
+            call_sig, _ = self.get_snippet()
+            _, _, arg_sigs = self.link_obj.get_signature(self.drop_arg)
+            return call_sig, self.get_documentation(), arg_sigs
+        return None, None, None
 
     def resolve_link(self, obj_tree):
         if self.link_name is None:
@@ -1081,6 +1103,8 @@ class fortran_file:
         self.current_scope = None
         self.END_SCOPE_WORD = None
         self.enc_scope_name = None
+        self.last_obj = None
+        self.pending_doc = None
 
     def create_none_scope(self):
         if self.none_scope is not None:
@@ -1112,6 +1136,10 @@ class fortran_file:
         self.current_scope = new_scope
         self.END_SCOPE_WORD = END_SCOPE_WORD
         self.enc_scope_name = self.get_enc_scope_name()
+        self.last_obj = new_scope
+        if self.pending_doc is not None:
+            self.last_obj.add_doc(self.pending_doc)
+            self.pending_doc = None
 
     def end_scope(self, line_number, check=True):
         if ((self.current_scope is None) or (self.current_scope is self.none_scope)) and check:
@@ -1134,6 +1162,10 @@ class fortran_file:
             new_var.FQSN = self.none_scope.FQSN + "::" + new_var.name.lower()
         self.current_scope.add_child(new_var)
         self.variable_list.append(new_var)
+        self.last_obj = new_var
+        if self.pending_doc is not None:
+            self.last_obj.add_doc(self.pending_doc)
+            self.pending_doc = None
 
     def add_int_member(self, key):
         self.current_scope.add_member(key)
@@ -1151,6 +1183,13 @@ class fortran_file:
 
     def add_include(self, path, line_number):
         self.include_stmnts.append([line_number, path, []])
+
+    def add_doc(self, doc_string, forward=False):
+        if forward:
+            self.pending_doc = doc_string
+        else:
+            if self.last_obj is not None:
+                self.last_obj.add_doc(doc_string)
 
     def start_ppif(self, line_number):
         self.pp_if.append([line_number-1, -1])

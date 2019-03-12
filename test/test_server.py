@@ -113,7 +113,7 @@ def test_symbols():
     def check_return(result_array):
         # Expected objects
         objs = (
-            ["test_free", 2, 0, 77],
+            ["test_free", 2, 0, 79],
             ["scale_type", 5, 4, 6],
             ["val", 13, 5, 5],
             ["vector", 5, 8, 16],
@@ -134,7 +134,7 @@ def test_symbols():
             ["scaled_vector_norm", 12, 55, 59],
             ["unscaled_norm", 12, 61, 65],
             ["test_sig_Sub", 6, 67, 70],
-            ["bound_pass", 6, 72, 76]
+            ["bound_pass", 6, 72, 78]
         )
         assert len(result_array) == len(objs)
         for i, obj in enumerate(objs):
@@ -422,7 +422,46 @@ def test_hover():
     errcode, results = run_request(string)
     assert errcode == 0
     #
-    free_path = os.path.join(test_dir, "subdir", "test_free.f90")
     check_return(results[1:], ("""SUBROUTINE test(a, b)
  INTEGER(4), DIMENSION(3,6), INTENT(IN) :: a
  REAL(8), DIMENSION(4), INTENT(OUT) :: b""",))
+
+
+def test_docs():
+    def check_return(result_array, checks):
+        comm_lines = []
+        for (i, hover_line) in enumerate(result_array['contents']['value'].splitlines()):
+            if hover_line.count('!!') > 0:
+                comm_lines.append((i, hover_line))
+        assert len(comm_lines) == len(checks)
+        for i in range(len(checks)):
+            assert comm_lines[i][0] == checks[i][0]
+            assert comm_lines[i][1] == checks[i][1]
+
+    def hover_request(file_path, line, char):
+        return write_rpc_request(1, "textDocument/hover", {
+            "textDocument": {"uri": file_path},
+            "position": {"line": line, "character": char}
+        })
+    #
+    string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
+    file_path = os.path.join(test_dir, "subdir", "test_free.f90")
+    string += hover_request(file_path, 13, 19)
+    string += hover_request(file_path, 13, 31)
+    string += hover_request(file_path, 14, 17)
+    string += hover_request(file_path, 14, 28)
+    string += hover_request(file_path, 21, 18)
+    string += hover_request(file_path, 21, 37)
+    string += hover_request(file_path, 15, 32)
+    string += hover_request(file_path, 15, 47)
+    errcode, results = run_request(string)
+    assert errcode == 0
+    #
+    check_return(results[1], ((1, '!! Doc 1'), (3, ' !! Doc 4')))
+    check_return(results[2], ((1, '!! Doc 3'), (4, ' !! Doc 4')))
+    check_return(results[3], ((1, '!! Doc 2'), ))
+    check_return(results[4], ((1, '!! Doc 5'), ))
+    check_return(results[5], ((2, ' !! Doc 6'), ))
+    check_return(results[6], ((3, ' !! Doc 6'), ))
+    check_return(results[7], ())
+    check_return(results[8], ((3, ' !! Doc 7'), (4, ' !! Doc 8')))

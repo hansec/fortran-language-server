@@ -5,7 +5,7 @@ from fortls.objects import map_keywords, fortran_module, fortran_program, \
     fortran_select, fortran_type, fortran_enum, fortran_int, fortran_obj, \
     fortran_meth, fortran_associate, fortran_do, fortran_where, fortran_if, \
     fortran_file
-#
+# Fortran statement matching rules
 USE_REGEX = re.compile(r'[ ]*USE([, ]+INTRINSIC)?[ :]+([a-z0-9_]*)([, ]+ONLY[ :]+)?', re.I)
 INCLUDE_REGEX = re.compile(r'[ ]*INCLUDE[ :]*[\'\"]([^\'\"]*)', re.I)
 CONTAINS_REGEX = re.compile(r'[ ]*(CONTAINS)[ ]*$', re.I)
@@ -67,15 +67,18 @@ KIND_SPEC_MATCH = re.compile(r'\([a-z0-9_, =*]*\)', re.I)
 SQ_STRING_REGEX = re.compile(r'\'[^\']*\'', re.I)
 DQ_STRING_REGEX = re.compile(r'\"[^\"]*\"', re.I)
 LINE_LABEL_REGEX = re.compile(r'[ ]*([0-9]+)[ ]+', re.I)
-#
+# Fixed format matching rules
 FIXED_COMMENT_LINE_MATCH = re.compile(r'(!|c|d|\*)', re.I)
 FIXED_CONT_REGEX = re.compile(r'(     [\S])')
-#
+FIXED_DOC_MATCH = re.compile(r'(?:!|c|d|\*)(<|>|!)', re.I)
+FIXED_OPENMP_MATCH = re.compile(r'[!|c|\*]\$OMP', re.I)
+# Free format matching rules
 FREE_COMMENT_LINE_MATCH = re.compile(r'([ ]*!)')
 FREE_CONT_REGEX = re.compile(r'([ ]*&)')
+FREE_DOC_MATCH = re.compile(r'[ ]*!(<|>|!)')
+FREE_OPENMP_MATCH = re.compile(r'[ ]*!\$OMP', re.I)
 FREE_FORMAT_TEST = re.compile(r'[ ]{1,4}[a-z]', re.I)
-OPENMP_LINE_MATCH = re.compile(r'[ ]*[!|c|\*]\$OMP', re.I)
-#
+# Preprocessor mathching rules
 PP_REGEX = re.compile(r'#(if |ifdef|ifndef|else|elif|endif)')
 PP_DEF_REGEX = re.compile(r'#(define|undef)[ ]*([a-z0-9_]+)', re.I)
 PP_DEF_TEST_REGEX = re.compile(r'(![ ]*)?defined[ ]*\([ ]*([a-z0-9_]*)[ ]*\)$', re.I)
@@ -100,12 +103,14 @@ def detect_fixed_format(file_lines):
 
 
 def detect_comment_start(line, fixed_format=False):
-    if OPENMP_LINE_MATCH.match(line) is not None:
-        return -1
     if fixed_format:
+        if FIXED_OPENMP_MATCH.match(line) is not None:
+            return -1
         if FIXED_COMMENT_LINE_MATCH.match(line) is not None:
             return 0
     else:
+        if FREE_OPENMP_MATCH.match(line) is not None:
+            return -1
         return strip_strings(line).find('!')
     return -1
 
@@ -719,9 +724,11 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
     if fixed_format:
         COMMENT_LINE_MATCH = FIXED_COMMENT_LINE_MATCH
         CONT_REGEX = FIXED_CONT_REGEX
+        DOC_COMMENT_MATCH = FIXED_DOC_MATCH
     else:
         COMMENT_LINE_MATCH = FREE_COMMENT_LINE_MATCH
         CONT_REGEX = FREE_CONT_REGEX
+        DOC_COMMENT_MATCH = FREE_DOC_MATCH
     #
     file_obj = fortran_file(path)
     #
@@ -748,7 +755,13 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
     block_id_stack = []
     next_line = None
     line_ind = 0
+    doc_string = None
     while((line_ind < len(file_str)) or (next_line is not None)):
+        if doc_string is not None:
+            file_obj.add_doc('!! ' + doc_string)
+            if(debug):
+                print('{1} !!! Doc string({0})'.format(line_number, doc_string))
+            doc_string = None
         # Get next line
         if next_line is None:
             line = file_str[line_ind]
@@ -763,6 +776,28 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
         # Skip comment lines
         match = COMMENT_LINE_MATCH.match(line)
         if (match is not None):
+            # Check for documentation
+            doc_match = DOC_COMMENT_MATCH.match(line)
+            if doc_match is not None:
+                doc_lines = [line[doc_match.end(0):].strip()]
+                if doc_match.group(1) == '>':
+                    doc_forward = True
+                else:
+                    doc_forward = False
+                if line_ind < len(file_str):
+                    next_line = file_str[line_ind]
+                    line_ind += 1
+                    doc_match = DOC_COMMENT_MATCH.match(next_line)
+                    while((doc_match is not None) and (line_ind < len(file_str))):
+                        doc_lines.append(next_line[doc_match.end(0):].strip())
+                        next_line_num += 1
+                        next_line = file_str[line_ind]
+                        line_ind += 1
+                        doc_match = DOC_COMMENT_MATCH.match(next_line)
+                if(debug):
+                    for (i, doc_line) in enumerate(doc_lines):
+                        print('{1} !!! Doc string({0})'.format(abs(line_number)+i, doc_line))
+                file_obj.add_doc('!! ' + '\n!! '.join(doc_lines), forward=doc_forward)
             continue
         do_skip = False
         for pp_reg in pp_skips:
@@ -815,7 +850,13 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                     iComm = iAmper + 1
             next_line = None
         line = line.rstrip()
-        line_no_comment = line.split('!')[0]
+        comm_ind = line.find('!')
+        if comm_ind >= 0:
+            line_no_comment = line[:comm_ind]
+            line_post_comment = line[comm_ind:]
+        else:
+            line_no_comment = line
+            line_post_comment = None
         # Test for scope end
         if file_obj.END_SCOPE_WORD is not None:
             match = END_WORD_REGEX.match(line_no_comment)
@@ -868,10 +909,15 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
             if(debug):
                 print('{1} !!! CONTAINS statement({0})'.format(line_number, line.strip()))
             continue
+        # Look for trailing doc string
+        if line_post_comment is not None:
+            doc_match = FREE_DOC_MATCH.match(line_post_comment)
+            if doc_match is not None:
+                doc_string = line_post_comment[doc_match.end(0):].strip()
         # Loop through tests
         obj_read = None
         for test in def_tests:
-            obj_read = test(line)
+            obj_read = test(line_no_comment)
             if obj_read is not None:
                 break
         #

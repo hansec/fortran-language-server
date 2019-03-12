@@ -11,8 +11,8 @@ TYPE :: vector
   REAL(8), POINTER, DIMENSION(:) :: v => NULL()
   PROCEDURE(fort_wrap), NOPASS, POINTER :: bound_nopass => NULL()
 CONTAINS
-  PROCEDURE :: create => vector_create
-  PROCEDURE :: norm => vector_norm
+  PROCEDURE :: create => vector_create !< Doc 1
+  PROCEDURE :: norm => vector_norm !< Doc 2
   PROCEDURE, PASS(self) :: bound_pass => bound_pass
 END TYPE vector
 !
@@ -32,15 +32,15 @@ END INTERFACE
 !
 LOGICAL :: module_variable
 CONTAINS
-!
+!> Doc 3
 SUBROUTINE vector_create(self, n)
 CLASS(vector), INTENT(inout) :: self
-INTEGER(4), INTENT(in) :: n
+INTEGER(4), INTENT(in) :: n !! Doc 4
 self%n=n
 ALLOCATE(self%v(n))
 self%v=0.d0
 END SUBROUTINE vector_create
-!
+!> Doc 5
 FUNCTION vector_norm(self) RESULT(norm)
 CLASS(vector), INTENT(in) :: self
 REAL(8) :: norm
@@ -49,7 +49,7 @@ END FUNCTION vector_norm
 !
 SUBROUTINE scaled_vector_set(self, scale)
 CLASS(vector), INTENT(inout) :: self
-REAL(8), INTENT(in) :: scale
+REAL(8), INTENT(in) :: scale !< Doc 6
 self%scale%val = scale
 END SUBROUTINE scaled_vector_set
 !
@@ -72,6 +72,8 @@ END SUBROUTINE test_sig_Sub
 !
 SUBROUTINE bound_pass(arg1, self)
 INTEGER(4), INTENT(in) :: arg1
+!> Doc 7
+!! Doc 8
 CLASS(vector), INTENT(inout) :: self
 self%n = arg1
 END SUBROUTINE bound_pass

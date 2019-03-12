@@ -722,7 +722,7 @@ class LangServer:
             comp_obj["detail"] = candidate.get_desc()
             if call_sig is not None:
                 comp_obj["detail"] += ' ' + call_sig
-            doc_str, _ = candidate.get_documentation()
+            doc_str, _ = candidate.get_hover()
             if doc_str is not None:
                 comp_obj["documentation"] = doc_str
             return comp_obj
@@ -1233,17 +1233,17 @@ class LangServer:
         # Construct hover information
         var_type = var_obj.get_type()
         hover_str = None
-        if var_type == 2 or var_type == 3:
-            hover_str, highlight = var_obj.get_documentation(long=True)
+        if (var_type == 2) or (var_type == 3):
+            hover_str, highlight = var_obj.get_hover(long=True)
         elif var_type == 5:
             hover_array = []
             for member in var_obj.mems:
-                hover_str, highlight = member.get_documentation(long=True)
+                hover_str, highlight = member.get_hover(long=True)
                 if hover_str is not None:
                     hover_array.append(create_hover(hover_str, highlight))
             return {"contents": hover_array}
-        elif var_type == 6 and self.variable_hover:
-            hover_str, highlight = var_obj.get_documentation()
+        elif self.variable_hover and (var_type == 6):
+            hover_str, highlight = var_obj.get_hover()
         #
         if hover_str is not None:
             return {"contents": create_hover(hover_str, highlight)}

@@ -68,7 +68,10 @@ class fortran_intrinsic_obj:
         call_sig, _ = self.get_snippet()
         return call_sig, self.doc_str, arg_sigs
 
-    def get_documentation(self, long=False):
+    def get_documentation(self):
+        return self.doc_str
+
+    def get_hover(self, long=False):
         return self.doc_str, False
 
     def get_children(self):
