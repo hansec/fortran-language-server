@@ -206,7 +206,7 @@ def climb_type_tree(var_stack, curr_scope, obj_tree):
         var_name = var_stack[iVar].strip().lower()
         var_obj, new_scope = find_in_scope(type_scope, var_name, obj_tree)
         # Set scope to declaration location if variable is inherited
-        if new_scope.get_type() == 4:
+        if (new_scope is not None) and (new_scope.get_type() == 4):
             for in_child in new_scope.in_children:
                 if (in_child.name.lower() == var_name) and (in_child.parent is not None):
                     curr_scope = in_child.parent
