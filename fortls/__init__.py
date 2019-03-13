@@ -427,10 +427,30 @@ def main():
             else:
                 print('=======')
                 for uri, result in ref_results["changes"].items():
-                    print('    {0}:'.format(uri))
-                    for change in result:
-                        print('      ({0}, {1})'.format(change['range']['start']['line']+1,
-                              change['range']['start']['character']+1))
+                    path = path_from_uri(uri)
+                    print('File: "{0}"'.format(path))
+                    file_obj = s.workspace.get(path)
+                    if file_obj is not None:
+                        file_contents = file_obj['contents']
+                        for change in result:
+                            start_line = change['range']['start']['line']
+                            end_line = change['range']['end']['line']
+                            start_col = change['range']['start']['character']
+                            end_col = change['range']['end']['character']
+                            print('  {0}, {1}'.format(start_line+1, end_line+1))
+                            new_contents = []
+                            for i in range(start_line, end_line+1):
+                                line = file_contents[i]
+                                print('  - {0}'.format(line))
+                                if i == start_line:
+                                    new_contents.append(line[:start_col] + args.debug_rename)
+                                if i == end_line:
+                                    new_contents[-1] += line[end_col:]
+                            for line in new_contents:
+                                print('  + {0}'.format(line))
+                            print()
+                    else:
+                        print('Unknown file: "{0}"'.fromat(path))
                 print('=======')
         tmpout.close()
         tmpin.close()
