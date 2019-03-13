@@ -30,6 +30,8 @@ Language Server Features
 - GoTo implementation (``textDocument/implementation``)
 - Find/Peek references (``textDocument/references``)
 - Project-wide symbol search (``workspace/symbol``)
+- Symbol renaming (``textDocument/rename``)
+- Documentation parsing (`Doxygen <http://www.doxygen.org/>`_ and `FORD <https://github.com/Fortran-FOSS-Programmers/ford>`_ styles)
 - Diagnostics (limited)
 
   - Multiple use of the same variable name
@@ -121,7 +123,7 @@ in the ``root_dir`` directory.
 * ``lowercase_intrinsics`` Use lowercase for intrinsics and keywords in autocomplete requests (default: false)
 * ``debug_log`` Write debug information to ``root_dir/fortls_debug.log`` (default: false)
 
-**Setup module search paths:**
+**Setup source file search paths:**
 
 By default all files with the suffix ``F,F77,F90,F95,F03,F08,FOR,FPP`` (case-insensitive) in the
 ``root_dir`` directory, specified during initialization, and all its sub-directories are parsed and included in
@@ -131,10 +133,13 @@ Directories and files can be excluded from the project by specifying their paths
 the ``excl_paths`` variable in the ``.fortls`` file. Excluded directories also exclude all sub-directories. Source
 files with a common suffix may also be excluded using the ``excl_suffixes`` variable.
 
-Module directories can also be specified manually by specifying their paths (relative to ``root_dir``) in
-the ``mod_dirs`` variable in the ``.fortls`` file. When ``mod_dirs`` is specified directories are not added
+Source file directories can also be specified manually by specifying their paths (relative to ``root_dir``) in
+the ``source_dirs`` variable in the ``.fortls`` file. When ``source_dirs`` is specified directories are not added
 recursively, so any nested sub directories must be explicitly listed. However, ``root_dir`` does not need to
 be specified manually as it is always included.
+
+*Note:* The previous naming convention for source file directories (``mod_dirs``) is still supported
+but has been deprecated.
 
 **Preprocessor definitions:**
 
@@ -153,7 +158,7 @@ test can be evaluated by the server or if the region is the *default* path (ie. 
 ::
 
     {
-      "mod_dirs": ["subdir1", "subdir2"],
+      "source_dirs": ["subdir1", "subdir2"],
       "excl_paths": ["subdir3", "subdir1/file_to_skip.F90"],
       "excl_suffixes": ["_skip.f90"],
       "pp_defs": {"HAVE_PACKAGE": ""},

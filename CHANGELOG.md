@@ -1,3 +1,15 @@
+## 1.5.0
+
+### Improvements
+* Add support for "textDocument/rename" requests
+* Add initial support for Doxygen and FORD style comment blocks, ref [#44](https://github.com/hansec/fortran-language-server/issues/44)
+
+### Fixes
+* Fix language server crash with unknown user-defined type fields
+
+### Other changes
+* Deprecate "mod_dirs" option in favor of more accurate "source_dirs". Support for "mod_dirs" will be removed in a future release.
+
 ## 1.4.0
 
 ### Improvements
