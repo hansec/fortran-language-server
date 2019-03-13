@@ -757,7 +757,7 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
     line_ind = 0
     doc_string = None
     while((line_ind < len(file_str)) or (next_line is not None)):
-        if doc_string is not None:
+        if (doc_string is not None) and (doc_string != ''):
             file_obj.add_doc('!! ' + doc_string)
             if(debug):
                 print('{1} !!! Doc string({0})'.format(line_number, doc_string))
@@ -797,7 +797,11 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 if(debug):
                     for (i, doc_line) in enumerate(doc_lines):
                         print('{1} !!! Doc string({0})'.format(abs(line_number)+i, doc_line))
-                file_obj.add_doc('!! ' + '\n!! '.join(doc_lines), forward=doc_forward)
+                line_sum = 0
+                for doc_line in doc_lines:
+                    line_sum += len(doc_line)
+                if line_sum > 0:
+                    file_obj.add_doc('!! ' + '\n!! '.join(doc_lines), forward=doc_forward)
             continue
         do_skip = False
         for pp_reg in pp_skips:

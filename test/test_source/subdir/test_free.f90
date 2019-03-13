@@ -19,8 +19,8 @@ END TYPE vector
 TYPE, EXTENDS(vector) :: scaled_vector
   TYPE(scale_type) :: scale
 CONTAINS
-  PROCEDURE :: set_scale => scaled_vector_set
-  PROCEDURE :: norm => scaled_vector_norm
+  PROCEDURE :: set_scale => scaled_vector_set !<
+  PROCEDURE :: norm => scaled_vector_norm !< Doc 3
 END TYPE scaled_vector
 !
 INTERFACE
@@ -32,27 +32,27 @@ END INTERFACE
 !
 LOGICAL :: module_variable
 CONTAINS
-!> Doc 3
+!> Doc 4
 SUBROUTINE vector_create(self, n)
 CLASS(vector), INTENT(inout) :: self
-INTEGER(4), INTENT(in) :: n !! Doc 4
+INTEGER(4), INTENT(in) :: n !! Doc 5
 self%n=n
 ALLOCATE(self%v(n))
 self%v=0.d0
 END SUBROUTINE vector_create
-!> Doc 5
+!> Doc 6
 FUNCTION vector_norm(self) RESULT(norm)
 CLASS(vector), INTENT(in) :: self
 REAL(8) :: norm
 norm = SQRT(DOT_PRODUCT(self%v,self%v))
 END FUNCTION vector_norm
-!
+!> Doc 7
 SUBROUTINE scaled_vector_set(self, scale)
 CLASS(vector), INTENT(inout) :: self
-REAL(8), INTENT(in) :: scale !< Doc 6
+REAL(8), INTENT(in) :: scale !< Doc 8
 self%scale%val = scale
 END SUBROUTINE scaled_vector_set
-!
+!>
 FUNCTION scaled_vector_norm(self) RESULT(norm)
 CLASS(scaled_vector), INTENT(in) :: self
 REAL(8) :: norm
@@ -72,8 +72,8 @@ END SUBROUTINE test_sig_Sub
 !
 SUBROUTINE bound_pass(arg1, self)
 INTEGER(4), INTENT(in) :: arg1
-!> Doc 7
-!! Doc 8
+!> Doc 9
+!! Doc 10
 CLASS(vector), INTENT(inout) :: self
 self%n = arg1
 END SUBROUTINE bound_pass

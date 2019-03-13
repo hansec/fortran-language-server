@@ -1038,16 +1038,16 @@ class fortran_meth(fortran_obj):
                 link_name_len = len(self.link_obj.name)
                 call_sig = call_sig[:paren_start-link_name_len] + self.name + call_sig[paren_start:]
                 hover_split = hover_split[1:]
-                if include_doc and (doc_str is not None):
-                    # Replace linked documentation with current object
-                    if (self.doc_str is not None) and (hover_split[0].count('!!') > 0):
+                if include_doc and (self.doc_str is not None):
+                    # Replace linked docs with current object's docs
+                    if (len(hover_split) > 0) and (hover_split[0].count('!!') > 0):
                         for (i, hover_line) in enumerate(hover_split):
                             if hover_line.count('!!') == 0:
                                 hover_split = hover_split[i:]
                                 break
-                        else:
+                        else:  # All lines are docs
                             hover_split = []
-                        hover_split = [self.doc_str] + hover_split
+                    hover_split = [self.doc_str] + hover_split
                 hover_str = '\n'.join([call_sig] + hover_split)
             return hover_str, True
         else:
@@ -1185,6 +1185,8 @@ class fortran_file:
         self.include_stmnts.append([line_number, path, []])
 
     def add_doc(self, doc_string, forward=False):
+        if doc_string == '':
+            return
         if forward:
             self.pending_doc = doc_string
         else:
