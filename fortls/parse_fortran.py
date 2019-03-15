@@ -2,9 +2,9 @@ from __future__ import print_function
 import re
 from fortls.objects import map_keywords, fortran_module, fortran_program, \
     fortran_submodule, fortran_subroutine, fortran_function, fortran_block, \
-    fortran_select, fortran_type, fortran_enum, fortran_int, fortran_obj, \
+    fortran_select, fortran_type, fortran_enum, fortran_int, fortran_var, \
     fortran_meth, fortran_associate, fortran_do, fortran_where, fortran_if, \
-    fortran_file
+    fortran_file, INTERFACE_TYPE_ID, SELECT_TYPE_ID
 # Fortran statement matching rules
 USE_REGEX = re.compile(r'[ ]*USE([, ]+INTRINSIC)?[ :]+([a-z0-9_]*)([, ]+ONLY[ :]+)?', re.I)
 INCLUDE_REGEX = re.compile(r'[ ]*INCLUDE[ :]*[\'\"]([^\'\"]*)', re.I)
@@ -897,7 +897,8 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                        and (file_obj.current_scope.req_named_end() or (end_scope_word is not None))
                        and (file_obj.current_scope is not file_obj.none_scope)):
                         file_obj.end_errors.append([line_number, file_obj.current_scope.sline])
-                    if (file_obj.current_scope.get_type() == 9) and (file_obj.current_scope.type in (3, 4)):
+                    if (file_obj.current_scope.get_type() == SELECT_TYPE_ID) \
+                       and (file_obj.current_scope.is_type_region()):
                         file_obj.end_scope(line_number)
                     file_obj.end_scope(line_number)
                     if(debug):
@@ -952,21 +953,25 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
             obj_type = obj_read[0]
             obj = obj_read[1]
             if obj_type == 'var':
-                if obj[2] is None:
+                var_names = obj[2]
+                if var_names is None:
                     continue
+                desc_string = obj[0]
                 link_name = None
-                if obj[0][:3] == 'PRO':
-                    if isinstance(file_obj.current_scope, fortran_int):
-                        for var_name in obj[2]:
+                procedure_def = False
+                if desc_string[:3] == 'PRO':
+                    if file_obj.current_scope.get_type() == INTERFACE_TYPE_ID:
+                        for var_name in var_names:
                             file_obj.add_int_member(var_name)
                         if(debug):
                             print('{1} !!! INTERFACE-PRO statement({0})'.format(line_number, line.strip()))
                         continue
-                    i1 = obj[0].find('(')
-                    i2 = obj[0].rfind(')')
+                    procedure_def = True
+                    i1 = desc_string.find('(')
+                    i2 = desc_string.rfind(')')
                     if i1 > -1 and i2 > -1:
-                        link_name = obj[0][i1+1:i2]
-                for var_name in obj[2]:
+                        link_name = desc_string[i1+1:i2]
+                for var_name in var_names:
                     link_name = None
                     if var_name.find('=>') > -1:
                         name_split = var_name.split('=>')
@@ -976,50 +981,46 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                             link_name = None
                     else:
                         name_stripped = var_name.split('=')[0]
-                    var_dim_str = None
+                    # Add dimension if specified
                     if name_stripped.find('(') > -1:
-                        var_dim_str = get_var_dims(name_stripped)
+                        obj[1].append('dimension({0})'.format(get_var_dims(name_stripped)))
                     name_stripped = name_stripped.split('(')[0].strip()
-                    modifiers, dim_str, pass_name = map_keywords(obj[1])
-                    if obj[0][:3] == 'PRO':
-                        new_var = fortran_meth(file_obj, line_number, name_stripped, obj[0],
-                                               modifiers, file_obj.enc_scope_name, link_name,
-                                               pass_name=pass_name)
+                    keywords, keyword_info = map_keywords(obj[1])
+                    if procedure_def:
+                        new_var = fortran_meth(file_obj, line_number, name_stripped, desc_string,
+                                               keywords, keyword_info=keyword_info, link_obj=link_name)
                     else:
-                        new_var = fortran_obj(file_obj, line_number, name_stripped, obj[0],
-                                              modifiers, dim_str, file_obj.enc_scope_name, link_name)
-                    if var_dim_str is not None:
-                        new_var.set_dim(var_dim_str)
+                        new_var = fortran_var(file_obj, line_number, name_stripped, desc_string,
+                                              keywords, keyword_info=keyword_info, link_obj=link_name)
                     file_obj.add_variable(new_var)
                 if(debug):
                     print('{1} !!! VARIABLE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'mod':
-                new_mod = fortran_module(file_obj, line_number, obj, file_obj.enc_scope_name)
+                new_mod = fortran_module(file_obj, line_number, obj)
                 file_obj.add_scope(new_mod, END_MOD_WORD)
                 if(debug):
                     print('{1} !!! MODULE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'smod':
-                new_smod = fortran_submodule(file_obj, line_number, obj[0], file_obj.enc_scope_name, obj[1])
+                new_smod = fortran_submodule(file_obj, line_number, obj[0], ancestor_name=obj[1])
                 file_obj.add_scope(new_smod, END_SMOD_WORD)
                 if(debug):
                     print('{1} !!! SUBMODULE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'prog':
-                new_prog = fortran_program(file_obj, line_number, obj, file_obj.enc_scope_name)
+                new_prog = fortran_program(file_obj, line_number, obj)
                 file_obj.add_scope(new_prog, END_PROG_WORD)
                 if(debug):
                     print('{1} !!! PROGRAM statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'sub':
-                new_sub = fortran_subroutine(file_obj, line_number, obj[0], file_obj.enc_scope_name, obj[1], obj[2])
+                new_sub = fortran_subroutine(file_obj, line_number, obj[0], args=obj[1], mod_sub=obj[2])
                 file_obj.add_scope(new_sub, END_SUB_WORD)
                 if(debug):
                     print('{1} !!! SUBROUTINE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'fun':
-                new_fun = fortran_function(file_obj, line_number, obj[0], file_obj.enc_scope_name,
-                                           obj[1], obj[3], return_type=obj[2][0], result_var=obj[2][1])
+                new_fun = fortran_function(file_obj, line_number, obj[0], args=obj[1],
+                                           mod_fun=obj[3], return_type=obj[2][0], result_var=obj[2][1])
                 file_obj.add_scope(new_fun, END_FUN_WORD)
                 if obj[2][0] is not None:
-                    new_obj = fortran_obj(file_obj, line_number, obj[0], obj[2][0][0], obj[2][0][1],
-                                          file_obj.enc_scope_name, None)
+                    new_obj = fortran_var(file_obj, line_number, obj[0], obj[2][0][0], obj[2][0][1])
                     file_obj.add_variable(new_obj)
                 if(debug):
                     print('{1} !!! FUNCTION statement({0})'.format(line_number, line.strip()))
@@ -1028,7 +1029,7 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 if name is None:
                     block_counter += 1
                     name = '#BLOCK{0}'.format(block_counter)
-                new_block = fortran_block(file_obj, line_number, name, file_obj.enc_scope_name)
+                new_block = fortran_block(file_obj, line_number, name)
                 file_obj.add_scope(new_block, END_BLOCK_WORD, req_container=True)
                 if(debug):
                     print('{1} !!! BLOCK statement({0})'.format(line_number, line.strip()))
@@ -1037,7 +1038,7 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 name = '#DO{0}'.format(do_counter)
                 if obj[0] != '':
                     block_id_stack.append(obj[0])
-                new_do = fortran_do(file_obj, line_number, name, file_obj.enc_scope_name)
+                new_do = fortran_do(file_obj, line_number, name)
                 file_obj.add_scope(new_do, END_DO_WORD, req_container=True)
                 if(debug):
                     print('{1} !!! DO statement({0})'.format(line_number, line.strip()))
@@ -1046,56 +1047,39 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 if not obj:
                     do_counter += 1
                     name = '#WHERE{0}'.format(do_counter)
-                    new_do = fortran_where(file_obj, line_number, name, file_obj.enc_scope_name)
+                    new_do = fortran_where(file_obj, line_number, name)
                     file_obj.add_scope(new_do, END_WHERE_WORD, req_container=True)
                 if(debug):
                     print('{1} !!! WHERE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'assoc':
                 block_counter += 1
                 name = '#ASSOC{0}'.format(block_counter)
-                new_assoc = fortran_associate(file_obj, line_number, name, file_obj.enc_scope_name)
+                new_assoc = fortran_associate(file_obj, line_number, name)
                 file_obj.add_scope(new_assoc, END_ASSOCIATE_WORD, req_container=True)
                 if(debug):
                     print('{1} !!! ASSOCIATE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'if':
                 if_counter += 1
                 name = '#IF{0}'.format(if_counter)
-                new_if = fortran_if(file_obj, line_number, name, file_obj.enc_scope_name)
+                new_if = fortran_if(file_obj, line_number, name)
                 file_obj.add_scope(new_if, END_IF_WORD, req_container=True)
                 if(debug):
                     print('{1} !!! IF statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'select':
                 select_counter += 1
                 name = '#SELECT{0}'.format(select_counter)
-                binding_name = None
-                bound_var = None
-                if file_obj.current_scope is not None:
-                    if (obj[0] in (3, 4)) and (file_obj.current_scope.get_type() == 9):
-                        if file_obj.current_scope.type in (3, 4):
-                            file_obj.end_scope(line_number)
-                if file_obj.current_scope is not None:
-                    if (obj[0] in (3, 4)) and (file_obj.current_scope.get_type() == 9):
-                        if file_obj.current_scope.type == 2:
-                            binding_name = file_obj.current_scope.binding_name
-                            bound_var = file_obj.current_scope.bound_var
-                new_select = fortran_select(file_obj, line_number, name, obj, file_obj.enc_scope_name)
+                new_select = fortran_select(file_obj, line_number, name, obj)
                 file_obj.add_scope(new_select, END_SELECT_WORD, req_container=True)
-                if binding_name is not None:
-                    if obj[0] != 4:
-                        bound_var = None
-                    new_var = fortran_obj(file_obj, line_number, binding_name,
-                                          '{0}({1})'.format(obj[2], obj[1]), [], file_obj.enc_scope_name,
-                                          link_obj=bound_var)
-                    file_obj.add_variable(new_var)
-                elif (binding_name is None) and (bound_var is not None):
-                    new_var = fortran_obj(file_obj, line_number, bound_var,
-                                          '{0}({1})'.format(obj[2], obj[1]), [], file_obj.enc_scope_name)
+                new_var = new_select.create_binding_variable(
+                    file_obj, line_number, '{0}({1})'.format(obj[2], obj[1]), obj[0]
+                )
+                if new_var is not None:
                     file_obj.add_variable(new_var)
                 if(debug):
                     print('{1} !!! SELECT statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'typ':
-                modifiers, _, _ = map_keywords(obj[2])
-                new_type = fortran_type(file_obj, line_number, obj[0], modifiers, file_obj.enc_scope_name)
+                keywords, _ = map_keywords(obj[2])
+                new_type = fortran_type(file_obj, line_number, obj[0], keywords)
                 if obj[1] is not None:
                     new_type.set_inherit(obj[1])
                 file_obj.add_scope(new_type, END_TYPED_WORD, req_container=True)
@@ -1104,23 +1088,21 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
             elif obj_type == 'enum':
                 block_counter += 1
                 name = '#ENUM{0}'.format(block_counter)
-                new_enum = fortran_enum(file_obj, line_number, name, file_obj.enc_scope_name)
+                new_enum = fortran_enum(file_obj, line_number, name)
                 file_obj.add_scope(new_enum, END_ENUMD_WORD, req_container=True)
                 if(debug):
                     print('{1} !!! ENUM statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'int':
-                abstract = obj[1]
                 name = obj[0]
                 if name is None:
                     int_counter += 1
                     name = '#GEN_INT{0}'.format(int_counter)
-                new_int = fortran_int(file_obj, line_number, name, file_obj.enc_scope_name, abstract)
+                new_int = fortran_int(file_obj, line_number, name, abstract=obj[1])
                 file_obj.add_scope(new_int, END_INT_WORD, req_container=True)
                 if(debug):
                     print('{1} !!! INTERFACE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'gen':
-                name = obj[0]
-                new_int = fortran_int(file_obj, line_number, name, file_obj.enc_scope_name, False)
+                new_int = fortran_int(file_obj, line_number, obj[0], abstract=False)
                 file_obj.add_scope(new_int, END_INT_WORD, req_container=True)
                 for pro_link in obj[1]:
                     file_obj.add_int_member(pro_link)
@@ -1128,9 +1110,7 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 if(debug):
                     print('{1} !!! GENERIC statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'int_pro':
-                if file_obj.current_scope is None:
-                    continue
-                if not isinstance(file_obj.current_scope, fortran_int):
+                if (file_obj.current_scope is None) or (file_obj.current_scope.get_type() != INTERFACE_TYPE_ID):
                     continue
                 for name in obj:
                     file_obj.add_int_member(name)

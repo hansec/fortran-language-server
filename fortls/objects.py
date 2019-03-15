@@ -4,6 +4,39 @@ import os
 from fortls.jsonrpc import path_to_uri
 WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
 CLASS_VAR_REGEX = re.compile(r'(TYPE|CLASS)[ ]*\(', re.I)
+# Keyword identifiers
+KEYWORD_LIST = [
+    'pointer',
+    'allocatable',
+    'optional',
+    'public',
+    'private',
+    'nopass',
+    'target',
+    'save',
+    'parameter',
+    'contiguous',
+    'deferred',
+    'dimension',
+    'intent',
+    'pass'
+]
+KEYWORD_ID_DICT = {keyword: ind for (ind, keyword) in enumerate(KEYWORD_LIST)}
+# Type identifiers
+MODULE_TYPE_ID = 1
+SUBROUTINE_TYPE_ID = 2
+FUNCTION_TYPE_ID = 3
+CLASS_TYPE_ID = 4
+INTERFACE_TYPE_ID = 5
+VAR_TYPE_ID = 6
+METH_TYPE_ID = 7
+BLOCK_TYPE_ID = 8
+SELECT_TYPE_ID = 9
+DO_TYPE_ID = 10
+WHERE_TYPE_ID = 11
+IF_TYPE_ID = 12
+ASSOC_TYPE_ID = 13
+ENUM_TYPE_ID = 14
 sort_keywords = True
 
 
@@ -13,89 +46,33 @@ def set_keyword_ordering(sorted):
 
 
 def map_keywords(keywords):
-    modifiers = []
-    pass_name = None
-    dim_str = None
-    for key in keywords:
-        key_lower = key.lower()
-        if key_lower == 'pointer':
-            modifiers.append(1)
-        elif key_lower == 'allocatable':
-            modifiers.append(2)
-        elif key_lower == 'optional':
-            modifiers.append(3)
-        elif key_lower == 'public':
-            modifiers.append(4)
-        elif key_lower == 'private':
-            modifiers.append(5)
-        elif key_lower == 'nopass':
-            modifiers.append(6)
-        elif key_lower == 'target':
-            modifiers.append(7)
-        elif key_lower == 'save':
-            modifiers.append(8)
-        elif key_lower == 'parameter':
-            modifiers.append(9)
-        elif key_lower == 'contiguous':
-            modifiers.append(10)
-        elif key_lower == 'deferred':
-            modifiers.append(11)
-        elif key_lower == 'intent(in)':
-            modifiers.append(101)
-        elif key_lower == 'intent(out)':
-            modifiers.append(102)
-        elif key_lower == 'intent(inout)':
-            modifiers.append(103)
-        elif key_lower.startswith('dimension'):
-            i1 = key_lower.find('(')
-            i2 = key_lower.rfind(')')
-            if i1 > -1 and i2 > i1:
-                dim_str = key_lower[i1+1:i2]
-                modifiers.append(20)
-        elif key_lower.startswith('pass'):
-            i1 = key_lower.find('(')
-            i2 = key_lower.rfind(')')
-            if i1 > -1 and i2 > i1:
-                pass_name = key_lower[i1+1:i2]
+    mapped_keywords = []
+    keyword_info = {}
+    for keyword in keywords:
+        keyword_prefix = keyword.split('(')[0].lower()
+        keyword_ind = KEYWORD_ID_DICT.get(keyword_prefix)
+        if keyword_ind is not None:
+            mapped_keywords.append(keyword_ind)
+            if keyword_prefix in ('intent', 'dimension', 'pass'):
+                i1 = keyword.find('(')
+                i2 = keyword.rfind(')')
+                if i1 > -1 and i2 > i1:
+                    keyword_info[keyword_prefix] = keyword[i1+1:i2]
     if sort_keywords:
-        modifiers.sort()
-    return modifiers, dim_str, pass_name
+        mapped_keywords.sort()
+    return mapped_keywords, keyword_info
 
 
-def get_keywords(modifiers, dim_str=None):
-    mod_strings = []
-    for modifier in modifiers:
-        if modifier == 1:
-            mod_strings.append('POINTER')
-        elif modifier == 2:
-            mod_strings.append('ALLOCATABLE')
-        elif modifier == 3:
-            mod_strings.append('OPTIONAL')
-        elif modifier == 4:
-            mod_strings.append('PUBLIC')
-        elif modifier == 5:
-            mod_strings.append('PRIVATE')
-        elif modifier == 6:
-            mod_strings.append('NOPASS')
-        elif modifier == 7:
-            mod_strings.append('TARGET')
-        elif modifier == 8:
-            mod_strings.append('SAVE')
-        elif modifier == 9:
-            mod_strings.append('PARAMETER')
-        elif modifier == 10:
-            mod_strings.append('CONTIGUOUS')
-        elif modifier == 11:
-            mod_strings.append('DEFERRED')
-        elif modifier == 101:
-            mod_strings.append('INTENT(IN)')
-        elif modifier == 102:
-            mod_strings.append('INTENT(OUT)')
-        elif modifier == 103:
-            mod_strings.append('INTENT(INOUT)')
-        elif (modifier == 20) and (dim_str is not None):
-            mod_strings.append('DIMENSION({0})'.format(dim_str))
-    return mod_strings
+def get_keywords(keywords, keyword_info={}):
+    keyword_strings = []
+    for keyword_id in keywords:
+        string_rep = KEYWORD_LIST[keyword_id]
+        addl_info = keyword_info.get(string_rep)
+        string_rep = string_rep.upper()
+        if addl_info is not None:
+            string_rep += '({0})'.format(addl_info)
+        keyword_strings.append(string_rep)
+    return keyword_strings
 
 
 def intersect_lists(l1, l2):
@@ -195,11 +172,89 @@ def find_word_in_line(line, word):
     return i0, i0 + len(word)
 
 
-class fortran_scope:
-    def __init__(self, file_obj, line_number, name, enc_scope=None):
-        self.base_setup(file_obj, line_number, name, enc_scope)
+class fortran_obj:
+    def __init__(self):
+        self.vis = 0
+        self.def_vis = 0
+        self.doc_str = None
+        self.parent = None
+        self.eline = -1
 
-    def base_setup(self, file_obj, sline, name, enc_scope=None):
+    def set_default_vis(self, new_vis):
+        self.def_vis = new_vis
+
+    def set_visibility(self, new_vis):
+        self.vis = new_vis
+
+    def set_parent(self, parent_obj):
+        self.parent = parent_obj
+
+    def add_doc(self, doc_str):
+        self.doc_str = doc_str
+
+    def update_fqsn(self, enc_scope=None):
+        return None
+
+    def end(self, line_number):
+        self.eline = line_number
+
+    def resolve_inherit(self, obj_tree):
+        return None
+
+    def resolve_link(self, obj_tree):
+        return None
+
+    def get_type(self):
+        return -1
+
+    def get_desc(self):
+        return 'unknown'
+
+    def get_snippet(self, name_replace=None, drop_arg=-1):
+        return None, None
+
+    def get_documentation(self):
+        return self.doc_str
+
+    def get_hover(self, long=False, include_doc=True, drop_arg=-1):
+        return None, False
+
+    def get_signature(self, drop_arg=-1):
+        return None, None, None
+
+    def get_children(self, public_only=False):
+        return []
+
+    def get_ancestors(self):
+        return []
+
+    def is_optional(self):
+        return False
+
+    def is_mod_scope(self):
+        return False
+
+    def is_callable(self):
+        return False
+
+    def is_external_int(self):
+        return False
+
+    def is_abstract(self):
+        return False
+
+    def req_named_end(self):
+        return False
+
+    def check_valid_parent(self):
+        return True
+
+
+class fortran_scope(fortran_obj):
+    def __init__(self, file_obj, line_number, name):
+        self.base_setup(file_obj, line_number, name)
+
+    def base_setup(self, file_obj, sline, name):
         self.file = file_obj
         self.sline = sline
         self.eline = sline
@@ -213,16 +268,10 @@ class fortran_scope:
         self.def_vis = 0
         self.contains_start = None
         self.doc_str = None
-        if enc_scope is not None:
-            self.FQSN = enc_scope.lower() + "::" + self.name.lower()
+        if file_obj.enc_scope_name is not None:
+            self.FQSN = file_obj.enc_scope_name.lower() + "::" + self.name.lower()
         else:
             self.FQSN = self.name.lower()
-
-    def set_default_vis(self, new_vis):
-        self.def_vis = new_vis
-
-    def set_visibility(self, new_vis):
-        self.vis = new_vis
 
     def add_use(self, use_mod, line_number, only_list=[]):
         lower_only = []
@@ -264,27 +313,6 @@ class fortran_scope:
     def add_member(self, member):
         self.members.append(member)
 
-    def add_doc(self, doc_str):
-        self.doc_str = doc_str
-
-    def get_type(self):
-        return -1
-
-    def get_desc(self):
-        return 'unknown'
-
-    def get_snippet(self, name_replace=None, drop_arg=-1):
-        return None, None
-
-    def get_documentation(self):
-        return self.doc_str
-
-    def get_hover(self, long=False, include_doc=True, drop_arg=-1):
-        return None, False
-
-    def get_signature(self, drop_arg=-1):
-        return None, None, None
-
     def get_children(self, public_only=False):
         if public_only:
             pub_children = []
@@ -301,34 +329,10 @@ class fortran_scope:
         else:
             return self.children
 
-    def get_ancestors(self):
-        return []
-
-    def is_optional(self):
-        return False
-
-    def is_mod_scope(self):
-        return False
-
-    def is_callable(self):
-        return False
-
-    def is_external_int(self):
-        return False
-
-    def is_abstract(self):
-        return False
-
-    def req_named_end(self):
-        return False
-
-    def end(self, line_number):
-        self.eline = line_number
-
     def check_double_def(self, file_contents, obj_tree):
         """Check for double definition errors in scope"""
         if self.parent is not None:
-            if self.parent.get_type() == 5:
+            if self.parent.get_type() == INTERFACE_TYPE_ID:
                 return []
         FQSN_dict = {}
         for child in self.children:
@@ -353,7 +357,7 @@ class fortran_scope:
                     find_in_scope(self.parent, child.name, obj_tree)
                 if parent_var is not None:
                     # Ignore if function return variable
-                    if (self.get_type() == 3) and (parent_var.FQSN == self.FQSN):
+                    if (self.get_type() == SUBROUTINE_TYPE_ID) and (parent_var.FQSN == self.FQSN):
                         continue
                     line_number = child.sline - 1
                     i0, i1 = find_word_in_line(file_contents[line_number].lower(), child.name.lower())
@@ -374,13 +378,10 @@ class fortran_scope:
                 errors.append([line_number, i0, i0+len(use_mod), use_mod])
         return errors
 
-    def check_valid_parent(self):
-        return True
-
 
 class fortran_module(fortran_scope):
     def get_type(self):
-        return 1
+        return MODULE_TYPE_ID
 
     def get_desc(self):
         return 'MODULE'
@@ -397,8 +398,8 @@ class fortran_program(fortran_module):
 
 
 class fortran_submodule(fortran_module):
-    def __init__(self, file_obj, line_number, name, enc_scope=None, ancestor_name=None):
-        self.base_setup(file_obj, line_number, name, enc_scope)
+    def __init__(self, file_obj, line_number, name, ancestor_name=None):
+        self.base_setup(file_obj, line_number, name)
         self.ancestor_name = ancestor_name
         self.ancestor_obj = None
 
@@ -426,10 +427,11 @@ class fortran_submodule(fortran_module):
         # Grab ancestor interface definitions (function/subroutine only)
         ancestor_interfaces = []
         for child in self.ancestor_obj.children:
-            if child.get_type() == 5:
+            if child.get_type() == INTERFACE_TYPE_ID:
                 for prototype in child.children:
                     prototype_type = prototype.get_type()
-                    if (prototype_type == 2 or prototype_type == 3) and prototype.is_mod_scope():
+                    if (prototype_type == SUBROUTINE_TYPE_ID or prototype_type == FUNCTION_TYPE_ID) \
+                       and prototype.is_mod_scope():
                         ancestor_interfaces.append(prototype)
         # Match interface definitions to implementations
         for prototype in ancestor_interfaces:
@@ -441,8 +443,8 @@ class fortran_submodule(fortran_module):
 
 
 class fortran_subroutine(fortran_scope):
-    def __init__(self, file_obj, line_number, name, enc_scope=None, args="", mod_sub=False):
-        self.base_setup(file_obj, line_number, name, enc_scope)
+    def __init__(self, file_obj, line_number, name, args="", mod_sub=False):
+        self.base_setup(file_obj, line_number, name)
         self.args = args.replace(' ', '').lower()
         self.args_snip = self.args
         self.arg_objs = []
@@ -501,7 +503,7 @@ class fortran_subroutine(fortran_scope):
         self.resolve_arg_link(obj_tree)
 
     def get_type(self):
-        return 2
+        return SUBROUTINE_TYPE_ID
 
     def get_snippet(self, name_replace=None, drop_arg=-1):
         arg_list = self.args_snip.split(",")
@@ -571,15 +573,15 @@ class fortran_subroutine(fortran_scope):
     def check_valid_parent(self):
         if self.parent is not None:
             parent_type = self.parent.get_type()
-            if (parent_type == 4) or (parent_type >= 8):
+            if (parent_type == CLASS_TYPE_ID) or (parent_type >= BLOCK_TYPE_ID):
                 return False
         return True
 
 
 class fortran_function(fortran_subroutine):
-    def __init__(self, file_obj, line_number, name, enc_scope=None, args="",
+    def __init__(self, file_obj, line_number, name, args="",
                  mod_fun=False, return_type=None, result_var=None):
-        self.base_setup(file_obj, line_number, name, enc_scope)
+        self.base_setup(file_obj, line_number, name)
         self.args = args.replace(' ', '').lower()
         self.args_snip = self.args
         self.arg_objs = []
@@ -589,11 +591,10 @@ class fortran_function(fortran_subroutine):
         self.result_obj = None
         if return_type is not None:
             self.return_type = return_type[0]
-            self.modifiers, self.dim_str, _ = map_keywords(return_type[1])
+            self.keywords, _ = map_keywords(return_type[1])
         else:
             self.return_type = None
-            self.modifiers = []
-            self.dim_str = None
+            self.keywords = []
 
     def copy_interface(self, copy_source):
         # Copy arguments and returns
@@ -626,7 +627,7 @@ class fortran_function(fortran_subroutine):
                     self.result_obj = child
 
     def get_type(self):
-        return 3
+        return FUNCTION_TYPE_ID
 
     def get_desc(self):
         # desc = None
@@ -663,21 +664,20 @@ class fortran_function(fortran_subroutine):
 
 
 class fortran_type(fortran_scope):
-    def __init__(self, file_obj, line_number, name, modifiers, enc_scope=None):
-        self.base_setup(file_obj, line_number, name, enc_scope)
+    def __init__(self, file_obj, line_number, name, keywords):
+        self.base_setup(file_obj, line_number, name)
         #
         self.in_children = []
-        self.modifiers = modifiers
+        self.keywords = keywords
         self.inherit = None
         self.inherit_var = None
-        for modifier in self.modifiers:
-            if modifier == 4:
-                self.vis = 1
-            elif modifier == 5:
-                self.vis = -1
+        if self.keywords.count(KEYWORD_ID_DICT['public']) > 0:
+            self.vis = 1
+        if self.keywords.count(KEYWORD_ID_DICT['private']) > 0:
+            self.vis = -1
 
     def get_type(self):
-        return 4
+        return CLASS_TYPE_ID
 
     def get_desc(self):
         return 'TYPE'
@@ -722,17 +722,17 @@ class fortran_type(fortran_scope):
             return False
         else:
             parent_type = self.parent.get_type()
-            if (parent_type == 4) or (parent_type >= 8):
+            if (parent_type == CLASS_TYPE_ID) or (parent_type >= BLOCK_TYPE_ID):
                 return False
         return True
 
 
 class fortran_block(fortran_scope):
-    def __init__(self, file_obj, line_number, name, enc_scope=None):
-        self.base_setup(file_obj, line_number, name, enc_scope)
+    def __init__(self, file_obj, line_number, name):
+        self.base_setup(file_obj, line_number, name)
 
     def get_type(self):
-        return 8
+        return BLOCK_TYPE_ID
 
     def get_desc(self):
         return 'BLOCK'
@@ -745,93 +745,122 @@ class fortran_block(fortran_scope):
 
 
 class fortran_do(fortran_block):
-    def __init__(self, file_obj, line_number, name, enc_scope=None):
-        self.base_setup(file_obj, line_number, name, enc_scope)
+    def __init__(self, file_obj, line_number, name):
+        self.base_setup(file_obj, line_number, name)
 
     def get_type(self):
-        return 10
+        return DO_TYPE_ID
 
     def get_desc(self):
         return 'DO'
 
 
 class fortran_where(fortran_block):
-    def __init__(self, file_obj, line_number, name, enc_scope=None):
-        self.base_setup(file_obj, line_number, name, enc_scope)
+    def __init__(self, file_obj, line_number, name):
+        self.base_setup(file_obj, line_number, name)
 
     def get_type(self):
-        return 11
+        return WHERE_TYPE_ID
 
     def get_desc(self):
         return 'WHERE'
 
 
 class fortran_if(fortran_block):
-    def __init__(self, file_obj, line_number, name, enc_scope=None):
-        self.base_setup(file_obj, line_number, name, enc_scope)
+    def __init__(self, file_obj, line_number, name):
+        self.base_setup(file_obj, line_number, name)
 
     def get_type(self):
-        return 12
+        return IF_TYPE_ID
 
     def get_desc(self):
         return 'IF'
 
 
 class fortran_associate(fortran_block):
-    def __init__(self, file_obj, line_number, name, enc_scope=None):
-        self.base_setup(file_obj, line_number, name, enc_scope)
+    def __init__(self, file_obj, line_number, name):
+        self.base_setup(file_obj, line_number, name)
 
     def get_type(self):
-        return 13
+        return ASSOC_TYPE_ID
 
     def get_desc(self):
         return 'ASSOCIATE'
 
 
 class fortran_enum(fortran_block):
-    def __init__(self, file_obj, line_number, name, enc_scope=None):
-        self.base_setup(file_obj, line_number, name, enc_scope)
+    def __init__(self, file_obj, line_number, name):
+        self.base_setup(file_obj, line_number, name)
 
     def get_type(self):
-        return 14
+        return ENUM_TYPE_ID
 
     def get_desc(self):
         return 'ENUM'
 
 
 class fortran_select(fortran_block):
-    def __init__(self, file_obj, line_number, name, select_info, enc_scope=None):
-        self.base_setup(file_obj, line_number, name, enc_scope)
-        self.type = select_info[0]
+    def __init__(self, file_obj, line_number, name, select_info):
+        self.base_setup(file_obj, line_number, name)
+        self.select_type = select_info[0]
         self.binding_name = None
         self.bound_var = None
         self.binding_type = None
-        if self.type == 2:
+        if self.select_type == 2:
             binding_split = select_info[1].split('=>')
             if len(binding_split) == 1:
                 self.bound_var = binding_split[0].strip()
             elif len(binding_split) == 2:
                 self.binding_name = binding_split[0].strip()
                 self.bound_var = binding_split[1].strip()
-        elif self.type == 3:
+        elif self.select_type == 3:
             self.binding_type = select_info[1]
+        # Close previous "TYPE IS" region if open
+        if (file_obj.current_scope is not None) \
+           and (file_obj.current_scope.get_type() == SELECT_TYPE_ID)\
+           and file_obj.current_scope.is_type_region():
+            file_obj.end_scope(line_number)
 
     def get_type(self):
-        return 9
+        return SELECT_TYPE_ID
 
     def get_desc(self):
         return 'SELECT'
 
+    def is_type_binding(self):
+        return (self.select_type == 2)
+
+    def is_type_region(self):
+        return ((self.select_type == 3) or (self.select_type == 4))
+
+    def create_binding_variable(self, file_obj, line_number, var_desc, case_type):
+        if self.parent.get_type() != SELECT_TYPE_ID:
+            return None
+        binding_name = None
+        bound_var = None
+        if (self.parent is not None) and self.parent.is_type_binding():
+            binding_name = self.parent.binding_name
+            bound_var = self.parent.bound_var
+        # Check for default case
+        if (binding_name is not None) and (case_type != 4):
+            bound_var = None
+        # Create variable
+        if binding_name is not None:
+            return fortran_var(file_obj, line_number, binding_name, var_desc, [], link_obj=bound_var)
+        elif (binding_name is None) and (bound_var is not None):
+            return fortran_var(file_obj, line_number, bound_var, var_desc, [])
+        return None
+
 
 class fortran_int(fortran_scope):
-    def __init__(self, file_obj, line_number, name, enc_scope=None, abstract=False):
-        self.base_setup(file_obj, line_number, name, enc_scope)
+    def __init__(self, file_obj, line_number, name, abstract=False):
+        self.base_setup(file_obj, line_number, name)
         self.mems = []
         self.abstract = abstract
         self.external = name.startswith('#GEN_INT') and (not abstract)
 
     def get_type(self):
-        return 5
+        return INTERFACE_TYPE_ID
 
     def get_desc(self):
         return 'INTERFACE'
@@ -857,21 +886,21 @@ class fortran_int(fortran_scope):
             child.resolve_link(obj_tree)
 
 
-class fortran_obj:
-    def __init__(self, file_obj, line_number, name, var_desc, modifiers,
-                 dim_str, enc_scope=None, link_obj=None):
-        self.base_setup(file_obj, line_number, name, var_desc, modifiers,
-                        dim_str, enc_scope, link_obj)
+class fortran_var(fortran_obj):
+    def __init__(self, file_obj, line_number, name, var_desc, keywords,
+                 keyword_info={}, link_obj=None):
+        self.base_setup(file_obj, line_number, name, var_desc, keywords,
+                        keyword_info, link_obj)
 
-    def base_setup(self, file_obj, line_number, name, var_desc, modifiers,
-                   dim_str, enc_scope, link_obj):
+    def base_setup(self, file_obj, line_number, name, var_desc, keywords,
+                   keyword_info, link_obj):
         self.file = file_obj
         self.sline = line_number
         self.eline = line_number
         self.name = name
         self.desc = var_desc
-        self.modifiers = modifiers
-        self.dim_str = dim_str
+        self.keywords = keywords
+        self.keyword_info = keyword_info
         self.doc_str = None
         self.callable = (CLASS_VAR_REGEX.match(var_desc) is not None)
         self.children = []
@@ -883,21 +912,14 @@ class fortran_obj:
             self.link_name = link_obj.lower()
         else:
             self.link_name = None
-        if enc_scope is not None:
-            self.FQSN = enc_scope.lower() + "::" + self.name.lower()
+        if file_obj.enc_scope_name is not None:
+            self.FQSN = file_obj.enc_scope_name.lower() + "::" + self.name.lower()
         else:
             self.FQSN = self.name.lower()
-        for modifier in self.modifiers:
-            if modifier == 4:
-                self.vis = 1
-            elif modifier == 5:
-                self.vis = -1
-
-    def set_parent(self, parent_obj):
-        self.parent = parent_obj
-
-    def add_doc(self, doc_str):
-        self.doc_str = doc_str
+        if self.keywords.count(KEYWORD_ID_DICT['public']) > 0:
+            self.vis = 1
+        if self.keywords.count(KEYWORD_ID_DICT['private']) > 0:
+            self.vis = -1
 
     def update_fqsn(self, enc_scope=None):
         if enc_scope is not None:
@@ -915,14 +937,11 @@ class fortran_obj:
             if link_obj is not None:
                 self.link_obj = link_obj
 
-    def set_visibility(self, new_vis):
-        self.vis = new_vis
-
     def get_type(self):
         if self.link_obj is not None:
             return self.link_obj.get_type()
         # Normal variable
-        return 6
+        return VAR_TYPE_ID
 
     def get_desc(self):
         if self.link_obj is not None:
@@ -931,10 +950,10 @@ class fortran_obj:
         return self.desc
 
     def set_dim(self, dim_str):
-        self.dim_str = dim_str
-        if 20 not in self.modifiers:
-            self.modifiers.append(20)
-            self.modifiers.sort()
+        if KEYWORD_ID_DICT['dimension'] not in self.keywords:
+            self.keywords.append(KEYWORD_ID_DICT['dimension'])
+            self.keyword_info['dimension'] = dim_str
+            self.keywords.sort()
 
     def get_snippet(self, name_replace=None, drop_arg=-1):
         name = self.name
@@ -945,27 +964,15 @@ class fortran_obj:
         # Normal variable
         return None, None
 
-    def get_documentation(self):
-        return self.doc_str
-
     def get_hover(self, long=False, include_doc=True, drop_arg=-1):
         doc_str = self.get_documentation()
-        hover_str = ", ".join([self.desc] + get_keywords(self.modifiers, self.dim_str))
+        hover_str = ", ".join([self.desc] + get_keywords(self.keywords, self.keyword_info))
         if include_doc and (doc_str is not None):
             hover_str += "\n {0}".format('\n '.join(doc_str.splitlines()))
         return hover_str, True
 
-    def get_signature(self, drop_arg=-1):
-        return None, None, None
-
-    def get_children(self, public_only=False):
-        return []
-
-    def resolve_inherit(self, obj_tree):
-        return
-
     def is_optional(self):
-        if self.modifiers.count(3) > 0:
+        if self.keywords.count(KEYWORD_ID_DICT['optional']) > 0:
             return True
         else:
             return False
@@ -973,20 +980,14 @@ class fortran_obj:
     def is_callable(self):
         return self.callable
 
-    def is_external_int(self):
-        return False
 
-    def is_abstract(self):
-        return False
-
-
-class fortran_meth(fortran_obj):
-    def __init__(self, file_obj, line_number, name, var_desc, modifiers,
-                 enc_scope=None, link_obj=None, pass_name=None):
-        self.base_setup(file_obj, line_number, name, var_desc, modifiers,
-                        None, enc_scope, link_obj)
+class fortran_meth(fortran_var):
+    def __init__(self, file_obj, line_number, name, var_desc, keywords,
+                 keyword_info, link_obj=None):
+        self.base_setup(file_obj, line_number, name, var_desc, keywords,
+                        keyword_info, link_obj)
         self.drop_arg = -1
-        self.pass_name = pass_name
+        self.pass_name = keyword_info.get('pass')
         if link_obj is None:
             open_paren = var_desc.find('(')
             close_paren = var_desc.rfind(')')
@@ -995,8 +996,8 @@ class fortran_meth(fortran_obj):
 
     def set_parent(self, parent_obj):
         self.parent = parent_obj
-        if self.parent.get_type() == 4:
-            if self.modifiers.count(6) == 0:
+        if self.parent.get_type() == CLASS_TYPE_ID:
+            if self.keywords.count(KEYWORD_ID_DICT['nopass']) == 0:
                 self.drop_arg = 0
             if (self.parent.contains_start is not None) and \
                (self.sline > self.parent.contains_start) and (self.link_name is None):
@@ -1015,7 +1016,7 @@ class fortran_meth(fortran_obj):
         if self.link_obj is not None:
             return self.link_obj.get_type()
         # Generic
-        return 7
+        return METH_TYPE_ID
 
     def get_documentation(self):
         if (self.link_obj is not None) and (self.doc_str is None):
@@ -1051,7 +1052,7 @@ class fortran_meth(fortran_obj):
                 hover_str = '\n'.join([call_sig] + hover_split)
             return hover_str, True
         else:
-            hover_str = ", ".join([self.desc] + get_keywords(self.modifiers))
+            hover_str = ", ".join([self.desc] + get_keywords(self.keywords))
             if include_doc and (doc_str is not None):
                 hover_str += "\n{0}".format(doc_str)
             return hover_str, True
@@ -1067,7 +1068,7 @@ class fortran_meth(fortran_obj):
         if self.link_name is None:
             return
         if self.parent is not None:
-            if self.parent.get_type() == 4:
+            if self.parent.get_type() == CLASS_TYPE_ID:
                 link_obj, _ = find_in_scope(self.parent.parent, self.link_name, obj_tree)
             else:
                 link_obj, _ = find_in_scope(self.parent, self.link_name, obj_tree)

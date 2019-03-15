@@ -7,8 +7,10 @@ import re
 from fortls.jsonrpc import path_to_uri, path_from_uri
 from fortls.parse_fortran import process_file, read_use_stmt, read_var_def, \
     detect_fixed_format, detect_comment_start
-from fortls.objects import find_in_scope, get_use_tree, set_keyword_ordering
-from fortls.intrinsics import get_keywords, load_intrinsics, set_lowercase_intrinsics
+from fortls.objects import find_in_scope, get_use_tree, set_keyword_ordering, \
+    MODULE_TYPE_ID, SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID, CLASS_TYPE_ID, \
+    INTERFACE_TYPE_ID, SELECT_TYPE_ID
+from fortls.intrinsics import get_intrinsic_keywords, load_intrinsics, set_lowercase_intrinsics
 
 log = logging.getLogger(__name__)
 PY3K = sys.version_info >= (3, 0)
@@ -206,7 +208,7 @@ def climb_type_tree(var_stack, curr_scope, obj_tree):
         var_name = var_stack[iVar].strip().lower()
         var_obj, new_scope = find_in_scope(type_scope, var_name, obj_tree)
         # Set scope to declaration location if variable is inherited
-        if (new_scope is not None) and (new_scope.get_type() == 4):
+        if (new_scope is not None) and (new_scope.get_type() == CLASS_TYPE_ID):
             for in_child in new_scope.in_children:
                 if (in_child.name.lower() == var_name) and (in_child.parent is not None):
                     curr_scope = in_child.parent
@@ -533,7 +535,7 @@ class LangServer:
 
         def add_children(mod_obj, query):
             tmp_list = []
-            if mod_obj.get_type() == 1:
+            if mod_obj.get_type() == MODULE_TYPE_ID:
                 for child_obj in mod_obj.get_children():
                     if not child_obj.name.lower().find(query) > -1:
                         continue
@@ -599,7 +601,7 @@ class LangServer:
         # Add scopes to outline view
         test_output = []
         for scope in file_obj.get_scopes():
-            if (scope.name[0] == "#") or (scope.get_type() == 8):
+            if (scope.name[0] == "#") or (scope.get_type() == SELECT_TYPE_ID):
                 continue
             scope_tree = scope.FQSN.split("::")
             if len(scope_tree) > 2:
@@ -627,7 +629,7 @@ class LangServer:
                 tmp_out["containerName"] = tmp_list[0]
             test_output.append(tmp_out)
             # If class add members
-            if scope.get_type() == 4 and self.symbol_include_mem:
+            if (scope.get_type() == CLASS_TYPE_ID) and self.symbol_include_mem:
                 for child in scope.children:
                     tmp_out = {}
                     tmp_out["name"] = child.name
@@ -845,7 +847,7 @@ class LangServer:
             # Use statement module part (modules only)
             for key in self.obj_tree:
                 candidate = self.obj_tree[key][0]
-                if (candidate.get_type() == 1) and \
+                if (candidate.get_type() == MODULE_TYPE_ID) and \
                    candidate.name.lower().startswith(var_prefix):
                     item_list.append(build_comp(candidate, name_only=True))
             req_dict["items"] = item_list
@@ -893,20 +895,20 @@ class LangServer:
             # Variable definition keywords (variables only)
             key_context = 0
             enc_scope_type = scope_list[-1].get_type()
-            if enc_scope_type == 1:
+            if enc_scope_type == MODULE_TYPE_ID:
                 key_context = 1
-            elif (enc_scope_type == 2) or (enc_scope_type == 3):
+            elif (enc_scope_type == SUBROUTINE_TYPE_ID) or (enc_scope_type == FUNCTION_TYPE_ID):
                 key_context = 2
-            elif enc_scope_type == 4:
+            elif enc_scope_type == CLASS_TYPE_ID:
                 key_context = 3
-            for candidate in get_keywords(self.statements, self.keywords, key_context):
+            for candidate in get_intrinsic_keywords(self.statements, self.keywords, key_context):
                 if candidate.name.lower().startswith(var_prefix):
                     item_list.append(build_comp(candidate))
             req_dict["items"] = item_list
             return req_dict
         elif line_context == 9:
             # First word -> default context plus Fortran statements
-            for candidate in get_keywords(self.statements, self.keywords, 0):
+            for candidate in get_intrinsic_keywords(self.statements, self.keywords, 0):
                 if candidate.name.lower().startswith(var_prefix):
                     item_list.append(build_comp(candidate))
         for candidate in get_candidates(scope_list, var_prefix, include_globals, public_only, abstract_only):
@@ -917,7 +919,7 @@ class LangServer:
             if req_callable and (not candidate.is_callable()):
                 continue
             #
-            if candidate_type == 5:
+            if candidate_type == INTERFACE_TYPE_ID:
                 tmp_list = []
                 for member in candidate.mems:
                     tmp_text, _ = member.get_snippet(candidate.name)
@@ -969,7 +971,7 @@ class LangServer:
         # Find in available scopes
         var_obj = None
         if curr_scope is not None:
-            if (curr_scope.get_type() == 4) and (not is_member) and \
+            if (curr_scope.get_type() == CLASS_TYPE_ID) and (not is_member) and \
                line_prefix.lstrip().lower().startswith('procedure') and (line_prefix.count("=>") > 0):
                 curr_scope = curr_scope.parent
             var_obj, _ = find_in_scope(curr_scope, def_name, self.obj_tree)
@@ -1075,7 +1077,7 @@ class LangServer:
         # Check keywords
         if (var_obj is None) and (INT_STMNT_REGEX.match(line_prefix[:sub_end]) is not None):
             key = sub_name.lower()
-            for candidate in get_keywords(self.statements, self.keywords, 0):
+            for candidate in get_intrinsic_keywords(self.statements, self.keywords, 0):
                 if candidate.name.lower() == key:
                     var_obj = candidate
                     break
@@ -1127,7 +1129,7 @@ class LangServer:
         restrict_file = None
         type_mem = False
         if def_obj.FQSN.count(":") > 2:
-            if def_obj.parent.get_type() == 4:
+            if def_obj.parent.get_type() == CLASS_TYPE_ID:
                 type_mem = True
             else:
                 restrict_file = def_obj.file.path
@@ -1159,7 +1161,7 @@ class LangServer:
                         ref_match = False
                         if (def_fqsn == var_def.FQSN) or (var_def.FQSN in override_cache):
                             ref_match = True
-                        elif var_def.parent.get_type() == 4:
+                        elif var_def.parent.get_type() == CLASS_TYPE_ID:
                             if type_mem:
                                 for inherit_def in var_def.parent.get_overriden(def_name):
                                     if def_fqsn == inherit_def.FQSN:
@@ -1233,9 +1235,9 @@ class LangServer:
         # Construct hover information
         var_type = var_obj.get_type()
         hover_str = None
-        if (var_type == 2) or (var_type == 3):
+        if (var_type == SUBROUTINE_TYPE_ID) or (var_type == FUNCTION_TYPE_ID):
             hover_str, highlight = var_obj.get_hover(long=True)
-        elif var_type == 5:
+        elif var_type == INTERFACE_TYPE_ID:
             hover_array = []
             for member in var_obj.mems:
                 hover_str, highlight = member.get_hover(long=True)
@@ -1264,7 +1266,7 @@ class LangServer:
         if var_obj is None:
             return None
         # Construct implementation reference
-        if var_obj.parent.get_type() == 4:
+        if var_obj.parent.get_type() == CLASS_TYPE_ID:
             impl_obj = var_obj.link_obj
             if (impl_obj is not None) and (impl_obj.file.path is not None):
                 sline = impl_obj.sline-1
