@@ -1,3 +1,12 @@
+## 1.5.1
+
+### Improvements
+* Add support for semicolon separators and multiline preprocessor macros, fixes [#98](https://github.com/hansec/fortran-language-server/issues/98)
+* Add various "parsing errors" to debug_parser output
+
+### Fixes
+* Use consistent file access method across debug_parser run and language server requests
+
 ## 1.5.0
 
 ### Improvements
