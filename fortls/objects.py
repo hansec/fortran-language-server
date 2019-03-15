@@ -20,7 +20,10 @@ KEYWORD_LIST = [
     'deferred',
     'dimension',
     'intent',
-    'pass'
+    'pass',
+    'pure',
+    'elemental',
+    'recursive'
 ]
 KEYWORD_ID_DICT = {keyword: ind for (ind, keyword) in enumerate(KEYWORD_LIST)}
 # Type identifiers
@@ -584,8 +587,8 @@ class fortran_submodule(fortran_module):
 
 
 class fortran_subroutine(fortran_scope):
-    def __init__(self, file_obj, line_number, name, args="", mod_sub=False):
-        self.base_setup(file_obj, line_number, name)
+    def __init__(self, file_obj, line_number, name, args="", mod_sub=False, keywords=[]):
+        self.base_setup(file_obj, line_number, name, keywords=keywords)
         self.args = args.replace(' ', '').lower()
         self.args_snip = self.args
         self.arg_objs = []
@@ -683,7 +686,9 @@ class fortran_subroutine(fortran_scope):
 
     def get_hover(self, long=False, include_doc=True, drop_arg=-1):
         sub_sig, _ = self.get_snippet(drop_arg=drop_arg)
-        hover_array = ["SUBROUTINE " + sub_sig]
+        keyword_list = get_keywords(self.keywords)
+        keyword_list.append("SUBROUTINE ")
+        hover_array = [" ".join(keyword_list) + sub_sig]
         doc_str = self.get_documentation()
         if include_doc and (doc_str is not None):
             hover_array[0] += "\n" + doc_str
@@ -770,8 +775,8 @@ class fortran_subroutine(fortran_scope):
 
 class fortran_function(fortran_subroutine):
     def __init__(self, file_obj, line_number, name, args="",
-                 mod_fun=False, return_type=None, result_var=None):
-        self.base_setup(file_obj, line_number, name)
+                 mod_fun=False, keywords=[], return_type=None, result_var=None):
+        self.base_setup(file_obj, line_number, name, keywords=keywords)
         self.args = args.replace(' ', '').lower()
         self.args_snip = self.args
         self.arg_objs = []
@@ -782,10 +787,8 @@ class fortran_function(fortran_subroutine):
         self.result_obj = None
         if return_type is not None:
             self.return_type = return_type[0]
-            self.keywords, _ = map_keywords(return_type[1])
         else:
             self.return_type = None
-            self.keywords = []
 
     def copy_interface(self, copy_source):
         # Copy arguments and returns
@@ -837,7 +840,9 @@ class fortran_function(fortran_subroutine):
             fun_return, _ = self.result_obj.get_hover(include_doc=False)
         if self.return_type is not None:
             fun_return = self.return_type
-        hover_array = ["{0} FUNCTION {1}".format(fun_return, fun_sig)]
+        keyword_list = get_keywords(self.keywords)
+        keyword_list.append("FUNCTION")
+        hover_array = ["{0} {1} {2}".format(fun_return, " ".join(keyword_list), fun_sig)]
         doc_str = self.get_documentation()
         if include_doc and (doc_str is not None):
             hover_array[0] += "\n" + doc_str

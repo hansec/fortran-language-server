@@ -259,9 +259,11 @@ def read_var_def(line, type_word=None, fun_only=False):
 def read_fun_def(line, return_type=None, mod_fun=False):
     mod_match = SUB_MOD_REGEX.match(line)
     mods_found = False
+    keywords = []
     while mod_match is not None:
         mods_found = True
         line = line[mod_match.end(0):]
+        keywords.append(mod_match.group(1))
         mod_match = SUB_MOD_REGEX.match(line)
     if mods_found:
         tmp_var = read_var_def(line, fun_only=True)
@@ -290,13 +292,15 @@ def read_fun_def(line, return_type=None, mod_fun=False):
         results_match = RESULT_REGEX.match(trailing_line)
         if results_match is not None:
             return_var = results_match.group(1).strip().lower()
-    return 'fun', [name, args, [return_type, return_var], mod_fun]
+    return 'fun', [name, args, [return_type, return_var], mod_fun, keywords]
 
 
 def read_sub_def(line, mod_sub=False):
+    keywords = []
     mod_match = SUB_MOD_REGEX.match(line)
     while mod_match is not None:
         line = line[mod_match.end(0):]
+        keywords.append(mod_match.group(1))
         mod_match = SUB_MOD_REGEX.match(line)
     sub_match = SUB_REGEX.match(line)
     if sub_match is None:
@@ -314,7 +318,7 @@ def read_sub_def(line, mod_sub=False):
             word_match = [word for word in word_match]
             args = ','.join(word_match)
         trailing_line = trailing_line[paren_match.end(0):]
-    return 'sub', [name, args, mod_sub]
+    return 'sub', [name, args, mod_sub, keywords]
 
 
 def read_block_def(line):
@@ -1026,13 +1030,17 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 if(debug):
                     print('{1} !!! PROGRAM statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'sub':
-                new_sub = fortran_subroutine(file_obj, line_number, obj[0], args=obj[1], mod_sub=obj[2])
+                keywords, _ = map_keywords(obj[3])
+                new_sub = fortran_subroutine(file_obj, line_number, obj[0], args=obj[1], mod_sub=obj[2],
+                                             keywords=keywords)
                 file_obj.add_scope(new_sub, END_SUB_WORD)
                 if(debug):
                     print('{1} !!! SUBROUTINE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'fun':
+                keywords, _ = map_keywords(obj[4])
                 new_fun = fortran_function(file_obj, line_number, obj[0], args=obj[1],
-                                           mod_fun=obj[3], return_type=obj[2][0], result_var=obj[2][1])
+                                           mod_fun=obj[3], keywords=keywords,
+                                           return_type=obj[2][0], result_var=obj[2][1])
                 file_obj.add_scope(new_fun, END_FUN_WORD)
                 if obj[2][0] is not None:
                     new_obj = fortran_var(file_obj, line_number, obj[0], obj[2][0][0], obj[2][0][1])
