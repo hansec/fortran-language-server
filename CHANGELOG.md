@@ -1,3 +1,13 @@
+## 1.6.0
+
+### Improvements
+* Add support for EXTERNAL subroutines
+* Diagnostics: Missing subroutine/function arguments and argument declarations
+* Diagnostics: Unimplemented deferred type-bound procedures
+* Diagnostics: Unknown TYPE/KIND objects (only if candidate is visible in workspace)
+* Diagnostics: IMPORT statements (missing objects and placement)
+* Diagnostics: Basic handling for IMPLICIT statements
+
 ## 1.5.1
 
 ### Improvements

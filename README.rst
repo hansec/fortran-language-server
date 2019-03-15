@@ -34,12 +34,16 @@ Language Server Features
 - Documentation parsing (`Doxygen <http://www.doxygen.org/>`_ and `FORD <https://github.com/Fortran-FOSS-Programmers/ford>`_ styles)
 - Diagnostics (limited)
 
-  - Multiple use of the same variable name
-  - Unknown module in USE statement
-  - Variable masking definition from parent scope
+  - Multiple definitions with the same variable name
+  - Variable definition masks definition from parent scope
+  - Missing subroutine/function arguments
+  - Unknown user-defined type used in "TYPE"/"CLASS" definition (only if visible in project)
   - Unclosed blocks/scopes
   - Invalid scope nesting
-  - Contains statement errors
+  - Unknown modules in "USE" statement
+  - Unimplemented deferred type-bound procedures
+  - Use of unimported variables/objects in interface blocks
+  - Statement placement errors ("CONTAINS", "IMPLICIT", "IMPORT")
 
 **Notes/Limitations:**
 
