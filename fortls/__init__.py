@@ -3,7 +3,7 @@ import sys
 import os
 import argparse
 from multiprocessing import freeze_support
-from .langserver import LangServer
+from .langserver import LangServer, read_file_split
 from .jsonrpc import JSONRPC2Connection, ReadWriter, path_from_uri
 from .parse_fortran import process_file, detect_fixed_format
 __version__ = '1.5.0'
@@ -162,23 +162,24 @@ def main():
         #
         print('\nTesting parser')
         print('  File = "{0}"'.format(args.debug_filepath))
-        with open(args.debug_filepath, 'r') as fhandle:
-            contents_split = fhandle.readlines()
-            fixed_flag = detect_fixed_format(contents_split)
-            print('  Detected format: {0}'.format("fixed" if fixed_flag else "free"))
-            print("\n=========\nParser Output\n=========\n")
-            _, file_ext = os.path.splitext(os.path.basename(args.debug_filepath))
-            if file_ext == file_ext.upper():
-                ast_new = process_file(contents_split, True, fixed_format=fixed_flag, debug=True, pp_defs=pp_defs)
-            else:
-                ast_new = process_file(contents_split, True, fixed_format=fixed_flag, debug=True)
-            print("\n=========\nObject Tree\n=========\n")
-            for obj in ast_new.get_scopes():
-                print("{0}: {1}".format(obj.get_type(), obj.FQSN))
-                print_children(obj)
-            print("\n=========\nExportable Objects\n=========\n")
-            for _, obj in ast_new.global_dict.items():
-                print("{0}: {1}".format(obj.get_type(), obj.FQSN))
+        contents_split, err_str = read_file_split(args.debug_filepath)
+        if contents_split is None:
+            error_exit("Reading file failed: {0}".format(err_str))
+        fixed_flag = detect_fixed_format(contents_split)
+        print('  Detected format: {0}'.format("fixed" if fixed_flag else "free"))
+        print("\n=========\nParser Output\n=========\n")
+        _, file_ext = os.path.splitext(os.path.basename(args.debug_filepath))
+        if file_ext == file_ext.upper():
+            ast_new = process_file(contents_split, True, fixed_format=fixed_flag, debug=True, pp_defs=pp_defs)
+        else:
+            ast_new = process_file(contents_split, True, fixed_format=fixed_flag, debug=True)
+        print("\n=========\nObject Tree\n=========\n")
+        for obj in ast_new.get_scopes():
+            print("{0}: {1}".format(obj.get_type(), obj.FQSN))
+            print_children(obj)
+        print("\n=========\nExportable Objects\n=========\n")
+        for _, obj in ast_new.global_dict.items():
+            print("{0}: {1}".format(obj.get_type(), obj.FQSN))
     #
     elif debug_server:
         prb, pwb = os.pipe()

@@ -1134,4 +1134,17 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 if(debug):
                     print('{1} !!! Visiblity statement({0})'.format(line_number, line.strip()))
     file_obj.close_file(line_number)
+    if debug:
+        if len(file_obj.end_errors) > 0:
+            print("\n=== Scope Errors ===\n")
+            for error in file_obj.end_errors:
+                if error[0] >= 0:
+                    message = 'Unexpected end of scope at line {0}'.format(error[0])
+                else:
+                    message = 'Unexpected end statement: No open scopes'
+                print('{0}: {1}'.format(error[1], message))
+        if len(file_obj.parse_errors) > 0:
+            print("\n=== Parsing Errors ===\n")
+            for error in file_obj.parse_errors:
+                print('{0}: {1}'.format(error["line"], error["mess"]))
     return file_obj
