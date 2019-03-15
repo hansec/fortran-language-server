@@ -285,6 +285,9 @@ class fortran_obj:
     def get_signature(self, drop_arg=-1):
         return None, None, None
 
+    def get_interface(self, name_replace=None, drop_arg=-1, change_strings=None):
+        return None
+
     def get_children(self, public_only=False):
         return []
 
@@ -302,6 +305,9 @@ class fortran_obj:
             if (self.implicit_vars is not None) or (parent_implicit is None):
                 return self.implicit_vars
             return parent_implicit
+
+    def get_actions(self, sline, eline):
+        return None
 
     def is_optional(self):
         return False
@@ -492,6 +498,26 @@ class fortran_scope(fortran_obj):
                 severity=1, file_contents=file_contents, find_word='IMPLICIT'
             ))
         return errors
+
+    def add_subroutine(self, interface_string, no_contains=False):
+        edits = []
+        line_number = self.eline - 1
+        if (self.contains_start is None) and (not no_contains):
+            edits.append({
+                "range": {
+                    "start": {"line": line_number, "character": 0},
+                    "end": {"line": line_number, "character": 0}
+                },
+                "newText": "CONTAINS\n"
+            })
+        edits.append({
+            "range": {
+                "start": {"line": line_number, "character": 0},
+                "end": {"line": line_number, "character": 0}
+            },
+            "newText": interface_string + "\n"
+        })
+        return self.file.path, edits
 
 
 class fortran_module(fortran_scope):
@@ -692,6 +718,27 @@ class fortran_subroutine(fortran_scope):
         call_sig, _ = self.get_snippet()
         return call_sig, self.get_documentation(), arg_sigs
 
+    def get_interface(self, name_replace=None, change_arg=-1, change_strings=None):
+        sub_sig, _ = self.get_snippet(name_replace=name_replace)
+        keyword_list = get_keywords(self.keywords)
+        keyword_list.append("SUBROUTINE ")
+        interface_array = [" ".join(keyword_list) + sub_sig]
+        for (i, arg_obj) in enumerate(self.arg_objs):
+            if arg_obj is None:
+                return None
+            arg_doc, _ = arg_obj.get_hover(include_doc=False)
+            if i == change_arg:
+                i0 = arg_doc.lower().find(change_strings[0].lower())
+                if i0 >= 0:
+                    i1 = i0 + len(change_strings[0])
+                    arg_doc = arg_doc[:i0] + change_strings[1] + arg_doc[i1:]
+            interface_array.append("{0} :: {1}".format(arg_doc, arg_obj.name))
+        name = self.name
+        if name_replace is not None:
+            name = name_replace
+        interface_array.append("END SUBROUTINE {0}".format(name))
+        return "\n".join(interface_array)
+
     def check_valid_parent(self):
         if self.parent is not None:
             parent_type = self.parent.get_type()
@@ -805,6 +852,35 @@ class fortran_function(fortran_subroutine):
                     hover_array += doc_str.splitlines()
         return "\n ".join(hover_array), long
 
+    def get_interface(self, name_replace=None, change_arg=-1, change_strings=None):
+        fun_sig, _ = self.get_snippet(name_replace=name_replace)
+        keyword_list = []
+        if self.return_type is not None:
+            keyword_list.append(self.return_type)
+        if self.result_obj is not None:
+            fun_sig += " RESULT({0})".format(self.result_obj.name)
+        keyword_list += get_keywords(self.keywords)
+        keyword_list.append("FUNCTION ")
+        interface_array = [" ".join(keyword_list) + fun_sig]
+        for (i, arg_obj) in enumerate(self.arg_objs):
+            if arg_obj is None:
+                return None
+            arg_doc, _ = arg_obj.get_hover(include_doc=False)
+            if i == change_arg:
+                i0 = arg_doc.lower().find(change_strings[0].lower())
+                if i0 >= 0:
+                    i1 = i0 + len(change_strings[0])
+                    arg_doc = arg_doc[:i0] + change_strings[1] + arg_doc[i1:]
+            interface_array.append("{0} :: {1}".format(arg_doc, arg_obj.name))
+        if self.result_obj is not None:
+            arg_doc, _ = self.result_obj.get_hover(include_doc=False)
+            interface_array.append("{0} :: {1}".format(arg_doc, self.result_obj.name))
+        name = self.name
+        if name_replace is not None:
+            name = name_replace
+        interface_array.append("END FUNCTION {0}".format(name))
+        return "\n".join(interface_array)
+
 
 class fortran_type(fortran_scope):
     def __init__(self, file_obj, line_number, name, keywords):
@@ -871,16 +947,70 @@ class fortran_type(fortran_scope):
         errors = []
         for in_child in self.in_children:
             if in_child.keywords.count(KEYWORD_ID_DICT['deferred']) > 0:
-                if self.contains_start is None:
-                    line_number = self.eline - 1
-                else:
-                    line_number = self.contains_start - 1
                 errors.append(build_diagnostic(
-                    line_number, 'Deferred procedure "{0}" not implemented'.format(in_child.name),
+                    self.eline - 1, 'Deferred procedure "{0}" not implemented'.format(in_child.name),
                     severity=1, related_path=in_child.file.path,
                     related_line=in_child.sline-1, related_message='Inherited procedure declaration'
                 ))
         return errors
+
+    def get_actions(self, sline, eline):
+        actions = []
+        edits = []
+        line_number = self.eline - 1
+        if (line_number < sline) or (line_number > eline):
+            return actions
+        if self.contains_start is None:
+            edits.append({
+                "range": {
+                    "start": {"line": line_number, "character": 0},
+                    "end": {"line": line_number, "character": 0}
+                },
+                "newText": "CONTAINS\n"
+            })
+        #
+        diagnostics = []
+        has_edits = False
+        file_uri = path_to_uri(self.file.path)
+        for in_child in self.in_children:
+            if in_child.keywords.count(KEYWORD_ID_DICT['deferred']) > 0:
+                # Get interface
+                interface_string = in_child.get_interface(
+                    name_replace=in_child.name,
+                    change_strings=('class({0})'.format(in_child.parent.name), 'CLASS({0})'.format(self.name))
+                )
+                if interface_string is None:
+                    continue
+                interface_path, interface_edits = self.parent.add_subroutine(interface_string, no_contains=has_edits)
+                if interface_path != self.file.path:
+                    continue
+                edits.append({
+                    "range": {
+                        "start": {"line": line_number, "character": 0},
+                        "end": {"line": line_number, "character": 0}
+                    },
+                    "newText": "  PROCEDURE :: {0} => {0}\n".format(in_child.name)
+                })
+                edits += interface_edits
+                diagnostics.append(build_diagnostic(
+                    line_number, 'Deferred procedure "{0}" not implemented'.format(in_child.name),
+                    severity=1, related_path=in_child.file.path,
+                    related_line=in_child.sline-1, related_message='Inherited procedure declaration'
+                ))
+                has_edits = True
+        #
+        if has_edits:
+            actions.append({
+                "title": "Implement deferred procedures",
+                "kind": "quickfix",
+                "edit": {
+                    "changes": {
+                        file_uri: edits
+                    }
+                },
+                "diagnostics": diagnostics
+            })
+        return actions
 
 
 class fortran_block(fortran_scope):
@@ -1258,6 +1388,11 @@ class fortran_meth(fortran_var):
             _, _, arg_sigs = self.link_obj.get_signature(self.drop_arg)
             return call_sig, self.get_documentation(), arg_sigs
         return None, None, None
+
+    def get_interface(self, name_replace=None, change_arg=-1, change_strings=None):
+        if self.link_obj is not None:
+            return self.link_obj.get_interface(name_replace, self.drop_arg, change_strings)
+        return None
 
     def resolve_link(self, obj_tree):
         if self.link_name is None:

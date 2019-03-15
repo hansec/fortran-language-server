@@ -52,6 +52,10 @@ def main():
         help="Display variable keywords information in original order (default: sort to consistent ordering)"
     )
     parser.add_argument(
+        '--enable_code_actions', action="store_true",
+        help="Enable experimental code actions (default: false)"
+    )
+    parser.add_argument(
         '--debug_log', action="store_true",
         help="Generate debug log in project root folder"
     )
@@ -101,6 +105,10 @@ def main():
         help="Test rename request for specified file and position"
     )
     group.add_argument(
+        '--debug_actions', action="store_true",
+        help="Test codeAction request for specified file and position"
+    )
+    group.add_argument(
         '--debug_filepath', type=str,
         help="File path for language server tests"
     )
@@ -124,7 +132,7 @@ def main():
                     or args.debug_completion or args.debug_signature
                     or args.debug_definition or args.debug_hover
                     or args.debug_implementation or args.debug_references
-                    or (args.debug_rename is not None)
+                    or (args.debug_rename is not None) or args.debug_actions
                     or (args.debug_rootpath is not None)
                     or (args.debug_workspace_symbols is not None))
     #
@@ -135,7 +143,8 @@ def main():
         "lowercase_intrinsics": args.lowercase_intrinsics,
         "use_signature_help": args.use_signature_help,
         "variable_hover": args.variable_hover,
-        "sort_keywords": (not args.preserve_keyword_order)
+        "sort_keywords": (not args.preserve_keyword_order),
+        "enable_code_actions": (args.enable_code_actions or args.debug_actions)
     }
     #
     if args.debug_parser:
@@ -451,8 +460,34 @@ def main():
                                 print('  + {0}'.format(line))
                             print()
                     else:
-                        print('Unknown file: "{0}"'.fromat(path))
+                        print('Unknown file: "{0}"'.format(path))
                 print('=======')
+        #
+        if args.debug_actions:
+            import pprint
+            pp = pprint.PrettyPrinter(indent=2, width=120)
+            print('\nTesting "textDocument/getActions" request:')
+            check_request_params(args)
+            s.serve_onSave({
+                "params": {
+                    "textDocument": {"uri": args.debug_filepath}
+                }
+            })
+            action_results = s.serve_codeActions({
+                "params": {
+                    "textDocument": {"uri": args.debug_filepath},
+                    "range": {
+                        "start": {"line": args.debug_line-1, "character": args.debug_char-1},
+                        "end": {"line": args.debug_line-1, "character": args.debug_char-1}
+                    }
+                }
+            })
+            for result in action_results:
+                print("Kind = '{0}', Title = '{1}'".format(result['kind'], result['title']))
+                for editUri, editChange in result['edit']['changes'].items():
+                    print("\nChange: URI = '{0}'".format(editUri))
+                    pp.pprint(editChange)
+                print()
         tmpout.close()
         tmpin.close()
     #

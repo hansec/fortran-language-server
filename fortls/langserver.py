@@ -346,6 +346,7 @@ class LangServer:
         self.use_signature_help = settings.get("use_signature_help", False)
         self.variable_hover = settings.get("variable_hover", False)
         self.sort_keywords = settings.get("sort_keywords", True)
+        self.enable_code_actions = settings.get("enable_code_actions", False)
         # Set object settings
         set_keyword_ordering(self.sort_keywords)
 
@@ -390,6 +391,7 @@ class LangServer:
             "textDocument/didSave": self.serve_onSave,
             "textDocument/didClose": self.serve_onClose,
             "textDocument/didChange": self.serve_onChange,
+            "textDocument/codeAction": self.serve_codeActions,
             "initialized": noop,
             "workspace/didChangeWatchedFiles": noop,
             "workspace/symbol": self.serve_workspace_symbol,
@@ -511,6 +513,8 @@ class LangServer:
             server_capabilities["signatureHelpProvider"] = {
                 "triggerCharacters": ["(", ","]
             }
+        if self.enable_code_actions:
+            server_capabilities["codeActionProvider"] = True
         return {"capabilities": server_capabilities}
         #     "workspaceSymbolProvider": True,
         #     "streaming": False,
@@ -1278,6 +1282,20 @@ class LangServer:
                 "newText": new_name
             })
         return {"changes": changes}
+
+    def serve_codeActions(self, request):
+        params = request["params"]
+        uri = params["textDocument"]["uri"]
+        sline = params["range"]["start"]["line"]
+        eline = params["range"]["end"]["line"]
+        path = path_from_uri(uri)
+        # Find object
+        if path in self.workspace:
+            file_obj = self.workspace[path]["ast"]
+            curr_scope = file_obj.get_inner_scope(sline)
+            if curr_scope is not None:
+                return curr_scope.get_actions(sline, eline)
+        return None
 
     def send_diagnostics(self, uri):
         diag_results, diag_exp = self.get_diagnostics(uri)
