@@ -1,10 +1,10 @@
 from __future__ import print_function
 import re
-from fortls.objects import map_keywords, fortran_module, fortran_program, \
-    fortran_submodule, fortran_subroutine, fortran_function, fortran_block, \
-    fortran_select, fortran_type, fortran_enum, fortran_int, fortran_var, \
-    fortran_meth, fortran_associate, fortran_do, fortran_where, fortran_if, \
-    fortran_file, INTERFACE_TYPE_ID, SELECT_TYPE_ID
+from fortls.objects import get_paren_substring, map_keywords, fortran_module, \
+    fortran_program, fortran_submodule, fortran_subroutine, fortran_function, \
+    fortran_block, fortran_select, fortran_type, fortran_enum, fortran_int, \
+    fortran_var, fortran_meth, fortran_associate, fortran_do, fortran_where, \
+    fortran_if, fortran_file, INTERFACE_TYPE_ID, SELECT_TYPE_ID
 # Fortran statement matching rules
 USE_REGEX = re.compile(r'[ ]*USE([, ]+INTRINSIC)?[ :]+([a-z0-9_]*)([, ]+ONLY[ :]+)?', re.I)
 INCLUDE_REGEX = re.compile(r'[ ]*INCLUDE[ :]*[\'\"]([^\'\"]*)', re.I)
@@ -195,15 +195,6 @@ def parse_keywords(test_str):
         keywords.append(tmp_str.strip().upper())
         keyword_match = KEYWORD_LIST_REGEX.match(test_str)
     return keywords, test_str
-
-
-def get_var_dims(test_str):
-    i1 = test_str.find('(')
-    i2 = test_str.rfind(')')
-    if i1 > -1 and i2 > i1:
-        return test_str[i1+1:i2]
-    else:
-        return None
 
 
 def read_var_def(line, type_word=None, fun_only=False):
@@ -967,10 +958,7 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                             print('{1} !!! INTERFACE-PRO statement({0})'.format(line_number, line.strip()))
                         continue
                     procedure_def = True
-                    i1 = desc_string.find('(')
-                    i2 = desc_string.rfind(')')
-                    if i1 > -1 and i2 > -1:
-                        link_name = desc_string[i1+1:i2]
+                    link_name = get_paren_substring(desc_string)
                 for var_name in var_names:
                     link_name = None
                     if var_name.find('=>') > -1:
@@ -983,7 +971,7 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                         name_stripped = var_name.split('=')[0]
                     # Add dimension if specified
                     if name_stripped.find('(') > -1:
-                        obj[1].append('dimension({0})'.format(get_var_dims(name_stripped)))
+                        obj[1].append('dimension({0})'.format(get_paren_substring(name_stripped)))
                     name_stripped = name_stripped.split('(')[0].strip()
                     keywords, keyword_info = map_keywords(obj[1])
                     if procedure_def:

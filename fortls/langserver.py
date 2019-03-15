@@ -7,9 +7,9 @@ import re
 from fortls.jsonrpc import path_to_uri, path_from_uri
 from fortls.parse_fortran import process_file, read_use_stmt, read_var_def, \
     detect_fixed_format, detect_comment_start
-from fortls.objects import find_in_scope, get_use_tree, set_keyword_ordering, \
-    MODULE_TYPE_ID, SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID, CLASS_TYPE_ID, \
-    INTERFACE_TYPE_ID, SELECT_TYPE_ID
+from fortls.objects import get_paren_substring, find_in_scope, get_use_tree, \
+    set_keyword_ordering, MODULE_TYPE_ID, SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID, \
+    CLASS_TYPE_ID, INTERFACE_TYPE_ID, SELECT_TYPE_ID
 from fortls.intrinsics import get_intrinsic_keywords, load_intrinsics, set_lowercase_intrinsics
 
 log = logging.getLogger(__name__)
@@ -176,13 +176,10 @@ def expand_name(line, char_poss):
 
 def climb_type_tree(var_stack, curr_scope, obj_tree):
     def get_type_name(var_obj):
-        type_desc = var_obj.get_desc()
-        i1 = type_desc.find('(')
-        i2 = type_desc.rfind(')')
-        if i1 >= 0 and i2 >= 0:
-            return type_desc[i1+1:i2].strip().lower()
-        else:
-            return None
+        type_desc = get_paren_substring(var_obj.get_desc())
+        if type_desc is not None:
+            type_desc = type_desc.strip().lower()
+        return type_desc
     # Find base variable in current scope
     type_name = None
     type_scope = None

@@ -54,10 +54,9 @@ def map_keywords(keywords):
         if keyword_ind is not None:
             mapped_keywords.append(keyword_ind)
             if keyword_prefix in ('intent', 'dimension', 'pass'):
-                i1 = keyword.find('(')
-                i2 = keyword.rfind(')')
-                if i1 > -1 and i2 > i1:
-                    keyword_info[keyword_prefix] = keyword[i1+1:i2]
+                keyword_substring = get_paren_substring(keyword)
+                if keyword_substring is not None:
+                    keyword_info[keyword_prefix] = keyword_substring
     if sort_keywords:
         mapped_keywords.sort()
     return mapped_keywords, keyword_info
@@ -81,6 +80,15 @@ def intersect_lists(l1, l2):
         if l2.count(val1) > 0:
             tmp_list.append(val1)
     return tmp_list
+
+
+def get_paren_substring(test_str):
+    i1 = test_str.find('(')
+    i2 = test_str.rfind(')')
+    if i1 > -1 and i2 > i1:
+        return test_str[i1+1:i2]
+    else:
+        return None
 
 
 def get_use_tree(scope, use_dict, obj_tree, only_list=[]):
@@ -172,6 +180,35 @@ def find_word_in_line(line, word):
     return i0, i0 + len(word)
 
 
+def build_diagnostic(sline, message, severity=1, eline=None, file_contents=None, find_word=None,
+                     related_path=None, related_line=None, related_message=""):
+    if eline is None:
+        eline = sline
+    i0 = i1 = 0
+    if (file_contents is not None) and (find_word is not None):
+        i0, i1 = find_word_in_line(file_contents[sline].lower(), find_word.lower())
+    diag = {
+        "range": {
+            "start": {"line": sline, "character": i0},
+            "end": {"line": eline, "character": i1}
+        },
+        "message": message,
+        "severity": severity
+    }
+    if (related_path is not None) and (related_line is not None):
+        diag["relatedInformation"] = [{
+            "location": {
+                "uri": path_to_uri(related_path),
+                "range": {
+                    "start": {"line": related_line, "character": 0},
+                    "end": {"line": related_line, "character": 0}
+                }
+            },
+            "message": related_message
+        }]
+    return diag
+
+
 class fortran_obj:
     def __init__(self):
         self.vis = 0
@@ -228,6 +265,9 @@ class fortran_obj:
     def get_ancestors(self):
         return []
 
+    def get_diagnostics(self, file_contents):
+        return []
+
     def is_optional(self):
         return False
 
@@ -254,7 +294,7 @@ class fortran_scope(fortran_obj):
     def __init__(self, file_obj, line_number, name):
         self.base_setup(file_obj, line_number, name)
 
-    def base_setup(self, file_obj, sline, name):
+    def base_setup(self, file_obj, sline, name, keywords=[]):
         self.file = file_obj
         self.sline = sline
         self.eline = sline
@@ -262,6 +302,7 @@ class fortran_scope(fortran_obj):
         self.children = []
         self.members = []
         self.use = []
+        self.keywords = keywords
         self.inherit = None
         self.parent = None
         self.vis = 0
@@ -348,21 +389,18 @@ class fortran_scope(fortran_obj):
             if child.FQSN in FQSN_dict:
                 line_number = child.sline - 1
                 if line_number > FQSN_dict[child.FQSN]:
-                    i0, i1 = find_word_in_line(file_contents[line_number].lower(), child.name.lower())
-                    errors.append([0, line_number, i0, i1, child.name, self.file.path, FQSN_dict[child.FQSN]])
+                    errors.append([0, line_number, child.name, self.file.path, FQSN_dict[child.FQSN]])
                     continue
             # Check for masking from parent scope in subroutines, functions, and blocks
-            if (self.parent is not None) and (self.get_type() in (2, 3, 8)):
+            if (self.parent is not None) and \
+               (self.get_type() in (SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID, BLOCK_TYPE_ID)):
                 parent_var, _ = \
                     find_in_scope(self.parent, child.name, obj_tree)
                 if parent_var is not None:
                     # Ignore if function return variable
                     if (self.get_type() == SUBROUTINE_TYPE_ID) and (parent_var.FQSN == self.FQSN):
                         continue
-                    line_number = child.sline - 1
-                    i0, i1 = find_word_in_line(file_contents[line_number].lower(), child.name.lower())
-                    errors.append([1, line_number, i0, i1, child.name,
-                                   parent_var.file.path, parent_var.sline - 1])
+                    errors.append([1, child.sline-1, child.name, parent_var.file.path, parent_var.sline-1])
         return errors
 
     def check_use(self, obj_tree, file_contents):
@@ -370,12 +408,7 @@ class fortran_scope(fortran_obj):
         for use_line in self.use:
             use_mod = use_line[0]
             if use_mod not in obj_tree:
-                line_number = use_line[2] - 1
-                line = file_contents[line_number]
-                i0 = line.lower().find(use_mod)
-                if i0 == -1:
-                    i0 = 0
-                errors.append([line_number, i0, i0+len(use_mod), use_mod])
+                errors.append([use_line[2] - 1, use_mod])
         return errors
 
 
@@ -449,6 +482,7 @@ class fortran_subroutine(fortran_scope):
         self.args_snip = self.args
         self.arg_objs = []
         self.in_children = []
+        self.missing_args = []
         self.mod_scope = mod_sub
 
     def is_mod_scope(self):
@@ -480,19 +514,25 @@ class fortran_subroutine(fortran_scope):
         return tmp_list
 
     def resolve_arg_link(self, obj_tree):
+        if self.args == '':
+            return
         arg_list = self.args.replace(' ', '').split(',')
         self.arg_objs = [None for arg in arg_list]
         check_objs = self.children
         for child in self.children:
             if child.is_external_int():
                 check_objs += child.get_children()
+        self.missing_args = []
         for child in check_objs:
             ind = -1
-            for i, arg in enumerate(arg_list):
+            for (i, arg) in enumerate(arg_list):
                 if arg == child.name.lower():
                     ind = i
                     break
-            if ind >= 0:
+            if ind < 0:
+                if child.keywords.count(KEYWORD_ID_DICT['intent']) > 0:
+                    self.missing_args.append(child)
+            else:
                 self.arg_objs[ind] = child
                 if child.is_optional():
                     arg_list[ind] = "{0}={0}".format(arg_list[ind])
@@ -577,6 +617,24 @@ class fortran_subroutine(fortran_scope):
                 return False
         return True
 
+    def get_diagnostics(self, file_contents):
+        errors = []
+        for missing_obj in self.missing_args:
+            errors.append(build_diagnostic(
+                missing_obj.sline-1,
+                'Variable "{0}" with INTENT keyword not found in argument list'.format(missing_obj.name),
+                severity=1, file_contents=file_contents, find_word=missing_obj.name
+            ))
+        arg_list = self.args.replace(' ', '').split(',')
+        for (i, arg_obj) in enumerate(self.arg_objs):
+            if arg_obj is None:
+                arg_name = arg_list[i].strip()
+                errors.append(build_diagnostic(
+                    self.sline-1, 'No matching declaration found for argument "{0}"'.format(arg_name),
+                    severity=1, file_contents=file_contents, find_word=arg_name
+                ))
+        return errors
+
 
 class fortran_function(fortran_subroutine):
     def __init__(self, file_obj, line_number, name, args="",
@@ -586,6 +644,7 @@ class fortran_function(fortran_subroutine):
         self.args_snip = self.args
         self.arg_objs = []
         self.in_children = []
+        self.missing_args = []
         self.mod_scope = mod_fun
         self.result_var = result_var
         self.result_obj = None
@@ -630,7 +689,6 @@ class fortran_function(fortran_subroutine):
         return FUNCTION_TYPE_ID
 
     def get_desc(self):
-        # desc = None
         if self.result_obj is not None:
             return self.result_obj.get_desc() + ' FUNCTION'
         if self.return_type is not None:
@@ -665,10 +723,9 @@ class fortran_function(fortran_subroutine):
 
 class fortran_type(fortran_scope):
     def __init__(self, file_obj, line_number, name, keywords):
-        self.base_setup(file_obj, line_number, name)
+        self.base_setup(file_obj, line_number, name, keywords=keywords)
         #
         self.in_children = []
-        self.keywords = keywords
         self.inherit = None
         self.inherit_var = None
         if self.keywords.count(KEYWORD_ID_DICT['public']) > 0:
@@ -725,6 +782,21 @@ class fortran_type(fortran_scope):
             if (parent_type == CLASS_TYPE_ID) or (parent_type >= BLOCK_TYPE_ID):
                 return False
         return True
+
+    def get_diagnostics(self, file_contents):
+        errors = []
+        for in_child in self.in_children:
+            if in_child.keywords.count(KEYWORD_ID_DICT['deferred']) > 0:
+                if self.contains_start is None:
+                    line_number = self.eline - 1
+                else:
+                    line_number = self.contains_start - 1
+                errors.append(build_diagnostic(
+                    line_number, 'Deferred procedure "{0}" not implemented'.format(in_child.name),
+                    severity=1, related_path=in_child.file.path,
+                    related_line=in_child.sline-1, related_message='Inherited procedure declaration'
+                ))
+        return errors
 
 
 class fortran_block(fortran_scope):
@@ -989,10 +1061,7 @@ class fortran_meth(fortran_var):
         self.drop_arg = -1
         self.pass_name = keyword_info.get('pass')
         if link_obj is None:
-            open_paren = var_desc.find('(')
-            close_paren = var_desc.rfind(')')
-            if (open_paren > 0) and (close_paren > open_paren):
-                self.link_name = var_desc[open_paren+1:close_paren].lower()
+            self.link_name = get_paren_substring(var_desc.lower())
 
     def set_parent(self, parent_obj):
         self.parent = parent_obj
@@ -1324,64 +1393,36 @@ class fortran_file:
                 message = 'Unexpected end of scope at line {0}'.format(error[0])
             else:
                 message = 'Unexpected end statement: No open scopes'
-            errors.append({
-                "range": {
-                    "start": {"line": error[1]-1, "character": 0},
-                    "end": {"line": error[1]-1, "character": 0}
-                },
-                "message": message,
-                "severity": 1
-            })
+            errors.append(build_diagnostic(error[1]-1, message=message, severity=1))
         for scope in tmp_list:
             if not scope.check_valid_parent():
-                errors.append({
-                    "range": {
-                        "start": {"line": scope.sline-1, "character": 0},
-                        "end": {"line": scope.sline-1, "character": 0}
-                    },
-                    "message": 'Invalid parent for "{0}" declaration'.format(scope.get_desc()),
-                    "severity": 1
-                })
+                errors.append(build_diagnostic(
+                    scope.sline-1, message='Invalid parent for "{0}" declaration'.format(scope.get_desc()),
+                    severity=1
+                ))
             for error in scope.check_double_def(file_contents, obj_tree):
                 # Check preproc if
                 if self.check_ppif(error[1]):
                     continue
                 if error[0] == 0:
-                    message = 'Variable "{0}" declared twice in scope'.format(error[4])
+                    message = 'Variable "{0}" declared twice in scope'.format(error[2])
                     severity = 1
                 elif error[0] == 1:
-                    message = 'Variable "{0}" masks variable in parent scope'.format(error[4])
+                    message = 'Variable "{0}" masks variable in parent scope'.format(error[2])
                     severity = 2
                 else:
                     continue
-                errors.append({
-                    "range": {
-                        "start": {"line": error[1], "character": error[2]},
-                        "end": {"line": error[1], "character": error[3]}
-                    },
-                    "message": message,
-                    "severity": severity,
-                    "relatedInformation": [{
-                        "location": {
-                            "uri": path_to_uri(error[5]),
-                            "range": {
-                                "start": {"line": error[6], "character": 0},
-                                "end": {"line": error[6], "character": 0}
-                            }
-                        },
-                        "message": ""
-                    }]
-                })
+                errors.append(build_diagnostic(
+                    error[1], message=message, severity=severity, file_contents=file_contents, find_word=error[2],
+                    related_path=error[3], related_line=error[4], related_message='First declaration'
+                ))
             for error in scope.check_use(obj_tree, file_contents):
                 # Check preproc if
                 if self.check_ppif(error[0]):
                     continue
-                errors.append({
-                    "range": {
-                        "start": {"line": error[0], "character": error[1]},
-                        "end": {"line": error[0], "character": error[2]}
-                    },
-                    "message": 'Module "{0}" not found in project'.format(error[3]),
-                    "severity": 3
-                })
+                errors.append(build_diagnostic(
+                    error[0], message='Module "{0}" not found in project'.format(error[1]),
+                    severity=3, file_contents=file_contents, find_word=error[1]
+                ))
+            errors += scope.get_diagnostics(file_contents)
         return errors
