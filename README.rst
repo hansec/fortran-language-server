@@ -45,6 +45,10 @@ Language Server Features
   - Use of unimported variables/objects in interface blocks
   - Statement placement errors ("CONTAINS", "IMPLICIT", "IMPORT")
 
+- Code actions (``textDocument/codeAction``) [Experimental, must be enabled in settings]
+
+  - Generate type-bound procedures and implementation templates for deferred procedures
+
 **Notes/Limitations:**
 
 - Signature help is not available for overloaded subroutines/functions
@@ -90,6 +94,8 @@ Language server settings
 
 The following global settings can be used when launching the language server.
 
+* ``--nthreads`` Number of threads to use during workspace initialization (default: 4)
+* ``--notify_init`` Send notification message when workspace initialization is complete
 * ``--symbol_skip_mem`` Do not include type members in document symbol results
 * ``--incremental_sync`` Use incremental document synchronization
 * ``--autocomplete_no_prefix`` Do not filter autocomplete results by variable prefix
@@ -97,6 +103,7 @@ The following global settings can be used when launching the language server.
 * ``--use_signature_help`` Use signature help instead of snippets for subroutines/functions
 * ``--variable_hover`` Show hover information for variables (default: subroutines/functions only)
 * ``--preserve_keyword_order`` Display variable keywords information in original order (default: sort to consistent ordering)
+* ``--enable_code_actions`` Enable experimental code actions (default: false)
 * ``--debug_log`` Write debug information to ``root_dir/fortls_debug.log`` (requires a specified ``root_dir`` during initialization)
 
 **Debug settings:**
@@ -118,6 +125,7 @@ The following settings can be used to perform `standalone debug tests <https://g
 * ``--debug_implementation`` Test implementation request for specified file and position
 * ``--debug_references`` Test references request for specified file and position
 * ``--debug_rename=RENAME_STRING`` Test rename request for specified file and position
+* ``--debug_actions`` Test codeAction request for specified file and position
 
 Configuration
 -------------
