@@ -631,7 +631,17 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
         pp_stack = []
         defs_tmp = pp_defs.copy()
         output_file = []
+        def_cont_name = None
         for (i, line) in enumerate(file_str):
+            # Handle multiline macro continuation
+            if def_cont_name is not None:
+                output_file.append("")
+                if line.rstrip()[-1] != '\\':
+                    defs_tmp[def_cont_name] += line.strip()
+                    def_cont_name = None
+                else:
+                    defs_tmp[def_cont_name] += line[0:-1].strip()
+                continue
             match = PP_REGEX.match(line)
             if (match is not None):
                 output_file.append(line)
@@ -703,7 +713,12 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 if (match.group(1) == 'define') and (def_name not in defs_tmp):
                     eq_ind = line[match.end(0):].find(' ')
                     if eq_ind >= 0:
-                        defs_tmp[def_name] = line[match.end(0)+eq_ind:].strip()
+                        # Handle multiline macros
+                        if line.rstrip()[-1] == "\\":
+                            defs_tmp[def_name] = line[match.end(0)+eq_ind:-1].strip()
+                            def_cont_name = def_name
+                        else:
+                            defs_tmp[def_name] = line[match.end(0)+eq_ind:].strip()
                     else:
                         defs_tmp[def_name] = "True"
                 elif (match.group(1) == 'undef') and (def_name in defs_tmp):
@@ -815,6 +830,7 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
         # Get line label
         line, line_label = strip_line_label(line)
         # Merge lines with continuations
+        line = line.rstrip()
         if fixed_format:
             if line_ind < len(file_str):
                 next_line = file_str[line_ind]
@@ -826,6 +842,7 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                     next_line = file_str[line_ind]
                     line_ind += 1
                     cont_match = CONT_REGEX.match(next_line)
+            line_stripped = strip_strings(line, maintain_len=True)
         else:
             line_stripped = strip_strings(line, maintain_len=True)
             iAmper = line_stripped.find('&')
@@ -841,8 +858,7 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 if (next_line.rstrip() == '') or (match is not None):
                     next_line_num += 1
                     continue
-                next_stripped = strip_strings(next_line, maintain_len=True)
-                cont_match = CONT_REGEX.match(next_stripped)
+                cont_match = CONT_REGEX.match(next_line)
                 if cont_match is not None:
                     next_line = next_line[cont_match.end(0):]
                 next_line_num += 1
@@ -853,8 +869,15 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 if iComm < 0:
                     iComm = iAmper + 1
             next_line = None
-        line = line.rstrip()
-        comm_ind = line.find('!')
+        # Split lines with semicolons
+        semi_colon_ind = line_stripped.find(';')
+        if semi_colon_ind >= 0:
+            next_line = line[semi_colon_ind+1:]
+            next_line_num = line_number
+            line = line[:semi_colon_ind]
+            line_stripped = line_stripped[:semi_colon_ind]
+        # Find trailing comments
+        comm_ind = line_stripped.find('!')
         if comm_ind >= 0:
             line_no_comment = line[:comm_ind]
             line_post_comment = line[comm_ind:]
