@@ -1270,12 +1270,6 @@ class fortran_file:
         if len(self.pp_if) > 0:
             self.pp_if[-1][1] = line_number-1
 
-    def check_ppif(self, line_number):
-        for pp_if in self.pp_if:
-            if line_number >= pp_if[0] and line_number <= pp_if[1]:
-                return True
-        return False
-
     def get_scopes(self, line_number=None):
         if line_number is None:
             return self.scope_list
@@ -1401,9 +1395,6 @@ class fortran_file:
                     severity=1
                 ))
             for error in scope.check_double_def(file_contents, obj_tree):
-                # Check preproc if
-                if self.check_ppif(error[1]):
-                    continue
                 if error[0] == 0:
                     message = 'Variable "{0}" declared twice in scope'.format(error[2])
                     severity = 1
@@ -1417,9 +1408,6 @@ class fortran_file:
                     related_path=error[3], related_line=error[4], related_message='First declaration'
                 ))
             for error in scope.check_use(obj_tree, file_contents):
-                # Check preproc if
-                if self.check_ppif(error[0]):
-                    continue
                 errors.append(build_diagnostic(
                     error[0], message='Module "{0}" not found in project'.format(error[1]),
                     severity=3, file_contents=file_contents, find_word=error[1]
