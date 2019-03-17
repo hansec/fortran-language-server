@@ -4,6 +4,7 @@ import os
 from fortls.jsonrpc import path_to_uri
 WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
 CLASS_VAR_REGEX = re.compile(r'(TYPE|CLASS)[ ]*\(', re.I)
+DEF_KIND_REGEX = re.compile(r'([a-z]*)[ ]*\((?:KIND|LEN)?[ =]*([a-z_][a-z0-9_]*)', re.I)
 # Keyword identifiers
 KEYWORD_LIST = [
     'pointer',
@@ -129,9 +130,7 @@ def find_in_scope(scope, var_name, obj_tree):
                 if tmp_var is not None:
                     return tmp_var
             if filter_public:
-                if child.vis < 0:
-                    continue
-                if local_scope.def_vis < 0 and child.vis <= 0:
+                if (child.vis < 0) or ((local_scope.def_vis < 0) and (child.vis <= 0)):
                     continue
             if child.name.lower() == var_name_lower:
                 return child
@@ -170,10 +169,10 @@ def find_in_scope(scope, var_name, obj_tree):
     return None
 
 
-def find_in_workspace(obj_tree, query):
+def find_in_workspace(obj_tree, query, filter_public=False, exact_match=False):
     def add_children(mod_obj, query):
         tmp_list = []
-        for child_obj in mod_obj.get_children():
+        for child_obj in mod_obj.get_children(filter_public):
             if child_obj.name.lower().find(query) >= 0:
                 tmp_list.append(child_obj)
         return tmp_list
@@ -187,6 +186,13 @@ def find_in_workspace(obj_tree, query):
                 matching_symbols.append(top_obj)
             if top_obj.get_type() == MODULE_TYPE_ID:
                 matching_symbols += add_children(top_obj, query)
+    if exact_match:
+        filtered_symbols = []
+        n = len(query)
+        for symbol in matching_symbols:
+            if len(symbol.name) == n:
+                filtered_symbols.append(symbol)
+        matching_symbols = filtered_symbols
     return matching_symbols
 
 
@@ -308,6 +314,9 @@ class fortran_obj:
     def check_valid_parent(self):
         return True
 
+    def check_definition(self, file_contents, obj_tree, known_types={}):
+        return None, known_types
+
 
 class fortran_scope(fortran_obj):
     def __init__(self, file_obj, line_number, name):
@@ -377,9 +386,7 @@ class fortran_scope(fortran_obj):
         if public_only:
             pub_children = []
             for child in self.children:
-                if child.vis < 0:
-                    continue
-                if (self.def_vis < 0) and (child.vis <= 0):
+                if (child.vis < 0) or ((self.def_vis < 0) and (child.vis <= 0)):
                     continue
                 if child.name.startswith("#GEN_INT"):
                     pub_children.append(child)
@@ -403,8 +410,13 @@ class fortran_scope(fortran_obj):
             else:
                 FQSN_dict[child.FQSN] = child.sline - 1
         errors = []
+        known_types = {}
         for child in self.children:
             line_number = child.sline - 1
+            # Check for type definition in scope
+            def_error, known_types = child.check_definition(file_contents, obj_tree, known_types)
+            if def_error is not None:
+                errors.append(def_error)
             # Check other variables in current scope
             if child.FQSN in FQSN_dict:
                 if line_number > FQSN_dict[child.FQSN]:
@@ -1082,6 +1094,41 @@ class fortran_var(fortran_obj):
     def is_callable(self):
         return self.callable
 
+    def check_definition(self, file_contents, obj_tree, known_types={}):
+        # Check for type definition in scope
+        type_match = DEF_KIND_REGEX.match(self.desc)
+        if type_match is not None:
+            var_type = type_match.group(1).strip().lower()
+            if var_type == 'procedure':
+                return None, known_types
+            desc_obj_name = type_match.group(2).strip().lower()
+            if desc_obj_name not in known_types:
+                type_def = find_in_scope(self, desc_obj_name, obj_tree)
+                if type_def is None:
+                    type_defs = find_in_workspace(obj_tree, desc_obj_name, filter_public=True, exact_match=True)
+                    known_types[desc_obj_name] = None
+                    var_type = type_match.group(1).strip().lower()
+                    filter_id = VAR_TYPE_ID
+                    if (var_type == 'class') or (var_type == 'type'):
+                        filter_id = CLASS_TYPE_ID
+                    for type_def in type_defs:
+                        if type_def.get_type() == filter_id:
+                            known_types[desc_obj_name] = (1, type_def)
+                            break
+                else:
+                    known_types[desc_obj_name] = (0, type_def)
+            type_info = known_types[desc_obj_name]
+            if (type_info is not None) and (type_info[0] == 1):
+                type_def = type_info[1]
+                out_diag = build_diagnostic(
+                    self.sline-1, message='Object "{0}" not found in scope'.format(desc_obj_name),
+                    severity=1, file_contents=file_contents, find_word=desc_obj_name,
+                    related_path=type_def.file.path, related_line=type_def.sline-1,
+                    related_message='Possible object'
+                )
+                return out_diag, known_types
+        return None, known_types
+
 
 class fortran_meth(fortran_var):
     def __init__(self, file_obj, line_number, name, var_desc, keywords,
@@ -1182,6 +1229,9 @@ class fortran_meth(fortran_var):
 
     def is_callable(self):
         return True
+
+    def check_definition(self, file_contents, obj_tree, known_types={}):
+        return None, known_types
 
 
 class fortran_file:
