@@ -171,6 +171,26 @@ def find_in_scope(scope, var_name, obj_tree):
     return None, None
 
 
+def find_in_workspace(obj_tree, query):
+    def add_children(mod_obj, query):
+        tmp_list = []
+        for child_obj in mod_obj.get_children():
+            if child_obj.name.lower().find(query) >= 0:
+                tmp_list.append(child_obj)
+        return tmp_list
+    matching_symbols = []
+    query = query.lower()
+    for (_, obj_packed) in obj_tree.items():
+        top_obj = obj_packed[0]
+        top_uri = obj_packed[1]
+        if top_uri is not None:
+            if top_obj.name.lower().find(query) > -1:
+                matching_symbols.append(top_obj)
+            if top_obj.get_type() == MODULE_TYPE_ID:
+                matching_symbols += add_children(top_obj, query)
+    return matching_symbols
+
+
 def find_word_in_line(line, word):
     i0 = 0
     for poss_name in WORD_REGEX.finditer(line):

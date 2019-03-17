@@ -7,9 +7,9 @@ import re
 from fortls.jsonrpc import path_to_uri, path_from_uri
 from fortls.parse_fortran import process_file, read_use_stmt, read_var_def, \
     detect_fixed_format, detect_comment_start
-from fortls.objects import get_paren_substring, find_in_scope, get_use_tree, \
-    set_keyword_ordering, MODULE_TYPE_ID, SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID, \
-    CLASS_TYPE_ID, INTERFACE_TYPE_ID, SELECT_TYPE_ID
+from fortls.objects import get_paren_substring, find_in_scope, find_in_workspace, \
+    get_use_tree, set_keyword_ordering, MODULE_TYPE_ID, SUBROUTINE_TYPE_ID, \
+    FUNCTION_TYPE_ID, CLASS_TYPE_ID, INTERFACE_TYPE_ID, SELECT_TYPE_ID
 from fortls.intrinsics import get_intrinsic_keywords, load_intrinsics, set_lowercase_intrinsics
 
 log = logging.getLogger(__name__)
@@ -529,44 +529,25 @@ class LangServer:
                 return 6
             else:
                 return 1
-
-        def add_children(mod_obj, query):
-            tmp_list = []
-            if mod_obj.get_type() == MODULE_TYPE_ID:
-                for child_obj in mod_obj.get_children():
-                    if not child_obj.name.lower().find(query) > -1:
-                        continue
-                    tmp_list.append(child_obj)
-            return tmp_list
         matching_symbols = []
         query = request["params"]["query"].lower()
-        for _, obj_packed in self.obj_tree.items():
-            top_obj = obj_packed[0]
-            top_uri = obj_packed[1]
-            if top_uri is None:
-                continue
-            candidates = add_children(top_obj, query)
-            if top_obj.name.lower().find(query) > -1:
-                candidates += [top_obj]
-            for candidate in candidates:
-                tmp_out = {}
-                tmp_out["name"] = candidate.name
-                tmp_out["kind"] = map_types(candidate.get_type())
-                sline = candidate.sline-1
-                eline = candidate.eline-1
-                # Set containing scope
-                if candidate.FQSN.find('::') > 0:
-                    tmp_list = candidate.FQSN.split("::")
-                    tmp_out["containerName"] = tmp_list[0]
-                # Set location
-                tmp_out["location"] = {
-                    "uri": path_to_uri(top_uri),
+        for candidate in find_in_workspace(self.obj_tree, query):
+            tmp_out = {
+                "name": candidate.name,
+                "kind": map_types(candidate.get_type()),
+                "location": {
+                    "uri": path_to_uri(candidate.file.path),
                     "range": {
-                        "start": {"line": sline, "character": 0},
-                        "end": {"line": eline, "character": 0}
+                        "start": {"line": candidate.sline-1, "character": 0},
+                        "end": {"line": candidate.eline-1, "character": 0}
                     }
                 }
-                matching_symbols.append(tmp_out)
+            }
+            # Set containing scope
+            if candidate.FQSN.find('::') > 0:
+                tmp_list = candidate.FQSN.split("::")
+                tmp_out["containerName"] = tmp_list[0]
+            matching_symbols.append(tmp_out)
         return sorted(matching_symbols, key=lambda k: k['name'])
 
     def serve_document_symbols(self, request):
