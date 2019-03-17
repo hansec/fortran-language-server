@@ -390,8 +390,8 @@ class fortran_scope(fortran_obj):
         else:
             return self.children
 
-    def check_double_def(self, file_contents, obj_tree):
-        """Check for double definition errors in scope"""
+    def check_definitions(self, file_contents, obj_tree):
+        """Check for definition errors in scope"""
         if self.parent is not None:
             if self.parent.get_type() == INTERFACE_TYPE_ID:
                 return []
@@ -405,22 +405,31 @@ class fortran_scope(fortran_obj):
                 FQSN_dict[child.FQSN] = child.sline - 1
         errors = []
         for child in self.children:
+            line_number = child.sline - 1
             # Check other variables in current scope
             if child.FQSN in FQSN_dict:
-                line_number = child.sline - 1
                 if line_number > FQSN_dict[child.FQSN]:
-                    errors.append([0, line_number, child.name, self.file.path, FQSN_dict[child.FQSN]])
+                    errors.append(build_diagnostic(
+                        line_number, message='Variable "{0}" declared twice in scope'.format(child.name),
+                        severity=1, file_contents=file_contents, find_word=child.name,
+                        related_path=self.file.path, related_line=FQSN_dict[child.FQSN],
+                        related_message='First declaration'
+                    ))
                     continue
             # Check for masking from parent scope in subroutines, functions, and blocks
             if (self.parent is not None) and \
                (self.get_type() in (SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID, BLOCK_TYPE_ID)):
-                parent_var, _ = \
-                    find_in_scope(self.parent, child.name, obj_tree)
+                parent_var, _ = find_in_scope(self.parent, child.name, obj_tree)
                 if parent_var is not None:
                     # Ignore if function return variable
-                    if (self.get_type() == SUBROUTINE_TYPE_ID) and (parent_var.FQSN == self.FQSN):
+                    if (self.get_type() == FUNCTION_TYPE_ID) and (parent_var.FQSN == self.FQSN):
                         continue
-                    errors.append([1, child.sline-1, child.name, parent_var.file.path, parent_var.sline-1])
+                    errors.append(build_diagnostic(
+                        line_number, message='Variable "{0}" masks variable in parent scope'.format(child.name),
+                        severity=2, file_contents=file_contents, find_word=child.name,
+                        related_path=parent_var.file.path, related_line=parent_var.sline-1,
+                        related_message='First declaration'
+                    ))
         return errors
 
     def check_use(self, obj_tree, file_contents):
@@ -428,7 +437,10 @@ class fortran_scope(fortran_obj):
         for use_line in self.use:
             use_mod = use_line[0]
             if use_mod not in obj_tree:
-                errors.append([use_line[2] - 1, use_mod])
+                errors.append(build_diagnostic(
+                    use_line[2]-1, message='Module "{0}" not found in project'.format(use_mod),
+                    severity=3, file_contents=file_contents, find_word=use_mod
+                ))
         return errors
 
 
@@ -1414,23 +1426,7 @@ class fortran_file:
                     scope.sline-1, message='Invalid parent for "{0}" declaration'.format(scope.get_desc()),
                     severity=1
                 ))
-            for error in scope.check_double_def(file_contents, obj_tree):
-                if error[0] == 0:
-                    message = 'Variable "{0}" declared twice in scope'.format(error[2])
-                    severity = 1
-                elif error[0] == 1:
-                    message = 'Variable "{0}" masks variable in parent scope'.format(error[2])
-                    severity = 2
-                else:
-                    continue
-                errors.append(build_diagnostic(
-                    error[1], message=message, severity=severity, file_contents=file_contents, find_word=error[2],
-                    related_path=error[3], related_line=error[4], related_message='First declaration'
-                ))
-            for error in scope.check_use(obj_tree, file_contents):
-                errors.append(build_diagnostic(
-                    error[0], message='Module "{0}" not found in project'.format(error[1]),
-                    severity=3, file_contents=file_contents, find_word=error[1]
-                ))
+            errors += scope.check_use(obj_tree, file_contents)
+            errors += scope.check_definitions(file_contents, obj_tree)
             errors += scope.get_diagnostics(file_contents)
         return errors
