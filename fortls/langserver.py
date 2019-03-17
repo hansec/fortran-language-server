@@ -185,31 +185,36 @@ def climb_type_tree(var_stack, curr_scope, obj_tree):
     type_scope = None
     iVar = 0
     var_name = var_stack[iVar].strip().lower()
-    var_obj, curr_scope = find_in_scope(curr_scope, var_name, obj_tree)
-    if var_obj is not None:
+    var_obj = find_in_scope(curr_scope, var_name, obj_tree)
+    if var_obj is None:
+        return None
+    else:
         type_name = get_type_name(var_obj)
+        curr_scope = var_obj.parent
     # Search for type, then next variable in stack and so on
     for _ in range(30):
         # Find variable type in available scopes
         if type_name is None:
             break
-        type_scope, curr_scope = find_in_scope(curr_scope, type_name, obj_tree)
+        type_scope = find_in_scope(curr_scope, type_name, obj_tree)
         # Exit if not found
         if type_scope is None:
             break
+        curr_scope = type_scope.parent
         # Go to next variable in stack and exit if done
         iVar += 1
         if iVar == len(var_stack)-1:
             break
         # Find next variable by name in scope
         var_name = var_stack[iVar].strip().lower()
-        var_obj, new_scope = find_in_scope(type_scope, var_name, obj_tree)
+        var_obj = find_in_scope(type_scope, var_name, obj_tree)
         # Set scope to declaration location if variable is inherited
-        if (new_scope is not None) and (new_scope.get_type() == CLASS_TYPE_ID):
-            for in_child in new_scope.in_children:
-                if (in_child.name.lower() == var_name) and (in_child.parent is not None):
-                    curr_scope = in_child.parent
         if var_obj is not None:
+            curr_scope = var_obj.parent
+            if (var_obj.parent is not None) and (var_obj.parent.get_type() == CLASS_TYPE_ID):
+                for in_child in var_obj.parent.in_children:
+                    if (in_child.name.lower() == var_name) and (in_child.parent is not None):
+                        curr_scope = in_child.parent
             type_name = get_type_name(var_obj)
         else:
             break
@@ -952,7 +957,7 @@ class LangServer:
             if (curr_scope.get_type() == CLASS_TYPE_ID) and (not is_member) and \
                line_prefix.lstrip().lower().startswith('procedure') and (line_prefix.count("=>") > 0):
                 curr_scope = curr_scope.parent
-            var_obj, _ = find_in_scope(curr_scope, def_name, self.obj_tree)
+            var_obj = find_in_scope(curr_scope, def_name, self.obj_tree)
         # Search in global scope
         if var_obj is None:
             key = def_name.lower()
@@ -1041,7 +1046,7 @@ class LangServer:
         # Find in available scopes
         var_obj = None
         if curr_scope is not None:
-            var_obj, _ = find_in_scope(curr_scope, sub_name, self.obj_tree)
+            var_obj = find_in_scope(curr_scope, sub_name, self.obj_tree)
         # Search in global scope
         if var_obj is None:
             key = sub_name.lower()

@@ -125,23 +125,23 @@ def find_in_scope(scope, var_name, obj_tree):
     def check_scope(local_scope, var_name_lower, filter_public=False):
         for child in local_scope.get_children():
             if child.name.startswith("#GEN_INT"):
-                tmp_var, tmp_scope = check_scope(child, var_name_lower, filter_public)
+                tmp_var = check_scope(child, var_name_lower, filter_public)
                 if tmp_var is not None:
-                    return tmp_var, tmp_scope
+                    return tmp_var
             if filter_public:
                 if child.vis < 0:
                     continue
                 if local_scope.def_vis < 0 and child.vis <= 0:
                     continue
             if child.name.lower() == var_name_lower:
-                return child, local_scope
-        return None, None
+                return child
+        return None
     #
     var_name_lower = var_name.lower()
     # Check local scope
-    tmp_var, tmp_scope = check_scope(scope, var_name_lower)
+    tmp_var = check_scope(scope, var_name_lower)
     if tmp_var is not None:
-        return tmp_var, tmp_scope
+        return tmp_var
     # Setup USE search
     use_dict = get_use_tree(scope, {}, obj_tree)
     # Look in found use modules
@@ -149,26 +149,25 @@ def find_in_scope(scope, var_name, obj_tree):
         use_scope = obj_tree[use_mod][0]
         # Module name is request
         if use_mod.lower() == var_name_lower:
-            return use_scope, None
+            return use_scope
         # Filter children by only_list
         if len(only_list) > 0:
             if var_name_lower not in only_list:
                 continue
-        tmp_var, tmp_scope = check_scope(use_scope, var_name_lower, filter_public=True)
+        tmp_var = check_scope(use_scope, var_name_lower, filter_public=True)
         if tmp_var is not None:
-            return tmp_var, tmp_scope
+            return tmp_var
     # Check parent scopes
     if scope.parent is not None:
-        curr_scope = scope.parent
-        tmp_var, tmp_scope = find_in_scope(curr_scope, var_name, obj_tree)
+        tmp_var = find_in_scope(scope.parent, var_name, obj_tree)
         if tmp_var is not None:
-            return tmp_var, tmp_scope
+            return tmp_var
     # Check ancestor scopes
     for ancestor in scope.get_ancestors():
-        tmp_var, tmp_scope = find_in_scope(ancestor, var_name, obj_tree)
+        tmp_var = find_in_scope(ancestor, var_name, obj_tree)
         if tmp_var is not None:
-            return tmp_var, tmp_scope
-    return None, None
+            return tmp_var
+    return None
 
 
 def find_in_workspace(obj_tree, query):
@@ -419,7 +418,7 @@ class fortran_scope(fortran_obj):
             # Check for masking from parent scope in subroutines, functions, and blocks
             if (self.parent is not None) and \
                (self.get_type() in (SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID, BLOCK_TYPE_ID)):
-                parent_var, _ = find_in_scope(self.parent, child.name, obj_tree)
+                parent_var = find_in_scope(self.parent, child.name, obj_tree)
                 if parent_var is not None:
                     # Ignore if function return variable
                     if (self.get_type() == FUNCTION_TYPE_ID) and (parent_var.FQSN == self.FQSN):
@@ -780,8 +779,7 @@ class fortran_type(fortran_scope):
         if self.inherit is None:
             return
         #
-        self.inherit_var, _ = \
-            find_in_scope(self.parent, self.inherit, obj_tree)
+        self.inherit_var = find_in_scope(self.parent, self.inherit, obj_tree)
         if self.inherit_var is not None:
             self.inherit_var.resolve_inherit(obj_tree)
             # Get current fields
@@ -983,7 +981,7 @@ class fortran_int(fortran_scope):
             return
         self.mems = []
         for member in self.members:
-            mem_obj, _ = find_in_scope(self.parent, member, obj_tree)
+            mem_obj = find_in_scope(self.parent, member, obj_tree)
             if mem_obj is not None:
                 self.mems.append(mem_obj)
         for child in self.children:
@@ -1037,7 +1035,7 @@ class fortran_var(fortran_obj):
         if self.link_name is None:
             return
         if self.parent is not None:
-            link_obj, _ = find_in_scope(self.parent, self.link_name, obj_tree)
+            link_obj = find_in_scope(self.parent, self.link_name, obj_tree)
             if link_obj is not None:
                 self.link_obj = link_obj
 
@@ -1170,9 +1168,9 @@ class fortran_meth(fortran_var):
             return
         if self.parent is not None:
             if self.parent.get_type() == CLASS_TYPE_ID:
-                link_obj, _ = find_in_scope(self.parent.parent, self.link_name, obj_tree)
+                link_obj = find_in_scope(self.parent.parent, self.link_name, obj_tree)
             else:
-                link_obj, _ = find_in_scope(self.parent, self.link_name, obj_tree)
+                link_obj = find_in_scope(self.parent, self.link_name, obj_tree)
             if link_obj is not None:
                 self.link_obj = link_obj
                 if self.pass_name is not None:
