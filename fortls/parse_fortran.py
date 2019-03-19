@@ -7,6 +7,7 @@ from fortls.objects import get_paren_substring, map_keywords, fortran_module, \
     fortran_if, fortran_file, INTERFACE_TYPE_ID, SELECT_TYPE_ID
 # Fortran statement matching rules
 USE_REGEX = re.compile(r'[ ]*USE([, ]+INTRINSIC)?[ :]+([a-z0-9_]*)([, ]+ONLY[ :]+)?', re.I)
+IMPORT_REGEX = re.compile(r'[ ]*IMPORT[ :]+([a-z_])', re.I)
 INCLUDE_REGEX = re.compile(r'[ ]*INCLUDE[ :]*[\'\"]([^\'\"]*)', re.I)
 CONTAINS_REGEX = re.compile(r'[ ]*(CONTAINS)[ ]*$', re.I)
 SUB_MOD_REGEX = re.compile(r'[ ]*(PURE|ELEMENTAL|RECURSIVE)+', re.I)
@@ -522,6 +523,11 @@ def read_int_def(line):
 
 
 def read_use_stmt(line):
+    import_match = IMPORT_REGEX.match(line)
+    if import_match is not None:
+        trailing_line = line[import_match.end(0)-1:].lower()
+        import_list = [import_obj.strip() for import_obj in trailing_line.split(',')]
+        return 'import', [import_list]
     use_match = USE_REGEX.match(line)
     if use_match is None:
         return None
@@ -530,9 +536,7 @@ def read_use_stmt(line):
         use_mod = use_match.group(2)
         only_list = []
         if use_match.group(3) is not None:
-            only_split = trailing_line.split(',')
-            for only_stmt in only_split:
-                only_list.append(only_stmt.split('=>')[0].strip())
+            only_list = [only_stmt.split('=>')[0].strip() for only_stmt in trailing_line.split(',')]
         return 'use', [use_mod, only_list]
 
 
@@ -1108,6 +1112,10 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                 file_obj.add_use(obj[0], line_number, obj[1])
                 if(debug):
                     print('{1} !!! USE statement({0})'.format(line_number, line.strip()))
+            elif obj_type == 'import':
+                file_obj.add_use('#IMPORT', line_number, obj[0])
+                if(debug):
+                    print('{1} !!! IMPORT statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'inc':
                 file_obj.add_include(obj[0], line_number)
                 if(debug):

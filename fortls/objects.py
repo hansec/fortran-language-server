@@ -314,7 +314,7 @@ class fortran_obj:
     def check_valid_parent(self):
         return True
 
-    def check_definition(self, file_contents, obj_tree, known_types={}):
+    def check_definition(self, file_contents, obj_tree, known_types={}, import_objs=None):
         return None, known_types
 
 
@@ -398,9 +398,6 @@ class fortran_scope(fortran_obj):
 
     def check_definitions(self, file_contents, obj_tree):
         """Check for definition errors in scope"""
-        if self.parent is not None:
-            if self.parent.get_type() == INTERFACE_TYPE_ID:
-                return []
         FQSN_dict = {}
         for child in self.children:
             # Check other variables in current scope
@@ -409,14 +406,26 @@ class fortran_scope(fortran_obj):
                     FQSN_dict[child.FQSN] = child.sline - 1
             else:
                 FQSN_dict[child.FQSN] = child.sline - 1
+        # Get list of imported objects for interfaces
+        import_objs = None
+        if (self.parent is not None) and (self.parent.get_type() == INTERFACE_TYPE_ID):
+            import_objs = []
+            for use_line in self.use:
+                if use_line[0].startswith('#import'):
+                    import_objs += use_line[1]
         errors = []
         known_types = {}
         for child in self.children:
             line_number = child.sline - 1
             # Check for type definition in scope
-            def_error, known_types = child.check_definition(file_contents, obj_tree, known_types)
+            def_error, known_types = child.check_definition(
+                file_contents, obj_tree, known_types=known_types, import_objs=import_objs
+            )
             if def_error is not None:
                 errors.append(def_error)
+            # Skip masking/double checks for interface members
+            if (self.parent is not None) and (self.parent.get_type() == INTERFACE_TYPE_ID):
+                continue
             # Check other variables in current scope
             if child.FQSN in FQSN_dict:
                 if line_number > FQSN_dict[child.FQSN]:
@@ -447,6 +456,13 @@ class fortran_scope(fortran_obj):
         errors = []
         for use_line in self.use:
             use_mod = use_line[0]
+            if use_mod.startswith('#import'):
+                if (self.parent is None) or (self.parent.get_type() != INTERFACE_TYPE_ID):
+                    errors.append(build_diagnostic(
+                        use_line[2]-1, message='IMPORT statement outside of interface',
+                        severity=1
+                    ))
+                continue
             if use_mod not in obj_tree:
                 errors.append(build_diagnostic(
                     use_line[2]-1, message='Module "{0}" not found in project'.format(use_mod),
@@ -1094,7 +1110,7 @@ class fortran_var(fortran_obj):
     def is_callable(self):
         return self.callable
 
-    def check_definition(self, file_contents, obj_tree, known_types={}):
+    def check_definition(self, file_contents, obj_tree, known_types={}, import_objs=None):
         # Check for type definition in scope
         type_match = DEF_KIND_REGEX.match(self.desc)
         if type_match is not None:
@@ -1118,15 +1134,22 @@ class fortran_var(fortran_obj):
                 else:
                     known_types[desc_obj_name] = (0, type_def)
             type_info = known_types[desc_obj_name]
-            if (type_info is not None) and (type_info[0] == 1):
-                type_def = type_info[1]
-                out_diag = build_diagnostic(
-                    self.sline-1, message='Object "{0}" not found in scope'.format(desc_obj_name),
-                    severity=1, file_contents=file_contents, find_word=desc_obj_name,
-                    related_path=type_def.file.path, related_line=type_def.sline-1,
-                    related_message='Possible object'
-                )
-                return out_diag, known_types
+            if type_info is not None:
+                if type_info[0] == 1:
+                    type_def = type_info[1]
+                    out_diag = build_diagnostic(
+                        self.sline-1, message='Object "{0}" not found in scope'.format(desc_obj_name),
+                        severity=1, file_contents=file_contents, find_word=desc_obj_name,
+                        related_path=type_def.file.path, related_line=type_def.sline-1,
+                        related_message='Possible object'
+                    )
+                    return out_diag, known_types
+                elif (import_objs is not None) and (desc_obj_name not in import_objs):
+                    out_diag = build_diagnostic(
+                        self.sline-1, message='Object "{0}" not imported in interface'.format(desc_obj_name),
+                        severity=1, file_contents=file_contents, find_word=desc_obj_name
+                    )
+                    return out_diag, known_types
         return None, known_types
 
 
@@ -1230,7 +1253,7 @@ class fortran_meth(fortran_var):
     def is_callable(self):
         return True
 
-    def check_definition(self, file_contents, obj_tree, known_types={}):
+    def check_definition(self, file_contents, obj_tree, known_types={}, import_objs=None):
         return None, known_types
 
 
