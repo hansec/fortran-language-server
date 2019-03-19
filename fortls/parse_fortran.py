@@ -10,6 +10,7 @@ USE_REGEX = re.compile(r'[ ]*USE([, ]+INTRINSIC)?[ :]+([a-z0-9_]*)([, ]+ONLY[ :]
 IMPORT_REGEX = re.compile(r'[ ]*IMPORT[ :]+([a-z_])', re.I)
 INCLUDE_REGEX = re.compile(r'[ ]*INCLUDE[ :]*[\'\"]([^\'\"]*)', re.I)
 CONTAINS_REGEX = re.compile(r'[ ]*(CONTAINS)[ ]*$', re.I)
+IMPLICIT_REGEX = re.compile(r'[ ]*IMPLICIT[ ]+([a-z]*)', re.I)
 SUB_MOD_REGEX = re.compile(r'[ ]*(PURE|ELEMENTAL|RECURSIVE)+', re.I)
 SUB_REGEX = re.compile(r'[ ]*SUBROUTINE[ ]+([a-z0-9_]+)', re.I)
 END_SUB_WORD = r'SUBROUTINE'
@@ -910,17 +911,39 @@ def process_file(file_str, close_open_scopes, path=None, fixed_format=False, deb
                         print('{1} !!! END "DO" scope({0})'.format(line_number, line.strip()))
                 if did_close:
                     continue
+        # Mark implicit statement
+        match = IMPLICIT_REGEX.match(line_no_comment)
+        if match is not None:
+            err_message = None
+            if file_obj.current_scope is None:
+                err_message = "IMPLICIT statement without enclosing scope"
+            else:
+                if match.group(1).lower() == 'none':
+                    file_obj.current_scope.set_implicit(False, line_number)
+                else:
+                    file_obj.current_scope.set_implicit(True, line_number)
+            if err_message is not None:
+                file_obj.parse_errors.append({
+                    "line": line_number,
+                    "schar": match.start(1),
+                    "echar": match.end(1),
+                    "mess": err_message,
+                    "sev": 1
+                })
+            if(debug):
+                print('{1} !!! IMPLICIT statement({0})'.format(line_number, line.strip()))
+            continue
         # Mark contains statement
         match = CONTAINS_REGEX.match(line_no_comment)
         if match is not None:
             err_message = None
             try:
                 if file_obj.current_scope is None:
-                    err_message = "Contains statement without enclosing scope"
+                    err_message = "CONTAINS statement without enclosing scope"
                 else:
                     file_obj.current_scope.mark_contains(line_number)
             except ValueError:
-                err_message = "Multiple contains statements in scope"
+                err_message = "Multiple CONTAINS statements in scope"
             if err_message is not None:
                 file_obj.parse_errors.append({
                     "line": line_number,

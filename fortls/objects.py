@@ -241,6 +241,7 @@ class fortran_obj:
         self.doc_str = None
         self.parent = None
         self.eline = -1
+        self.implicit_vars = None
 
     def set_default_vis(self, new_vis):
         self.def_vis = new_vis
@@ -293,6 +294,15 @@ class fortran_obj:
     def get_diagnostics(self, file_contents):
         return []
 
+    def get_implicit(self):
+        if self.parent is None:
+            return self.implicit_vars
+        else:
+            parent_implicit = self.parent.get_implicit()
+            if (self.implicit_vars is not None) or (parent_implicit is None):
+                return self.implicit_vars
+            return parent_implicit
+
     def is_optional(self):
         return False
 
@@ -337,6 +347,8 @@ class fortran_scope(fortran_obj):
         self.def_vis = 0
         self.contains_start = None
         self.doc_str = None
+        self.implicit_vars = None
+        self.implicit_line = None
         if file_obj.enc_scope_name is not None:
             self.FQSN = file_obj.enc_scope_name.lower() + "::" + self.name.lower()
         else:
@@ -361,6 +373,10 @@ class fortran_scope(fortran_obj):
 
     def set_parent(self, parent_obj):
         self.parent = parent_obj
+
+    def set_implicit(self, implicit_flag, line_number):
+        self.implicit_vars = implicit_flag
+        self.implicit_line = line_number
 
     def mark_contains(self, line_number):
         if self.contains_start is not None:
@@ -454,8 +470,10 @@ class fortran_scope(fortran_obj):
 
     def check_use(self, obj_tree, file_contents):
         errors = []
+        last_use_line = -1
         for use_line in self.use:
             use_mod = use_line[0]
+            last_use_line = max(last_use_line, use_line[2])
             if use_mod.startswith('#import'):
                 if (self.parent is None) or (self.parent.get_type() != INTERFACE_TYPE_ID):
                     errors.append(build_diagnostic(
@@ -468,6 +486,11 @@ class fortran_scope(fortran_obj):
                     use_line[2]-1, message='Module "{0}" not found in project'.format(use_mod),
                     severity=3, file_contents=file_contents, find_word=use_mod
                 ))
+        if (self.implicit_line is not None) and (last_use_line >= self.implicit_line):
+            errors.append(build_diagnostic(
+                self.implicit_line-1, message='USE statements after IMPLICIT statement',
+                severity=1, file_contents=file_contents, find_word='IMPLICIT'
+            ))
         return errors
 
 
@@ -684,6 +707,9 @@ class fortran_subroutine(fortran_scope):
                 'Variable "{0}" with INTENT keyword not found in argument list'.format(missing_obj.name),
                 severity=1, file_contents=file_contents, find_word=missing_obj.name
             ))
+        implicit_flag = self.get_implicit()
+        if (implicit_flag is None) or (implicit_flag):
+            return errors
         arg_list = self.args.replace(' ', '').split(',')
         for (i, arg_obj) in enumerate(self.arg_objs):
             if arg_obj is None:
