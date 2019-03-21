@@ -273,9 +273,12 @@ class LangServer:
                     self.source_dirs.append(dirName)
                 if compile_db:
                     # parse the compile db and add paths to source_dirs
-                    json_db = jcb(compile_db)
+                    json_db = jcb(str(compile_db))
                     for db_file in json_db.get_all_files():
-                        self.source_dirs.append(os.path.dirname(db_file))
+                        db_file_path = os.path.dirname(db_file)
+                        if db_file_path not in self.source_dirs:
+                            self.source_dirs.append(db_file_path)
+                    compile_db = ""
         # Initialize workspace
         self.workspace_init()
         #
