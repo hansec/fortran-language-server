@@ -1,6 +1,7 @@
 import os
 import json
-from fortls.objects import fortran_file, fortran_module, fortran_subroutine, \
+from fortls.parse_fortran import fortran_file
+from fortls.objects import fortran_module, fortran_subroutine, \
     fortran_function, fortran_type, fortran_var, fortran_obj, map_keywords
 none_file = fortran_file()
 lowercase_intrinsics = False

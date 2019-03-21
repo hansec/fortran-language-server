@@ -3,9 +3,9 @@ import sys
 import os
 import argparse
 from multiprocessing import freeze_support
-from .langserver import LangServer, read_file_split
+from .langserver import LangServer
 from .jsonrpc import JSONRPC2Connection, ReadWriter, path_from_uri
-from .parse_fortran import process_file, detect_fixed_format
+from .parse_fortran import fortran_file, process_file
 __version__ = '1.6.0'
 
 
@@ -171,23 +171,23 @@ def main():
         #
         print('\nTesting parser')
         print('  File = "{0}"'.format(args.debug_filepath))
-        contents_split, err_str = read_file_split(args.debug_filepath)
-        if contents_split is None:
+        file_obj = fortran_file(args.debug_filepath)
+        err_str = file_obj.load_from_disk()
+        if err_str is not None:
             error_exit("Reading file failed: {0}".format(err_str))
-        fixed_flag = detect_fixed_format(contents_split)
-        print('  Detected format: {0}'.format("fixed" if fixed_flag else "free"))
+        print('  Detected format: {0}'.format("fixed" if file_obj.fixed else "free"))
         print("\n=========\nParser Output\n=========\n")
         _, file_ext = os.path.splitext(os.path.basename(args.debug_filepath))
         if file_ext == file_ext.upper():
-            ast_new = process_file(contents_split, True, fixed_format=fixed_flag, debug=True, pp_defs=pp_defs)
+            file_ast = process_file(file_obj, True, debug=True, pp_defs=pp_defs)
         else:
-            ast_new = process_file(contents_split, True, fixed_format=fixed_flag, debug=True)
+            file_ast = process_file(file_obj, True, debug=True)
         print("\n=========\nObject Tree\n=========\n")
-        for obj in ast_new.get_scopes():
+        for obj in file_ast.get_scopes():
             print("{0}: {1}".format(obj.get_type(), obj.FQSN))
             print_children(obj)
         print("\n=========\nExportable Objects\n=========\n")
-        for _, obj in ast_new.global_dict.items():
+        for _, obj in file_ast.global_dict.items():
             print("{0}: {1}".format(obj.get_type(), obj.FQSN))
     #
     elif debug_server:
@@ -202,20 +202,20 @@ def main():
             if dir_exists is False:
                 error_exit("Specified 'debug_rootpath' does not exist or is not a directory")
             print('\nTesting "initialize" request:')
-            print('  Root = "{0}"\n'.format(args.debug_rootpath))
+            print('  Root = "{0}"'.format(args.debug_rootpath))
             s.serve_initialize({
                 "params": {"rootPath": args.debug_rootpath}
             })
             if len(s.post_messages) == 0:
-                print("  Succesful")
+                print("  Succesful!")
             else:
                 print("  Succesful with errors:")
                 for message in s.post_messages:
                     print("    {0}".format(message[1]))
             # Print module directories
-            print("  Found module directories:")
-            for mod_dir in s.source_dirs:
-                print("    {0}".format(mod_dir))
+            print("\n  Source directories:")
+            for source_dir in s.source_dirs:
+                print("    {0}".format(source_dir))
         #
         if args.debug_diagnostics:
             print('\nTesting "textDocument/publishDiagnostics" notification:')

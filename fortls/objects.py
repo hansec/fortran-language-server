@@ -200,7 +200,7 @@ def find_in_workspace(obj_tree, query, filter_public=False, exact_match=False):
 
 
 def find_word_in_line(line, word):
-    i0 = 0
+    i0 = -1
     for poss_name in WORD_REGEX.finditer(line):
         if poss_name.group() == word:
             i0 = poss_name.start()
@@ -235,6 +235,58 @@ def build_diagnostic(sline, message, severity=1, eline=None, file_contents=None,
             "message": related_message
         }]
     return diag
+
+
+class fortran_diagnostic:
+    def __init__(self, sline, message, severity=1, find_word=None):
+        self.sline = sline
+        self.message = message
+        self.severity = severity
+        self.find_word = find_word
+        self.has_related = False
+        self.related_path = None
+        self.related_line = None
+        self.related_message = None
+
+    def add_related(self, path, line, message):
+        self.has_related = True
+        self.related_path = path
+        self.related_line = line
+        self.related_message = message
+
+    def build(self, file_obj):
+        schar = echar = 0
+        if self.find_word is not None:
+            _, curr_line, forward_lines = file_obj.get_code_line(self.sline, backward=False)
+            schar, echar = find_word_in_line(curr_line.lower(), self.find_word.lower())
+            if schar < 0:
+                for (i, line) in enumerate(forward_lines):
+                    schar, echar = find_word_in_line(line.lower(), self.find_word.lower())
+                    if schar >= 0:
+                        self.sline += i+1
+                        break
+        if schar < 0:
+            schar = echar = 0
+        diag = {
+            "range": {
+                "start": {"line": self.sline, "character": schar},
+                "end": {"line": self.sline, "character": echar}
+            },
+            "message": self.message,
+            "severity": self.severity
+        }
+        if self.has_related:
+            diag["relatedInformation"] = [{
+                "location": {
+                    "uri": path_to_uri(self.related_path),
+                    "range": {
+                        "start": {"line": self.related_line, "character": 0},
+                        "end": {"line": self.related_line, "character": 0}
+                    }
+                },
+                "message": self.related_message
+            }]
+        return diag
 
 
 class fortran_obj:
@@ -297,7 +349,7 @@ class fortran_obj:
     def get_ancestors(self):
         return []
 
-    def get_diagnostics(self, file_contents):
+    def get_diagnostics(self):
         return []
 
     def get_implicit(self):
@@ -333,7 +385,7 @@ class fortran_obj:
     def check_valid_parent(self):
         return True
 
-    def check_definition(self, file_contents, obj_tree, known_types={}, import_objs=None):
+    def check_definition(self, obj_tree, known_types={}, import_objs=None):
         return None, known_types
 
 
@@ -421,7 +473,7 @@ class fortran_scope(fortran_obj):
         else:
             return self.children
 
-    def check_definitions(self, file_contents, obj_tree):
+    def check_definitions(self, obj_tree):
         """Check for definition errors in scope"""
         FQSN_dict = {}
         for child in self.children:
@@ -444,7 +496,7 @@ class fortran_scope(fortran_obj):
             line_number = child.sline - 1
             # Check for type definition in scope
             def_error, known_types = child.check_definition(
-                file_contents, obj_tree, known_types=known_types, import_objs=import_objs
+                obj_tree, known_types=known_types, import_objs=import_objs
             )
             if def_error is not None:
                 errors.append(def_error)
@@ -454,12 +506,12 @@ class fortran_scope(fortran_obj):
             # Check other variables in current scope
             if child.FQSN in FQSN_dict:
                 if line_number > FQSN_dict[child.FQSN]:
-                    errors.append(build_diagnostic(
+                    new_diag = fortran_diagnostic(
                         line_number, message='Variable "{0}" declared twice in scope'.format(child.name),
-                        severity=1, file_contents=file_contents, find_word=child.name,
-                        related_path=self.file.path, related_line=FQSN_dict[child.FQSN],
-                        related_message='First declaration'
-                    ))
+                        severity=1, find_word=child.name
+                    )
+                    new_diag.add_related(path=self.file.path, line=FQSN_dict[child.FQSN], message='First declaration')
+                    errors.append(new_diag)
                     continue
             # Check for masking from parent scope in subroutines, functions, and blocks
             if (self.parent is not None) and \
@@ -469,15 +521,16 @@ class fortran_scope(fortran_obj):
                     # Ignore if function return variable
                     if (self.get_type() == FUNCTION_TYPE_ID) and (parent_var.FQSN == self.FQSN):
                         continue
-                    errors.append(build_diagnostic(
+                    new_diag = fortran_diagnostic(
                         line_number, message='Variable "{0}" masks variable in parent scope'.format(child.name),
-                        severity=2, file_contents=file_contents, find_word=child.name,
-                        related_path=parent_var.file.path, related_line=parent_var.sline-1,
-                        related_message='First declaration'
-                    ))
+                        severity=2, find_word=child.name
+                    )
+                    new_diag.add_related(path=parent_var.file.path, line=parent_var.sline-1,
+                                         message='First declaration')
+                    errors.append(new_diag)
         return errors
 
-    def check_use(self, obj_tree, file_contents):
+    def check_use(self, obj_tree):
         errors = []
         last_use_line = -1
         for use_line in self.use:
@@ -485,21 +538,23 @@ class fortran_scope(fortran_obj):
             last_use_line = max(last_use_line, use_line[2])
             if use_mod.startswith('#import'):
                 if (self.parent is None) or (self.parent.get_type() != INTERFACE_TYPE_ID):
-                    errors.append(build_diagnostic(
-                        use_line[2]-1, message='IMPORT statement outside of interface',
-                        severity=1
-                    ))
+                    new_diag = fortran_diagnostic(
+                        use_line[2]-1, message='IMPORT statement outside of interface', severity=1
+                    )
+                    errors.append(new_diag)
                 continue
             if use_mod not in obj_tree:
-                errors.append(build_diagnostic(
+                new_diag = fortran_diagnostic(
                     use_line[2]-1, message='Module "{0}" not found in project'.format(use_mod),
-                    severity=3, file_contents=file_contents, find_word=use_mod
-                ))
+                    severity=3, find_word=use_mod
+                )
+                errors.append(new_diag)
         if (self.implicit_line is not None) and (last_use_line >= self.implicit_line):
-            errors.append(build_diagnostic(
+            new_diag = fortran_diagnostic(
                 self.implicit_line-1, message='USE statements after IMPLICIT statement',
-                severity=1, file_contents=file_contents, find_word='IMPLICIT'
-            ))
+                severity=1, find_word='IMPLICIT'
+            )
+            errors.append(new_diag)
         return errors
 
     def add_subroutine(self, interface_string, no_contains=False):
@@ -751,14 +806,15 @@ class fortran_subroutine(fortran_scope):
                 return False
         return True
 
-    def get_diagnostics(self, file_contents):
+    def get_diagnostics(self):
         errors = []
         for missing_obj in self.missing_args:
-            errors.append(build_diagnostic(
+            new_diag = fortran_diagnostic(
                 missing_obj.sline-1,
                 'Variable "{0}" with INTENT keyword not found in argument list'.format(missing_obj.name),
-                severity=1, file_contents=file_contents, find_word=missing_obj.name
-            ))
+                severity=1, find_word=missing_obj.name
+            )
+            errors.append(new_diag)
         implicit_flag = self.get_implicit()
         if (implicit_flag is None) or (implicit_flag):
             return errors
@@ -766,10 +822,11 @@ class fortran_subroutine(fortran_scope):
         for (i, arg_obj) in enumerate(self.arg_objs):
             if arg_obj is None:
                 arg_name = arg_list[i].strip()
-                errors.append(build_diagnostic(
+                new_diag = fortran_diagnostic(
                     self.sline-1, 'No matching declaration found for argument "{0}"'.format(arg_name),
-                    severity=1, file_contents=file_contents, find_word=arg_name
-                ))
+                    severity=1, find_word=arg_name
+                )
+                errors.append(new_diag)
         return errors
 
 
@@ -948,15 +1005,17 @@ class fortran_type(fortran_scope):
                 return False
         return True
 
-    def get_diagnostics(self, file_contents):
+    def get_diagnostics(self):
         errors = []
         for in_child in self.in_children:
             if in_child.keywords.count(KEYWORD_ID_DICT['deferred']) > 0:
-                errors.append(build_diagnostic(
+                new_diag = fortran_diagnostic(
                     self.eline - 1, 'Deferred procedure "{0}" not implemented'.format(in_child.name),
-                    severity=1, related_path=in_child.file.path,
-                    related_line=in_child.sline-1, related_message='Inherited procedure declaration'
-                ))
+                    severity=1
+                )
+                new_diag.add_related(path=in_child.file.path, line=in_child.sline-1,
+                                     message='Inherited procedure declaration')
+                errors.append(new_diag)
         return errors
 
     def get_actions(self, sline, eline):
@@ -997,15 +1056,17 @@ class fortran_type(fortran_scope):
                     "newText": "  PROCEDURE :: {0} => {0}\n".format(in_child.name)
                 })
                 edits += interface_edits
-                diagnostics.append(build_diagnostic(
+                new_diag = fortran_diagnostic(
                     line_number, 'Deferred procedure "{0}" not implemented'.format(in_child.name),
-                    severity=1, related_path=in_child.file.path,
-                    related_line=in_child.sline-1, related_message='Inherited procedure declaration'
-                ))
+                    severity=1
+                )
+                new_diag.add_related(path=in_child.file.path, line=in_child.sline-1,
+                                     message='Inherited procedure declaration')
+                diagnostics.append(new_diag)
                 has_edits = True
         #
         if has_edits:
-            actions.append({
+            actions = [{
                 "title": "Implement deferred procedures",
                 "kind": "quickfix",
                 "edit": {
@@ -1014,7 +1075,7 @@ class fortran_type(fortran_scope):
                     }
                 },
                 "diagnostics": diagnostics
-            })
+            }]
         return actions
 
 
@@ -1271,7 +1332,7 @@ class fortran_var(fortran_obj):
     def is_callable(self):
         return self.callable
 
-    def check_definition(self, file_contents, obj_tree, known_types={}, import_objs=None):
+    def check_definition(self, obj_tree, known_types={}, import_objs=None):
         # Check for type definition in scope
         type_match = DEF_KIND_REGEX.match(self.desc)
         if type_match is not None:
@@ -1298,17 +1359,16 @@ class fortran_var(fortran_obj):
             if type_info is not None:
                 if type_info[0] == 1:
                     type_def = type_info[1]
-                    out_diag = build_diagnostic(
+                    out_diag = fortran_diagnostic(
                         self.sline-1, message='Object "{0}" not found in scope'.format(desc_obj_name),
-                        severity=1, file_contents=file_contents, find_word=desc_obj_name,
-                        related_path=type_def.file.path, related_line=type_def.sline-1,
-                        related_message='Possible object'
+                        severity=1, find_word=desc_obj_name
                     )
+                    out_diag.add_related(path=type_def.file.path, line=type_def.sline-1, message='Possible object')
                     return out_diag, known_types
                 elif (import_objs is not None) and (desc_obj_name not in import_objs):
-                    out_diag = build_diagnostic(
+                    out_diag = fortran_diagnostic(
                         self.sline-1, message='Object "{0}" not imported in interface'.format(desc_obj_name),
-                        severity=1, file_contents=file_contents, find_word=desc_obj_name
+                        severity=1, find_word=desc_obj_name
                     )
                     return out_diag, known_types
         return None, known_types
@@ -1419,13 +1479,16 @@ class fortran_meth(fortran_var):
     def is_callable(self):
         return True
 
-    def check_definition(self, file_contents, obj_tree, known_types={}, import_objs=None):
+    def check_definition(self, obj_tree, known_types={}, import_objs=None):
         return None, known_types
 
 
-class fortran_file:
-    def __init__(self, path=None):
-        self.path = path
+class fortran_ast:
+    def __init__(self, file_obj=None):
+        self.file = file_obj
+        self.path = None
+        if file_obj is not None:
+            self.path = file_obj.path
         self.global_dict = {}
         self.scope_list = []
         self.variable_list = []
@@ -1446,12 +1509,14 @@ class fortran_file:
         self.pending_doc = None
 
     def create_none_scope(self):
+        """Create empty scope to hold non-module contained items"""
         if self.none_scope is not None:
             raise ValueError
         self.none_scope = fortran_program(self, 1, "main")
         self.add_scope(self.none_scope, re.compile(r'[ ]*END[ ]*PROGRAM', re.I), exportable=False)
 
     def get_enc_scope_name(self):
+        """Get current enclosing scope name"""
         if self.current_scope is None:
             return None
         return self.current_scope.FQSN
@@ -1595,7 +1660,7 @@ class fortran_file:
         return curr_obj
 
     def resolve_includes(self, workspace, path=None):
-        file_dir = os.path.dirname(self.path)
+        file_dir = os.path.dirname(self.file.path)
         for include_path in self.include_stmnts:
             file_path = os.path.normpath(os.path.join(file_dir, include_path[1]))
             if path is not None:
@@ -1604,19 +1669,20 @@ class fortran_file:
             parent_scope = self.get_inner_scope(include_path[0])
             added_entities = include_path[2]
             if file_path in workspace:
-                include_obj = workspace[file_path]["ast"]
-                if include_obj.none_scope is not None:
-                    if include_obj.inc_scope is None:
-                        include_obj.inc_scope = include_obj.none_scope
+                include_file = workspace[file_path]
+                include_ast = include_file.ast
+                if include_ast.none_scope is not None:
+                    if include_ast.inc_scope is None:
+                        include_ast.inc_scope = include_ast.none_scope
                     # Remove old objects
                     for obj in added_entities:
                         parent_scope.children.remove(obj)
                     added_entities = []
-                    for child in include_obj.inc_scope.children:
+                    for child in include_ast.inc_scope.children:
                         added_entities.append(child)
                         parent_scope.add_child(child)
                         child.update_fqsn(parent_scope.FQSN)
-                    include_obj.none_scope = parent_scope
+                    include_ast.none_scope = parent_scope
                     include_path[2] = added_entities
 
     def close_file(self, line_number):
@@ -1637,7 +1703,7 @@ class fortran_file:
             if obj is not None:
                 obj.set_visibility(1)
 
-    def check_file(self, obj_tree, file_contents):
+    def check_file(self, obj_tree):
         errors = []
         tmp_list = self.scope_list[:]
         if self.none_scope is not None:
@@ -1663,7 +1729,10 @@ class fortran_file:
                     scope.sline-1, message='Invalid parent for "{0}" declaration'.format(scope.get_desc()),
                     severity=1
                 ))
-            errors += scope.check_use(obj_tree, file_contents)
-            errors += scope.check_definitions(file_contents, obj_tree)
-            errors += scope.get_diagnostics(file_contents)
-        return errors
+            errors += scope.check_use(obj_tree)
+            errors += scope.check_definitions(obj_tree)
+            errors += scope.get_diagnostics()
+        diagnostics = []
+        for error in errors:
+            diagnostics.append(error.build(self.file))
+        return diagnostics

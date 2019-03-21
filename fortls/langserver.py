@@ -1,323 +1,57 @@
 import logging
-import sys
 import os
 import traceback
 import re
 # Local modules
 from fortls.jsonrpc import path_to_uri, path_from_uri
-from fortls.parse_fortran import process_file, read_use_stmt, read_var_def, \
-    detect_fixed_format, detect_comment_start
-from fortls.objects import get_paren_substring, find_in_scope, find_in_workspace, \
-    get_use_tree, set_keyword_ordering, MODULE_TYPE_ID, SUBROUTINE_TYPE_ID, \
-    FUNCTION_TYPE_ID, CLASS_TYPE_ID, INTERFACE_TYPE_ID, SELECT_TYPE_ID
-from fortls.intrinsics import get_intrinsic_keywords, load_intrinsics, set_lowercase_intrinsics
+from fortls.parse_fortran import fortran_file, process_file, get_paren_level, \
+    get_var_stack, climb_type_tree, expand_name, get_line_context
+from fortls.objects import find_in_scope, find_in_workspace, get_use_tree, \
+    set_keyword_ordering, MODULE_TYPE_ID, SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID, \
+    CLASS_TYPE_ID, INTERFACE_TYPE_ID, SELECT_TYPE_ID
+from fortls.intrinsics import get_intrinsic_keywords, load_intrinsics, \
+    set_lowercase_intrinsics
 
 log = logging.getLogger(__name__)
-PY3K = sys.version_info >= (3, 0)
-if not PY3K:
-    import io
 # Global regexes
 FORTRAN_EXT_REGEX = re.compile(r'^\.F(77|90|95|03|08|OR|PP)?$', re.I)
-OBJBREAK_REGEX = re.compile(r'[\/\-(.,+*<>=$: ]', re.I)
 INT_STMNT_REGEX = re.compile(r'^[ ]*[a-z]*$', re.I)
-WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
-CALL_REGEX = re.compile(r'[ ]*CALL[ ]+[a-z0-9_%]*$', re.I)
-TYPE_STMNT_REGEX = re.compile(r'[ ]*(TYPE|CLASS)[ ]*(IS)?[ ]*$', re.I)
-TYPE_DEF_REGEX = re.compile(r'[ ]*TYPE[, ]+', re.I)
-EXTENDS_REGEX = re.compile(r'EXTENDS[ ]*$', re.I)
-PROCEDURE_STMNT_REGEX = re.compile(r'[ ]*(PROCEDURE)[ ]*$', re.I)
 SCOPE_DEF_REGEX = re.compile(r'[ ]*(MODULE|PROGRAM|SUBROUTINE|FUNCTION)[ ]+', re.I)
 END_REGEX = re.compile(r'[ ]*(END)( |MODULE|PROGRAM|SUBROUTINE|FUNCTION|TYPE|DO|IF|SELECT)?', re.I)
-IMPORT_REGEX = re.compile(r'[ ]*IMPORT[ ]+', re.I)
-FIXED_CONT_REGEX = re.compile(r'(     [\S])')
-FREE_OPT_CONT_REGEX = re.compile(r'([ ]*&)')
-
-
-def read_file_split(filepath):
-    # Read and add file from disk
-    try:
-        if PY3K:
-            with open(filepath, 'r', encoding='utf-8', errors='replace') as fhandle:
-                contents = re.sub(r'\t', r'  ', fhandle.read())
-                contents_split = contents.splitlines()
-        else:
-            with io.open(filepath, 'r', encoding='utf-8', errors='replace') as fhandle:
-                contents = re.sub(r'\t', r'  ', fhandle.read())
-                contents_split = contents.splitlines()
-    except:
-        log.error("Could not read/decode file %s", filepath, exc_info=True)
-        return None, 'Could not read/decode file'
-    else:
-        return contents_split, None
 
 
 def init_file(filepath, pp_defs):
     #
-    contents_split, err_str = read_file_split(filepath)
-    if contents_split is None:
+    file_obj = fortran_file(filepath)
+    err_str = file_obj.load_from_disk()
+    if err_str is not None:
         return None, err_str
     #
     try:
-        fixed_flag = detect_fixed_format(contents_split)
         _, file_ext = os.path.splitext(os.path.basename(filepath))
         if file_ext == file_ext.upper():
-            ast_new = process_file(contents_split, True, filepath, fixed_flag, pp_defs=pp_defs)
+            file_ast = process_file(file_obj, True, pp_defs=pp_defs)
         else:
-            ast_new = process_file(contents_split, True, filepath, fixed_flag)
+            file_ast = process_file(file_obj, True)
     except:
         log.error("Error while parsing file %s", filepath, exc_info=True)
         return None, 'Error during parsing'
-    # Construct new file object and add to workspace
-    tmp_obj = {
-        "contents": contents_split,
-        "ast": ast_new,
-        "fixed": fixed_flag
-    }
-    return tmp_obj, None
+    file_obj.ast = file_ast
+    return file_obj, None
 
 
-def tokenize_line(line):
-    paren_list = [[[-1, len(line)]], []]
-    level = 1
-    in_string = False
-    string_char = ""
-    for i, char in enumerate(line):
-        if in_string:
-            if char == string_char:
-                in_string = False
-            continue
-        if (char == '(') or (char == '['):
-            paren_list[level].append([i, len(line)])
-            level += 1
-            if len(paren_list) < level+1:
-                paren_list.append([])
-        elif (char == ')') or (char == ']'):
-            paren_list[level-1][-1][1] = i
-            level -= 1
-        elif (char == "'") or (char == '"'):
-            in_string = True
-            string_char = char
-    return paren_split(line, paren_list[:-1])
-
-
-def paren_split(line, paren_list):
-    sections = []
-    for ilev, level in enumerate(paren_list):
-        sections.append([])
-        for group in level:
-            i1 = group[0]
-            i2 = group[1]
-            tmp_str = ""
-            i3 = i1 + 1
-            ranges = []
-            if len(paren_list) > ilev+1:
-                for lower_group in paren_list[ilev+1]:
-                    if (lower_group[0] > i1) and (lower_group[1] <= i2):
-                        tmp_str += line[i3:lower_group[0]]
-                        ranges.append([i3, lower_group[0]])
-                        i3 = lower_group[1] + 1
-            if i3 < i2:
-                tmp_str += line[i3:i2]
-                ranges.append([i3, i2])
-            if i3 == len(line):
-                tmp_str += line[i3:i2]
-                ranges.append([i3, i2])
-            sections[ilev].append([ranges, tmp_str])
-    return sections
-
-
-def get_var_stack(line):
-    if len(line) == 0:
+def get_line_prefix(pre_lines, curr_line, iChar):
+    # Get full line (and possible continuations) from file
+    if (curr_line is None) or (iChar > len(curr_line)) or (curr_line[0] == '#'):
         return None
-    var_list = tokenize_line(line)
-    deepest_var = None
-    final_var = None
-    final_paren = None
-    deepest_paren = None
-    n = len(line)
-    for var_group in var_list:
-        for var_tmp in var_group:
-            for parens in var_tmp[0]:
-                if n >= parens[0]:
-                    if n <= parens[1]:
-                        final_var = var_tmp[1]
-                        final_paren = parens
-                        break
-                    elif parens[1] == -1:
-                        deepest_var = var_tmp[1]
-                        deepest_paren = parens
-    if final_var is None:
-        if deepest_var is not None:
-            final_var = deepest_var
-            final_paren = deepest_paren
-        else:
-            return None
-    if final_var.find('%') < 0:
-        ntail = final_paren[1] - final_paren[0]
-        #
-        if ntail == 0:
-            final_var = ''
-        elif ntail > 0:
-            final_var = final_var[len(final_var)-ntail:]
-    #
-    if final_var is not None:
-        final_op_split = OBJBREAK_REGEX.split(final_var)
-        return final_op_split[-1].split('%')
-    else:
+    prepend_string = ''.join(pre_lines)
+    curr_line = prepend_string + curr_line
+    iChar += len(prepend_string)
+    line_prefix = curr_line[:iChar].lower()
+    # Ignore string literals
+    if (line_prefix.count("'") % 2 == 1) or (line_prefix.count('"') % 2 == 1):
         return None
-
-
-def expand_name(line, char_poss):
-    for word_match in WORD_REGEX.finditer(line):
-        if word_match.start(0) <= char_poss and word_match.end(0) >= char_poss:
-            return word_match.group(0)
-    return ''
-
-
-def climb_type_tree(var_stack, curr_scope, obj_tree):
-    def get_type_name(var_obj):
-        type_desc = get_paren_substring(var_obj.get_desc())
-        if type_desc is not None:
-            type_desc = type_desc.strip().lower()
-        return type_desc
-    # Find base variable in current scope
-    type_name = None
-    type_scope = None
-    iVar = 0
-    var_name = var_stack[iVar].strip().lower()
-    var_obj = find_in_scope(curr_scope, var_name, obj_tree)
-    if var_obj is None:
-        return None
-    else:
-        type_name = get_type_name(var_obj)
-        curr_scope = var_obj.parent
-    # Search for type, then next variable in stack and so on
-    for _ in range(30):
-        # Find variable type in available scopes
-        if type_name is None:
-            break
-        type_scope = find_in_scope(curr_scope, type_name, obj_tree)
-        # Exit if not found
-        if type_scope is None:
-            break
-        curr_scope = type_scope.parent
-        # Go to next variable in stack and exit if done
-        iVar += 1
-        if iVar == len(var_stack)-1:
-            break
-        # Find next variable by name in scope
-        var_name = var_stack[iVar].strip().lower()
-        var_obj = find_in_scope(type_scope, var_name, obj_tree)
-        # Set scope to declaration location if variable is inherited
-        if var_obj is not None:
-            curr_scope = var_obj.parent
-            if (var_obj.parent is not None) and (var_obj.parent.get_type() == CLASS_TYPE_ID):
-                for in_child in var_obj.parent.in_children:
-                    if (in_child.name.lower() == var_name) and (in_child.parent is not None):
-                        curr_scope = in_child.parent
-            type_name = get_type_name(var_obj)
-        else:
-            break
-    else:
-        raise KeyError
-    return type_scope
-
-
-def get_line(line, character, file_obj):
-    try:
-        curr_line = file_obj["contents"][line]
-    except:
-        return None, character
-    # Handle continuation lines
-    if file_obj["fixed"]:  # Fixed format file
-        tmp_line = file_obj["contents"][line]
-        char_out = character
-        prev_line = line-1
-        while(prev_line > 0):
-            if FIXED_CONT_REGEX.match(tmp_line):
-                tmp_line = file_obj["contents"][prev_line]
-                curr_line = tmp_line + curr_line[6:]
-                char_out += len(tmp_line) - 6
-            else:
-                break
-            prev_line = prev_line - 1
-        return curr_line, char_out
-    else:  # Free format file
-        char_out = character
-        prev_line = line-1
-        opt_cont_match = FREE_OPT_CONT_REGEX.match(curr_line)
-        if opt_cont_match is not None:
-            curr_line = curr_line[opt_cont_match.end(0):]
-            char_out -= opt_cont_match.end(0)
-        while(prev_line > 0):
-            tmp_line = file_obj["contents"][prev_line]
-            tmp_no_comm = tmp_line.split('!')[0]
-            cont_ind = tmp_no_comm.rfind('&')
-            opt_cont_match = FREE_OPT_CONT_REGEX.match(tmp_no_comm)
-            if opt_cont_match is not None:
-                if cont_ind == opt_cont_match.end(0)-1:
-                    break
-                tmp_no_comm = tmp_no_comm[opt_cont_match.end(0):]
-                cont_ind -= opt_cont_match.end(0)
-            if cont_ind >= 0:
-                curr_line = tmp_no_comm[:cont_ind] + curr_line
-                char_out += cont_ind
-            else:
-                break
-            prev_line = prev_line - 1
-        return curr_line, char_out
-
-
-def apply_change(contents_split, change):
-    """Apply a change to the document."""
-    text = change.get('text', "")
-    change_range = change.get('range')
-    if not PY3K:
-        text = text.encode('utf-8')
-    if len(text) == 0:
-        text_split = [""]
-    else:
-        text_split = text.splitlines()
-        # Check for ending newline
-        if (text[-1] == "\n") or (text[-1] == "\r"):
-            text_split.append("")
-
-    if change_range is None:
-        # The whole file has changed
-        return text_split, -1
-
-    start_line = change_range['start']['line']
-    start_col = change_range['start']['character']
-    end_line = change_range['end']['line']
-    end_col = change_range['end']['character']
-
-    # Check for an edit occuring at the very end of the file
-    if start_line == len(contents_split):
-        return contents_split + text_split, -1
-
-    # Check for single line edit
-    if (start_line == end_line) and (len(text_split) == 1):
-        prev_line = contents_split[start_line]
-        contents_split[start_line] = prev_line[:start_col] + text + prev_line[end_col:]
-        return contents_split, start_line
-
-    # Apply standard change to document
-    new_contents = []
-    for i, line in enumerate(contents_split):
-        if (i < start_line) or (i > end_line):
-            new_contents.append(line)
-            continue
-
-        if i == start_line:
-            for j, change_line in enumerate(text_split):
-                if j == 0:
-                    new_contents.append(line[:start_col] + change_line)
-                else:
-                    new_contents.append(change_line)
-
-        if i == end_line:
-            new_contents[-1] += line[end_col:]
-    return new_contents, -1
+    return line_prefix
 
 
 class LangServer:
@@ -581,13 +315,12 @@ class LangServer:
         params = request["params"]
         uri = params["textDocument"]["uri"]
         path = path_from_uri(uri)
-        # Get file AST
-        if path not in self.workspace:
+        file_obj = self.workspace.get(path)
+        if file_obj is None:
             return []
-        file_obj = self.workspace[path]["ast"]
         # Add scopes to outline view
         test_output = []
-        for scope in file_obj.get_scopes():
+        for scope in file_obj.ast.get_scopes():
             if (scope.name[0] == "#") or (scope.get_type() == SELECT_TYPE_ID):
                 continue
             scope_tree = scope.FQSN.split("::")
@@ -715,108 +448,42 @@ class LangServer:
             if doc_str is not None:
                 comp_obj["documentation"] = doc_str
             return comp_obj
-
-        def get_context(line, var_prefix):
-            line_grouped = tokenize_line(line)
-            lev1_end = line_grouped[0][0][0][-1][1]
-            if lev1_end < 0:
-                lev1_end = len(line)
-            # Test if variable definition statement
-            test_match = read_var_def(line)
-            if test_match is not None:
-                if test_match[0] == 'var':
-                    if (test_match[1][2] is None) and (lev1_end == len(line)):
-                        return 8, var_prefix, None
-                    return 7, var_prefix, None
-            # Test if in USE statement
-            test_match = read_use_stmt(line)
-            if test_match is not None:
-                if len(test_match[1][1]) > 0:
-                    return 2, var_prefix, test_match[1][0]
-                else:
-                    return 1, var_prefix, None
-            # Test if scope declaration or end statement
-            if SCOPE_DEF_REGEX.match(line) or END_REGEX.match(line):
-                return -1, None, None
-            # Test if import statement
-            if IMPORT_REGEX.match(line):
-                return 5, var_prefix, None
-            # In type-def
-            type_def = False
-            if TYPE_DEF_REGEX.match(line) is not None:
-                type_def = True
-            # Test if in call statement
-            if lev1_end == len(line):
-                if CALL_REGEX.match(line_grouped[0][0][1]) is not None:
-                    return 3, var_prefix, None
-            # Test if variable definition using type/class or procedure
-            if (len(line_grouped) >= 2) and (len(line_grouped[1][0][0]) > 0):
-                lev2_end = line_grouped[1][0][0][-1][1]
-                if lev2_end < 0:
-                    lev2_end = len(line)
-                if (lev2_end == len(line)
-                        and line_grouped[1][0][0][-1][0] == lev1_end + 1):
-                    test_str = line_grouped[0][0][1]
-                    if ((TYPE_STMNT_REGEX.match(test_str) is not None)
-                            or (type_def and EXTENDS_REGEX.search(test_str) is not None)):
-                        return 4, var_prefix, None
-                    if PROCEDURE_STMNT_REGEX.match(test_str) is not None:
-                        return 6, var_prefix, None
-            # Only thing on line?
-            if INT_STMNT_REGEX.match(line) is not None:
-                return 9, var_prefix, None
-            # Default context
-            if type_def:
-                return -1, var_prefix, None
-            else:
-                return 0, var_prefix, None
         # Get parameters from request
         req_dict = {"isIncomplete": False, "items": []}
         params = request["params"]
         uri = params["textDocument"]["uri"]
         path = path_from_uri(uri)
-        if path not in self.workspace:
+        file_obj = self.workspace.get(path)
+        if file_obj is None:
             return req_dict
         # Check line
         ac_line = params["position"]["line"]
         ac_char = params["position"]["character"]
         # Get full line (and possible continuations) from file
-        curr_line, ac_char = get_line(ac_line, ac_char, self.workspace[path])
-        if curr_line is None:
-            return req_dict
+        pre_lines, curr_line, _ = file_obj.get_code_line(ac_line, backward=False, strip_comment=True)
+        line_prefix = get_line_prefix(pre_lines, curr_line, ac_char)
         is_member = False
         try:
-            line_prefix = curr_line[:ac_char].lower()
-            # Ignore for comment lines
-            comm_start = detect_comment_start(line_prefix, self.workspace[path]["fixed"])
-            if (comm_start >= 0) or (line_prefix[0] == '#'):
-                return req_dict
-            # Ignore string literals
-            if (line_prefix.count("'") % 2 == 1) or \
-               (line_prefix.count('"') % 2 == 1):
-                return None
             var_stack = get_var_stack(line_prefix)
             is_member = (len(var_stack) > 1)
             var_prefix = var_stack[-1].strip()
         except:
             return req_dict
         # print(var_stack)
-        file_obj = self.workspace[path]["ast"]
         item_list = []
-        scope_list = file_obj.get_scopes(ac_line+1)
+        scope_list = file_obj.ast.get_scopes(ac_line+1)
         # Get context
         name_only = False
         public_only = False
         include_globals = True
-        line_context, var_prefix, context_info = \
-            get_context(line_prefix, var_prefix)
-        if (line_context < 0) or (var_prefix == '' and not (is_member or line_context == 2)):
+        line_context, context_info = get_line_context(line_prefix)
+        if (line_context == 'skip') or (var_prefix == '' and (not is_member)):
             return req_dict
         if self.autocomplete_no_prefix:
             var_prefix = ''
         # Suggestions for user-defined type members
         if is_member:
-            curr_scope = file_obj.get_inner_scope(ac_line+1)
+            curr_scope = file_obj.ast.get_inner_scope(ac_line+1)
             type_scope = climb_type_tree(var_stack, curr_scope, self.obj_tree)
             # Set enclosing type as scope
             if type_scope is None:
@@ -830,8 +497,8 @@ class LangServer:
         type_mask = set_type_mask(False)
         type_mask[1] = True
         type_mask[4] = True
-        if line_context == 1:
-            # Use statement module part (modules only)
+        if line_context == 'mod_only':
+            # Module names only (USE statement)
             for key in self.obj_tree:
                 candidate = self.obj_tree[key][0]
                 if (candidate.get_type() == MODULE_TYPE_ID) and \
@@ -839,8 +506,8 @@ class LangServer:
                     item_list.append(build_comp(candidate, name_only=True))
             req_dict["items"] = item_list
             return req_dict
-        elif line_context == 2:
-            # Use statement only part (module public members only)
+        elif line_context == 'mod_mems':
+            # Public module members only (USE ONLY statement)
             name_only = True
             mod_name = context_info.lower()
             if mod_name in self.obj_tree:
@@ -850,36 +517,34 @@ class LangServer:
                 type_mask[4] = False
             else:
                 return {"isIncomplete": False, "items": []}
-        elif line_context == 3:
-            # Filter callables for call statements
+        elif line_context == 'call':
+            # Callable objects only ("CALL" statements)
             req_callable = True
-        elif line_context == 4:
-            # Variable definition statement for user-defined type
-            # (user-defined types only)
+        elif line_context == 'type_only':
+            # User-defined types only (variable definitions, select clauses)
             type_mask = set_type_mask(True)
             type_mask[4] = False
-        elif line_context == 5:
-            # Include statement (variables and user-defined types only)
+        elif line_context == 'import':
+            # Import statement (variables and user-defined types only)
             name_only = True
             type_mask = set_type_mask(True)
             type_mask[4] = False
             type_mask[6] = False
-        elif line_context == 6:
-            # Variable definition statement for procedure with interface
-            # (interfaces only)
+        elif line_context == 'int_only':
+            # Interfaces only (procedure definitions)
             abstract_only = True
             include_globals = False
             name_only = True
             type_mask = set_type_mask(True)
             type_mask[2] = False
             type_mask[3] = False
-        elif line_context == 7:
-            # Variable definition statement (variables only)
+        elif line_context == 'var_only':
+            # Variables only (variable definitions)
             name_only = True
             type_mask[2] = True
             type_mask[3] = True
-        elif line_context == 8:
-            # Variable definition keywords (variables only)
+        elif line_context == 'var_key':
+            # Variable definition keywords only (variable definition)
             key_context = 0
             enc_scope_type = scope_list[-1].get_type()
             if enc_scope_type == MODULE_TYPE_ID:
@@ -893,11 +558,12 @@ class LangServer:
                     item_list.append(build_comp(candidate))
             req_dict["items"] = item_list
             return req_dict
-        elif line_context == 9:
+        elif line_context == 'first':
             # First word -> default context plus Fortran statements
             for candidate in get_intrinsic_keywords(self.statements, self.keywords, 0):
                 if candidate.name.lower().startswith(var_prefix):
                     item_list.append(build_comp(candidate))
+        # Build completion list
         for candidate in get_candidates(scope_list, var_prefix, include_globals, public_only, abstract_only):
             # Skip module names (only valid in USE)
             candidate_type = candidate.get_type()
@@ -922,21 +588,10 @@ class LangServer:
 
     def get_definition(self, def_file, def_line, def_char):
         # Get full line (and possible continuations) from file
-        curr_line, def_char = get_line(def_line, def_char, def_file)
-        if curr_line is None:
-            return None
-        #
+        pre_lines, curr_line, _ = def_file.get_code_line(def_line, forward=False, strip_comment=True)
+        line_prefix = get_line_prefix(pre_lines, curr_line, def_char)
         is_member = False
         try:
-            line_prefix = curr_line[:def_char].lower()
-            # Ignore for comment lines
-            comm_start = detect_comment_start(line_prefix, def_file["fixed"])
-            if (comm_start >= 0) or (line_prefix[0] == '#'):
-                return None
-            # Ignore string literals
-            if (line_prefix.count("'") % 2 == 1) or \
-               (line_prefix.count('"') % 2 == 1):
-                return None
             var_stack = get_var_stack(line_prefix)
             is_member = (len(var_stack) > 1)
             def_name = expand_name(curr_line, def_char)
@@ -945,8 +600,7 @@ class LangServer:
         # print(var_stack, def_name)
         if def_name == '':
             return None
-        file_obj = def_file["ast"]
-        curr_scope = file_obj.get_inner_scope(def_line+1)
+        curr_scope = def_file.ast.get_inner_scope(def_line+1)
         # Traverse type tree if necessary
         if is_member:
             type_scope = climb_type_tree(var_stack, curr_scope, self.obj_tree)
@@ -976,22 +630,12 @@ class LangServer:
 
     def serve_signature(self, request):
         def get_sub_name(line):
-            nLine = len(line)
-            line_grouped = tokenize_line(line)
-            if len(line_grouped) < 2:
+            _, sections = get_paren_level(line)
+            if sections[0][0] <= 1:
                 return None, None, None
-            lowest_level = -1
-            for i, level in enumerate(line_grouped):
-                if level[-1][0][-1][-1] == nLine:
-                    lowest_level = i
-            if lowest_level > 0:
-                arg_string = ''
-                for char_group in line_grouped[lowest_level]:
-                    arg_string += char_group[-1]
-                return line_grouped[lowest_level-1][0][1].strip(), arg_string.split(','), \
-                    line_grouped[lowest_level-1][0][0][-1][1]
-            else:
-                return None, None, None
+            arg_string = line[sections[0][0]:sections[-1][1]]
+            sub_string, sections = get_paren_level(line[:sections[0][0]-1])
+            return sub_string.strip(), arg_string.split(','), sections[-1][0]
 
         def check_optional(arg, params):
             opt_split = arg.split("=")
@@ -1007,37 +651,27 @@ class LangServer:
         params = request["params"]
         uri = params["textDocument"]["uri"]
         path = path_from_uri(uri)
-        if path not in self.workspace:
+        file_obj = self.workspace.get(path)
+        if file_obj is None:
             return req_dict
         # Check line
         sig_line = params["position"]["line"]
         sig_char = params["position"]["character"]
         # Get full line (and possible continuations) from file
-        curr_line, sig_char = get_line(sig_line, sig_char, self.workspace[path])
-        if curr_line is None:
-            return req_dict
+        pre_lines, curr_line, _ = file_obj.get_code_line(sig_line, backward=False, strip_comment=True)
+        line_prefix = get_line_prefix(pre_lines, curr_line, sig_char)
         # Test if scope declaration or end statement
         if SCOPE_DEF_REGEX.match(curr_line) or END_REGEX.match(curr_line):
             return req_dict
         is_member = False
         try:
-            line_prefix = curr_line[:sig_char].lower()
-            # Ignore for comment lines
-            comm_start = detect_comment_start(line_prefix, self.workspace[path]["fixed"])
-            if (comm_start >= 0) or (line_prefix[0] == '#'):
-                return req_dict
-            # Ignore string literals
-            if (line_prefix.count("'") % 2 == 1) or \
-               (line_prefix.count('"') % 2 == 1):
-                return req_dict
             sub_name, arg_strings, sub_end = get_sub_name(line_prefix)
             var_stack = get_var_stack(sub_name)
             is_member = (len(var_stack) > 1)
         except:
             return req_dict
         #
-        file_obj = self.workspace[path]["ast"]
-        curr_scope = file_obj.get_inner_scope(sig_line+1)
+        curr_scope = file_obj.ast.get_inner_scope(sig_line+1)
         # Traverse type tree if necessary
         if is_member:
             type_scope = climb_type_tree(var_stack, curr_scope, self.obj_tree)
@@ -1104,12 +738,11 @@ class LangServer:
         def_line = params["position"]["line"]
         def_char = params["position"]["character"]
         path = path_from_uri(uri)
-        refs = []
-        # Find object
-        if path in self.workspace:
-            def_obj = self.get_definition(self.workspace[path], def_line, def_char)
-        else:
+        file_obj = self.workspace.get(path)
+        if file_obj is None:
             return []
+        # Find object
+        def_obj = self.get_definition(file_obj, def_line, def_char)
         if def_obj is None:
             return []
         #
@@ -1119,8 +752,8 @@ class LangServer:
             if def_obj.parent.get_type() == CLASS_TYPE_ID:
                 type_mem = True
             else:
-                restrict_file = def_obj.file.path
-                if restrict_file not in self.workspace:
+                restrict_file = self.workspace.get(def_obj.file.path)
+                if restrict_file is None:
                     return []
         # Search through all files
         def_name = def_obj.name.lower()
@@ -1129,19 +762,18 @@ class LangServer:
         if restrict_file is None:
             file_set = self.workspace.items()
         else:
-            file_set = ((restrict_file, self.workspace.get(restrict_file)), )
+            file_set = ((restrict_file.path, restrict_file), )
         override_cache = []
+        refs = []
         for filename, file_obj in sorted(file_set):
             # Search through file line by line
-            for (i, line) in enumerate(file_obj["contents"]):
+            for (i, line) in enumerate(file_obj.contents_split):
                 if len(line) == 0:
                     continue
                 # Skip comment lines
-                comm_start = detect_comment_start(line, file_obj["fixed"])
-                if (comm_start == 0) or (line[0] == '#'):
+                line = file_obj.strip_comment(line)
+                if (line == '') or (line[0] == '#'):
                     continue
-                elif comm_start > 0:
-                    line = line[:comm_start]
                 for match in NAME_REGEX.finditer(line):
                     var_def = self.get_definition(file_obj, i, match.start(1)+1)
                     if var_def is not None:
@@ -1178,11 +810,11 @@ class LangServer:
         def_line = params["position"]["line"]
         def_char = params["position"]["character"]
         path = path_from_uri(uri)
-        # Find object
-        if path in self.workspace:
-            var_obj = self.get_definition(self.workspace[path], def_line, def_char)
-        else:
+        file_obj = self.workspace.get(path)
+        if file_obj is None:
             return None
+        # Find object
+        var_obj = self.get_definition(file_obj, def_line, def_char)
         if var_obj is None:
             return None
         # Construct link reference
@@ -1212,11 +844,11 @@ class LangServer:
         def_line = params["position"]["line"]
         def_char = params["position"]["character"]
         path = path_from_uri(uri)
-        # Find object
-        if path in self.workspace:
-            var_obj = self.get_definition(self.workspace[path], def_line, def_char)
-        else:
+        file_obj = self.workspace.get(path)
+        if file_obj is None:
             return None
+        # Find object
+        var_obj = self.get_definition(file_obj, def_line, def_char)
         if var_obj is None:
             return None
         # Construct hover information
@@ -1245,11 +877,11 @@ class LangServer:
         def_line = params["position"]["line"]
         def_char = params["position"]["character"]
         path = path_from_uri(uri)
-        # Find object
-        if path in self.workspace:
-            var_obj = self.get_definition(self.workspace[path], def_line, def_char)
-        else:
+        file_obj = self.workspace.get(path)
+        if file_obj is None:
             return None
+        # Find object
+        var_obj = self.get_definition(file_obj, def_line, def_char)
         if var_obj is None:
             return None
         # Construct implementation reference
@@ -1289,13 +921,25 @@ class LangServer:
         sline = params["range"]["start"]["line"]
         eline = params["range"]["end"]["line"]
         path = path_from_uri(uri)
+        file_obj = self.workspace.get(path)
         # Find object
-        if path in self.workspace:
-            file_obj = self.workspace[path]["ast"]
-            curr_scope = file_obj.get_inner_scope(sline)
-            if curr_scope is not None:
-                return curr_scope.get_actions(sline, eline)
-        return None
+        if file_obj is None:
+            return None
+        curr_scope = file_obj.ast.get_inner_scope(sline)
+        if curr_scope is None:
+            return None
+        action_list = curr_scope.get_actions(sline, eline)
+        if action_list is None:
+            return None
+        # Convert diagnostics
+        for action in action_list:
+            diagnostics = action.get("diagnostics")
+            if diagnostics is not None:
+                new_diags = []
+                for diagnostic in diagnostics:
+                    new_diags.append(diagnostic.build(file_obj))
+                action["diagnostics"] = new_diags
+        return action_list
 
     def send_diagnostics(self, uri):
         diag_results, diag_exp = self.get_diagnostics(uri)
@@ -1315,11 +959,10 @@ class LangServer:
 
     def get_diagnostics(self, uri):
         filepath = path_from_uri(uri)
-        if filepath in self.workspace:
-            file_obj = self.workspace[filepath]["ast"]
-            file_contents = self.workspace[filepath]["contents"]
+        file_obj = self.workspace.get(filepath)
+        if file_obj is not None:
             try:
-                diags = file_obj.check_file(self.obj_tree, file_contents)
+                diags = file_obj.ast.check_file(self.obj_tree)
             except Exception as e:
                 return None, e
             else:
@@ -1331,36 +974,32 @@ class LangServer:
         params = request["params"]
         uri = params["textDocument"]["uri"]
         path = path_from_uri(uri)
-        # Update file contents with changes
-        if self.sync_type == 1:
-            file_text = params["contentChanges"][0]["text"]
-            if not PY3K:
-                file_text = file_text.encode('utf-8')
-            new_contents = file_text.splitlines()
+        file_obj = self.workspace.get(path)
+        if file_obj is None:
+            self.post_message('Change request failed for unknown file "{0}"'.format(path))
+            log.error('Change request failed for unknown file "%s"', path)
+            return
         else:
-            if path in self.workspace:
-                new_contents = self.workspace[path]["contents"]
+            # Update file contents with changes
+            if self.sync_type == 1:
+                file_obj.apply_change(params["contentChanges"][0])
+            else:
                 try:
                     for change in params["contentChanges"]:
-                        old_contents = new_contents
-                        new_contents, _ = apply_change(old_contents, change)
+                        _ = file_obj.apply_change(change)
                 except:
                     self.post_message('Change request failed for file "{0}": Could not apply change'.format(path))
                     log.error('Change request failed for file "%s": Could not apply change', path, exc_info=True)
                     return
-            else:
-                self.post_message('Change request failed for unknown file "{0}"'.format(path))
-                log.error('Change request failed for unknown file "%s"', path)
-                return
         # Parse newly updated file
-        err_str = self.update_workspace_file(new_contents, path, update_links=True)
+        err_str = self.update_workspace_file(path, update_links=True)
         if err_str is not None:
             self.post_message('Change request failed for file "{0}": {1}'.format(path, err_str))
             return
         # Update include statements linking to this file
-        for _, file_obj in self.workspace.items():
-            file_obj["ast"].resolve_includes(self.workspace, path=path)
-        self.workspace[path]["ast"].resolve_includes(self.workspace)
+        for _, tmp_file in self.workspace.items():
+            tmp_file.ast.resolve_includes(self.workspace, path=path)
+        file_obj.ast.resolve_includes(self.workspace)
         # Update inheritance (currently only on open/save)
         # for key in self.obj_tree:
         #     self.obj_tree[key][0].resolve_inherit(self.obj_tree)
@@ -1382,8 +1021,9 @@ class LangServer:
             return
         # Update include statements linking to this file
         for _, file_obj in self.workspace.items():
-            file_obj["ast"].resolve_includes(self.workspace, path=filepath)
-        self.workspace[filepath]["ast"].resolve_includes(self.workspace)
+            file_obj.ast.resolve_includes(self.workspace, path=filepath)
+        file_obj = self.workspace.get(filepath)
+        file_obj.ast.resolve_includes(self.workspace)
         # Update inheritance
         for key in self.obj_tree:
             self.obj_tree[key][0].resolve_inherit(self.obj_tree)
@@ -1391,36 +1031,33 @@ class LangServer:
         self.send_diagnostics(uri)
 
     def add_file(self, filepath):
-        # Read and add file from disk
-        contents_split, err_str = read_file_split(filepath)
-        if contents_split is None:
-            return err_str
-        return self.update_workspace_file(contents_split, filepath)
+        return self.update_workspace_file(filepath, read_file=True)
 
-    def update_workspace_file(self, contents_split, filepath, update_links=False):
+    def update_workspace_file(self, filepath, read_file=False, update_links=False):
         # Update workspace from file contents and path
         try:
-            fixed_flag = detect_fixed_format(contents_split)
+            file_obj = self.workspace.get(filepath)
+            if read_file:
+                if file_obj is None:
+                    file_obj = fortran_file(filepath)
+                file_obj.load_from_disk()
             _, file_ext = os.path.splitext(os.path.basename(filepath))
             if file_ext == file_ext.upper():
-                ast_new = process_file(contents_split, True, filepath, fixed_flag, pp_defs=self.pp_defs)
+                ast_new = process_file(file_obj, True, pp_defs=self.pp_defs)
             else:
-                ast_new = process_file(contents_split, True, filepath, fixed_flag)
+                ast_new = process_file(file_obj, True)
         except:
             log.error("Error while parsing file %s", filepath, exc_info=True)
             return 'Error during parsing'  # Error during parsing
         # Remove old objects from tree
-        if filepath in self.workspace:
-            ast_old = self.workspace[filepath]["ast"]
+        ast_old = file_obj.ast
+        if ast_old is not None:
             for key in ast_old.global_dict:
                 self.obj_tree.pop(key, None)
-        # Construct new file object and add to workspace
-        tmp_obj = {
-            "contents": contents_split,
-            "ast": ast_new,
-            "fixed": fixed_flag
-        }
-        self.workspace[filepath] = tmp_obj
+        # Add new file to workspace
+        file_obj.ast = ast_new
+        if filepath not in self.workspace:
+            self.workspace[filepath] = file_obj
         # Add top-level objects to object tree
         for key, obj in ast_new.global_dict.items():
             self.obj_tree[key] = [obj, filepath]
@@ -1463,12 +1100,12 @@ class LangServer:
                 continue
             self.workspace[path] = result_obj[0]
             # Add top-level objects to object tree
-            ast_new = self.workspace[path]["ast"]
+            ast_new = self.workspace[path].ast
             for key in ast_new.global_dict:
                 self.obj_tree[key] = [ast_new.global_dict[key], path]
         # Update include statements
         for _, file_obj in self.workspace.items():
-            file_obj["ast"].resolve_includes(self.workspace)
+            file_obj.ast.resolve_includes(self.workspace)
         # Update inheritance
         for key in self.obj_tree:
             self.obj_tree[key][0].resolve_inherit(self.obj_tree)
