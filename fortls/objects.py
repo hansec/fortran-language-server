@@ -493,6 +493,13 @@ class fortran_scope(fortran_obj):
                     FQSN_dict[child.FQSN] = child.sline - 1
             else:
                 FQSN_dict[child.FQSN] = child.sline - 1
+        #
+        contains_line = -1
+        if self.get_type() in (MODULE_TYPE_ID, SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID):
+            if self.contains_start is None:
+                contains_line = self.eline
+            else:
+                contains_line = self.contains_start
         # Get list of imported objects for interfaces
         is_interface = False
         if (self.parent is not None) and (self.parent.get_type() == INTERFACE_TYPE_ID):
@@ -507,6 +514,13 @@ class fortran_scope(fortran_obj):
             )
             if def_error is not None:
                 errors.append(def_error)
+            # Detect contains errors
+            if (contains_line >= 0) and (child.get_type() in (SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID)):
+                new_diag = fortran_diagnostic(
+                    line_number, message='Subroutine/Function definition before CONTAINS statement',
+                    severity=1
+                )
+                errors.append(new_diag)
             # Skip masking/double checks for interface members
             if (self.parent is not None) and (self.parent.get_type() == INTERFACE_TYPE_ID):
                 continue
@@ -568,10 +582,14 @@ class fortran_scope(fortran_obj):
         edits = []
         line_number = self.eline - 1
         if (self.contains_start is None) and (not no_contains):
+            first_sub_line = line_number
+            for child in self.children:
+                if child.get_type() in (SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID):
+                    first_sub_line = min(first_sub_line, child.sline - 1)
             edits.append({
                 "range": {
-                    "start": {"line": line_number, "character": 0},
-                    "end": {"line": line_number, "character": 0}
+                    "start": {"line": first_sub_line, "character": 0},
+                    "end": {"line": first_sub_line, "character": 0}
                 },
                 "newText": "CONTAINS\n"
             })
