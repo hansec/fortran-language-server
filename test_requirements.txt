@@ -2,3 +2,4 @@ argparse
 pycodestyle
 pyflakes
 pytest
+compdb
