@@ -24,6 +24,14 @@ def main():
         help="Print server version number and exit"
     )
     parser.add_argument(
+        '--nthreads', type=int, default=4,
+        help="Number of threads to use during workspace initialization (default: 4)"
+    )
+    parser.add_argument(
+        '--notify_init', action="store_true",
+        help="Send notification message when workspace initialization is complete"
+    )
+    parser.add_argument(
         '--symbol_skip_mem', action="store_true",
         help="Do not include type members in document symbol results"
     )
@@ -137,6 +145,8 @@ def main():
                     or (args.debug_workspace_symbols is not None))
     #
     settings = {
+        "nthreads": args.nthreads,
+        "notify_init": args.notify_init,
         "symbol_include_mem": (not args.symbol_skip_mem),
         "sync_type": 2 if args.incremental_sync else 1,
         "autocomplete_no_prefix": args.autocomplete_no_prefix,

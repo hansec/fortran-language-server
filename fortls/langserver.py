@@ -73,6 +73,8 @@ class LangServer:
         # Intrinsic (re-loaded during initialize)
         self.statements, self.keywords, self.intrinsic_funs, self.intrinsic_mods = load_intrinsics()
         # Get launch settings
+        self.nthreads = settings.get("nthreads", 4)
+        self.notify_init = settings.get("notify_init", False)
         self.symbol_include_mem = settings.get("symbol_include_mem", True)
         self.sync_type = settings.get("sync_type", 1)
         self.autocomplete_no_prefix = settings.get("autocomplete_no_prefix", False)
@@ -249,6 +251,8 @@ class LangServer:
             }
         if self.enable_code_actions:
             server_capabilities["codeActionProvider"] = True
+        if self.notify_init:
+            self.post_messages.append([3, "FORTLS initialization complete"])
         return {"capabilities": server_capabilities}
         #     "workspaceSymbolProvider": True,
         #     "streaming": False,
@@ -1087,7 +1091,7 @@ class LangServer:
                         file_list.append(filepath)
         # Process files
         from multiprocessing import Pool
-        pool = Pool(processes=4)
+        pool = Pool(processes=self.nthreads)
         results = {}
         for filepath in file_list:
             results[filepath] = pool.apply_async(init_file, args=(filepath, self.pp_defs))
