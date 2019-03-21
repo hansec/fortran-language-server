@@ -75,6 +75,7 @@ KIND_SPEC_MATCH = re.compile(r'\([a-z0-9_, =*]*\)', re.I)
 SQ_STRING_REGEX = re.compile(r'\'[^\']*\'', re.I)
 DQ_STRING_REGEX = re.compile(r'\"[^\"]*\"', re.I)
 LINE_LABEL_REGEX = re.compile(r'[ ]*([0-9]+)[ ]+', re.I)
+NON_DEF_REGEX = re.compile(r'[ ]*(CALL[ ]+[a-z_]|[a-z_][a-z0-9_%]*[ ]*=)', re.I)
 # Fixed format matching rules
 FIXED_COMMENT_LINE_MATCH = re.compile(r'(!|c|d|\*)', re.I)
 FIXED_CONT_REGEX = re.compile(r'(     [\S])')
@@ -759,12 +760,6 @@ def read_vis_stmnt(line):
         return 'vis', [vis_type, mod_words]
 
 
-def_tests = [read_var_def, read_sub_def, read_fun_def, read_block_def,
-             read_select_def, read_type_def, read_enum_def, read_use_stmt,
-             read_int_def, read_generic_def, read_mod_def, read_prog_def,
-             read_submod_def, read_inc_stmt, read_vis_stmnt]
-
-
 class fortran_file:
     def __init__(self, path=None):
         self.path = path
@@ -1139,6 +1134,14 @@ class fortran_file:
         return pp_skips, pp_defines
 
 
+def_tests = [
+    read_var_def, read_sub_def, read_fun_def, read_block_def,
+    read_select_def, read_type_def, read_enum_def, read_use_stmt,
+    read_int_def, read_generic_def, read_mod_def, read_prog_def,
+    read_submod_def, read_inc_stmt, read_vis_stmnt
+]
+
+
 def process_file(file_obj, close_open_scopes, debug=False, pp_defs=None):
     """Build file AST by parsing file"""
     #
@@ -1207,12 +1210,12 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs=None):
                 else:
                     doc_forward = False
                 if next_line_ind < file_obj.nLines:
-                    next_line = file_obj.get_line(next_line_ind)
+                    next_line = file_obj.get_line(next_line_ind, pp_content=True)
                     next_line_ind += 1
                     doc_match = DOC_COMMENT_MATCH.match(next_line)
                     while((doc_match is not None) and (next_line_ind < file_obj.nLines)):
                         doc_lines.append(next_line[doc_match.end(0):].strip())
-                        next_line = file_obj.get_line(next_line_ind)
+                        next_line = file_obj.get_line(next_line_ind, pp_content=True)
                         next_line_ind += 1
                         doc_match = DOC_COMMENT_MATCH.match(next_line)
                     next_line_ind -= 1
@@ -1299,6 +1302,10 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs=None):
                         print('{1} !!! END "DO" scope({0})'.format(line_number, line.strip()))
                 if did_close:
                     continue
+        # Skip if known generic code line
+        match = NON_DEF_REGEX.match(line_no_comment)
+        if match is not None:
+            continue
         # Mark implicit statement
         match = IMPLICIT_REGEX.match(line_no_comment)
         if match is not None:
