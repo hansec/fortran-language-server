@@ -976,6 +976,7 @@ class fortran_type(fortran_scope):
         self.in_children = []
         self.inherit = None
         self.inherit_var = None
+        self.inherit_tmp = None
         if self.keywords.count(KEYWORD_ID_DICT['public']) > 0:
             self.vis = 1
         if self.keywords.count(KEYWORD_ID_DICT['private']) > 0:
@@ -998,12 +999,18 @@ class fortran_type(fortran_scope):
         #
         self.inherit_var = find_in_scope(self.parent, self.inherit, obj_tree)
         if self.inherit_var is not None:
+            # Disable "resolve_inherit" to allow circular type references
+            self.inherit_tmp = self.inherit
+            self.inherit = None
             self.inherit_var.resolve_inherit(obj_tree)
             # Get current fields
             child_names = []
             for child in self.children:
                 child_names.append(child.name.lower())
                 child.resolve_inherit(obj_tree)
+            # Re-enable "resolve_inherit" to allow circular type references
+            self.inherit = self.inherit_tmp
+            self.inherit_tmp = None
             # Import for parent objects
             self.in_children = []
             for child in self.inherit_var.get_children():
