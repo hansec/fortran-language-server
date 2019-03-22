@@ -50,7 +50,7 @@ END_INT_WORD = r'INTERFACE'
 END_WORD_REGEX = re.compile(r'[ ]*END[ ]*(DO|WHERE|IF|BLOCK|ASSOCIATE|SELECT'
                             r'|TYPE|ENUM|MODULE|SUBMODULE|PROGRAM|INTERFACE'
                             r'|SUBROUTINE|FUNCTION)?([ ]+|$)', re.I)
-TYPE_DEF_REGEX = re.compile(r'[ ]*(TYPE)[, ]+', re.I)
+TYPE_DEF_REGEX = re.compile(r'[ ]*(TYPE)[, :]+', re.I)
 EXTENDS_REGEX = re.compile(r'EXTENDS[ ]*\(([a-z0-9_]*)\)', re.I)
 GENERIC_PRO_REGEX = re.compile(r'[ ]*(GENERIC)[ ]*::[ ]*[a-z]', re.I)
 GEN_ASSIGN_REGEX = re.compile(r'(ASSIGNMENT|OPERATOR)\(', re.I)
