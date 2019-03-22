@@ -515,7 +515,7 @@ class fortran_scope(fortran_obj):
             if def_error is not None:
                 errors.append(def_error)
             # Detect contains errors
-            if (contains_line >= 0) and (child.get_type() in (SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID)):
+            if (contains_line >= child.sline) and (child.get_type() in (SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID)):
                 new_diag = fortran_diagnostic(
                     line_number, message='Subroutine/Function definition before CONTAINS statement',
                     severity=1
