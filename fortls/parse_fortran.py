@@ -1558,15 +1558,24 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs=None):
                 if(debug):
                     print('{1} !!! INCLUDE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'vis':
-                if (len(obj[1]) == 0) and (obj[0] == 1):
-                    file_ast.current_scope.set_default_vis(-1)
+                if file_ast.current_scope is None:
+                    file_ast.parse_errors.append({
+                        "line": line_number,
+                        "schar": 0,
+                        "echar": 0,
+                        "mess": "Visibility statement without enclosing scope",
+                        "sev": 1
+                    })
                 else:
-                    if obj[0] == 1:
-                        for word in obj[1]:
-                            file_ast.add_private(word)
+                    if (len(obj[1]) == 0) and (obj[0] == 1):
+                        file_ast.current_scope.set_default_vis(-1)
                     else:
-                        for word in obj[1]:
-                            file_ast.add_public(word)
+                        if obj[0] == 1:
+                            for word in obj[1]:
+                                file_ast.add_private(word)
+                        else:
+                            for word in obj[1]:
+                                file_ast.add_public(word)
                 if(debug):
                     print('{1} !!! Visiblity statement({0})'.format(line_number, line.strip()))
     file_ast.close_file(line_number)
