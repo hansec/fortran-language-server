@@ -101,7 +101,12 @@ END_REGEX = re.compile(r'[ ]*(END)( |MODULE|PROGRAM|SUBROUTINE|FUNCTION|TYPE|DO|
 
 
 def get_var_stack(line):
-    """Get user-defined type field sequence"""
+    """Get user-defined type field sequence terminating the given line
+
+    Examples:
+      "myvar%foo%bar" -> ["myvar", "foo", "bar"]
+      "CALL self%method(this%foo" -> ["this", "foo"]
+    """
     if len(line) == 0:
         return None
     final_var, sections = get_paren_level(line)
@@ -124,7 +129,7 @@ def get_var_stack(line):
 
 
 def expand_name(line, char_poss):
-    """Get full word containing current position"""
+    """Get full word containing given cursor position"""
     for word_match in WORD_REGEX.finditer(line):
         if word_match.start(0) <= char_poss and word_match.end(0) >= char_poss:
             return word_match.group(0)
@@ -199,7 +204,7 @@ def get_line_context(line):
             return 'mod_mems', test_match[1][0]
         else:
             return 'mod_only', None
-    # Test if scope declaration or end statement
+    # Test if scope declaration or end statement (no completion provided)
     if SCOPE_DEF_REGEX.match(line) or END_REGEX.match(line):
         return 'skip', None
     # Test if import statement
@@ -225,7 +230,7 @@ def get_line_context(line):
     # Only thing on line?
     if INT_STMNT_REGEX.match(line) is not None:
         return 'first', None
-    # Default context
+    # Default or skip context
     if type_def:
         return 'skip', None
     else:
@@ -278,7 +283,12 @@ def strip_strings(in_line, maintain_len=False):
 
 
 def separate_def_list(test_str):
-    """Separate definition lists, skipping parenthesis and bracket groups"""
+    """Separate definition lists, skipping parenthesis and bracket groups
+
+    Examples:
+      "var1, var2, var3" -> ["var1", "var2", "var3"]
+      "var, init_var(3) = [1,2,3], array(3,3)" -> ["var", "init_var", "array"]
+    """
     stripped_str = strip_strings(test_str)
     paren_count = 0
     def_list = []
@@ -304,7 +314,8 @@ def separate_def_list(test_str):
 
 
 def find_paren_match(test_str):
-    """Find matching closing parenthesis by searching forward"""
+    """Find matching closing parenthesis by searching forward,
+    returns -1 if no match is found"""
     paren_count = 1
     ind = -1
     for (i, char) in enumerate(test_str):
@@ -320,6 +331,10 @@ def find_paren_match(test_str):
 def get_paren_level(line):
     """Get sub-string corresponding to a single parenthesis level,
     via backward search up through the line.
+
+    Examples:
+      "CALL sub1(arg1,arg2" -> ("arg1,arg2", [[10, 19]])
+      "CALL sub1(arg1(i),arg2" -> ("arg1,arg2", [[10, 14], [17, 22]])
     """
     if line == '':
         return '', [[0, 0]]
@@ -357,8 +372,8 @@ def get_paren_level(line):
     return out_string, sections
 
 
-def parse_keywords(test_str):
-    """Parse keywords"""
+def parse_var_keywords(test_str):
+    """Parse Fortran variable declaration keywords"""
     keyword_match = KEYWORD_LIST_REGEX.match(test_str)
     keywords = []
     while (keyword_match is not None):
@@ -413,7 +428,7 @@ def read_var_def(line, type_word=None, fun_only=False):
         if not trailing_line[0] in (' ', ',', ':'):
             return None
     #
-    keywords, trailing_line = parse_keywords(trailing_line)
+    keywords, trailing_line = parse_var_keywords(trailing_line)
     # Check if function
     fun_def = read_fun_def(trailing_line, [type_word, keywords])
     if (fun_def is not None) or fun_only:
