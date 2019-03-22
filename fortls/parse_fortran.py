@@ -313,6 +313,16 @@ def separate_def_list(test_str):
     return def_list
 
 
+def find_word_in_line(line, word):
+    """Find Fortran word in line"""
+    i0 = -1
+    for poss_name in WORD_REGEX.finditer(line):
+        if poss_name.group() == word:
+            i0 = poss_name.start()
+            break
+    return i0, i0 + len(word)
+
+
 def find_paren_match(test_str):
     """Find matching closing parenthesis by searching forward,
     returns -1 if no match is found"""
@@ -983,6 +993,29 @@ class fortran_file:
             if FREE_OPENMP_MATCH.match(line) is None:
                 line = line.split('!')[0]
         return line
+
+    def find_word_in_code_line(self, line_number, find_word, forward=True, backward=False, pp_content=False):
+        back_lines, curr_line, forward_lines = self.get_code_line(
+            line_number, forward=forward, backward=backward, pp_content=pp_content
+        )
+        i0 = i1 = -1
+        if curr_line is not None:
+            find_word_lower = find_word.lower()
+            i0, i1 = find_word_in_line(curr_line.lower(), find_word_lower)
+        if backward and (i0 < 0):
+            back_lines.reverse()
+            for (i, line) in enumerate(back_lines):
+                i0, i1 = find_word_in_line(line.lower(), find_word_lower)
+                if i0 >= 0:
+                    line_number -= i+1
+                    return line_number, i0, i1
+        if forward and (i0 < 0):
+            for (i, line) in enumerate(forward_lines):
+                i0, i1 = find_word_in_line(line.lower(), find_word_lower)
+                if i0 >= 0:
+                    line_number += i+1
+                    return line_number, i0, i1
+        return line_number, i0, i1
 
     def preprocess(self, pp_defs=None, debug=False):
         # Look for and mark excluded preprocessor paths in file

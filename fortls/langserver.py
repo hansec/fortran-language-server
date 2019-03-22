@@ -283,7 +283,7 @@ class LangServer:
                 "name": candidate.name,
                 "kind": map_types(candidate.get_type()),
                 "location": {
-                    "uri": path_to_uri(candidate.file.path),
+                    "uri": path_to_uri(candidate.file_ast.path),
                     "range": {
                         "start": {"line": candidate.sline-1, "character": 0},
                         "end": {"line": candidate.eline-1, "character": 0}
@@ -362,7 +362,7 @@ class LangServer:
                         "uri": uri,
                         "range": {
                             "start": {"line": child.sline-1, "character": 0},
-                            "end": {"line": child.sline-1, "character": 1}
+                            "end": {"line": child.sline-1, "character": 0}
                         }
                     }
                     tmp_out["containerName"] = scope.name
@@ -756,7 +756,7 @@ class LangServer:
             if def_obj.parent.get_type() == CLASS_TYPE_ID:
                 type_mem = True
             else:
-                restrict_file = self.workspace.get(def_obj.file.path)
+                restrict_file = def_obj.file_ast.file
                 if restrict_file is None:
                     return []
         # Search through all files
@@ -791,7 +791,8 @@ class LangServer:
                                         ref_match = True
                                         override_cache.append(var_def.FQSN)
                                         break
-                            if (var_def.sline-1 == i) and (var_def.file.path == filename) and (line.count("=>") == 0):
+                            if (var_def.sline-1 == i) and (var_def.file_ast.path == filename) \
+                               and (line.count("=>") == 0):
                                 try:
                                     if var_def.link_obj is def_obj:
                                         ref_match = True
@@ -822,13 +823,17 @@ class LangServer:
         if var_obj is None:
             return None
         # Construct link reference
-        if var_obj.file.path is not None:
-            sline = var_obj.sline-1
+        if var_obj.file_ast.file is not None:
+            var_file = var_obj.file_ast.file
+            sline, schar, echar = \
+                var_file.find_word_in_code_line(var_obj.sline-1, var_obj.name)
+            if schar < 0:
+                schar = echar = 0
             return {
-                "uri": path_to_uri(var_obj.file.path),
+                "uri": path_to_uri(var_file.path),
                 "range": {
-                    "start": {"line": sline, "character": 0},
-                    "end": {"line": sline, "character": 1}
+                    "start": {"line": sline, "character": schar},
+                    "end": {"line": sline, "character": echar}
                 }
             }
         return None
@@ -891,13 +896,17 @@ class LangServer:
         # Construct implementation reference
         if var_obj.parent.get_type() == CLASS_TYPE_ID:
             impl_obj = var_obj.link_obj
-            if (impl_obj is not None) and (impl_obj.file.path is not None):
-                sline = impl_obj.sline-1
+            if (impl_obj is not None) and (impl_obj.file_ast.file is not None):
+                impl_file = impl_obj.file_ast.file
+                sline, schar, echar = \
+                    impl_file.find_word_in_code_line(impl_obj.sline-1, impl_obj.name)
+                if schar < 0:
+                    schar = echar = 0
                 return {
-                    "uri": path_to_uri(impl_obj.file.path),
+                    "uri": path_to_uri(impl_file.path),
                     "range": {
-                        "start": {"line": sline, "character": 0},
-                        "end": {"line": sline, "character": 1}
+                        "start": {"line": sline, "character": schar},
+                        "end": {"line": sline, "character": echar}
                     }
                 }
         return None
