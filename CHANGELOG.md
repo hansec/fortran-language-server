@@ -1,3 +1,9 @@
+## 1.7.1
+
+### Fixes
+* Fix bug with completion and signatureHelp requests on continuation lines (introduced in v1.7)
+* Fix out-of-range error with various requests on zero-length lines (introduced in v1.7)
+
 ## 1.7.0
 
 ### Improvements
