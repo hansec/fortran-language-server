@@ -41,8 +41,8 @@ def init_file(filepath, pp_defs):
 
 
 def get_line_prefix(pre_lines, curr_line, iChar):
-    # Get full line (and possible continuations) from file
-    if (curr_line is None) or (iChar > len(curr_line)) or (curr_line[0] == '#'):
+    """Get code line prefix from current line and preceeding continuation lines"""
+    if (curr_line is None) or (iChar > len(curr_line)) or (curr_line.startswith('#')):
         return None
     prepend_string = ''.join(pre_lines)
     curr_line = prepend_string + curr_line
@@ -466,6 +466,8 @@ class LangServer:
         # Get full line (and possible continuations) from file
         pre_lines, curr_line, _ = file_obj.get_code_line(ac_line, forward=False, strip_comment=True)
         line_prefix = get_line_prefix(pre_lines, curr_line, ac_char)
+        if line_prefix is None:
+            return req_dict
         is_member = False
         try:
             var_stack = get_var_stack(line_prefix)
@@ -594,6 +596,8 @@ class LangServer:
         # Get full line (and possible continuations) from file
         pre_lines, curr_line, _ = def_file.get_code_line(def_line, forward=False, strip_comment=True)
         line_prefix = get_line_prefix(pre_lines, curr_line, def_char)
+        if line_prefix is None:
+            return None
         is_member = False
         try:
             var_stack = get_var_stack(line_prefix)
@@ -664,6 +668,8 @@ class LangServer:
         # Get full line (and possible continuations) from file
         pre_lines, curr_line, _ = file_obj.get_code_line(sig_line, forward=False, strip_comment=True)
         line_prefix = get_line_prefix(pre_lines, curr_line, sig_char)
+        if line_prefix is None:
+            return req_dict
         # Test if scope declaration or end statement
         if SCOPE_DEF_REGEX.match(curr_line) or END_REGEX.match(curr_line):
             return req_dict
