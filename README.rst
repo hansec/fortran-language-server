@@ -45,7 +45,7 @@ Language Server Features
   - Use of unimported variables/objects in interface blocks
   - Statement placement errors ("CONTAINS", "IMPLICIT", "IMPORT")
 
-- Code actions (``textDocument/codeAction``) [Experimental, must be enabled in settings]
+- Code actions (``textDocument/codeAction``) [Experimental]
 
   - Generate type-bound procedures and implementation templates for deferred procedures
 

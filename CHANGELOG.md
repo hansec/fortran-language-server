@@ -1,3 +1,20 @@
+## 1.7.0
+
+### Improvements
+* Add initial support for "textDocument/codeAction" requests, generate unimplemented deferred procedures
+* Show subroutine/function keywords ("PURE", "ELEMENTAL", etc.)
+* Add position of object in line to "textDocument/definition" and "textDocument/implementation" results
+* Diagnostics: CONTAINS statement placement errors
+* Diagnostics: Visibility statement placement errors
+* Command line options: Notify when workspace initialization is complete
+* Command line options: Set number of threads used during initialization
+* Significant refactoring of core code
+
+### Fixes
+* Fix "RecursionError" exception with circular user-defined type references, fixes [#100](https://github.com/hansec/fortran-language-server/issues/100)
+* Fix bug detecting TYPE definitions with an immediately following colon, ref [#100](https://github.com/hansec/fortran-language-server/issues/100)
+* Fix incorrect diagnostics for interface statements with USE instead of IMPORT statements
+
 ## 1.6.0
 
 ### Improvements
