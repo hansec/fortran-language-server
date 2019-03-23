@@ -464,7 +464,7 @@ class LangServer:
         ac_line = params["position"]["line"]
         ac_char = params["position"]["character"]
         # Get full line (and possible continuations) from file
-        pre_lines, curr_line, _ = file_obj.get_code_line(ac_line, backward=False, strip_comment=True)
+        pre_lines, curr_line, _ = file_obj.get_code_line(ac_line, forward=False, strip_comment=True)
         line_prefix = get_line_prefix(pre_lines, curr_line, ac_char)
         is_member = False
         try:
@@ -662,7 +662,7 @@ class LangServer:
         sig_line = params["position"]["line"]
         sig_char = params["position"]["character"]
         # Get full line (and possible continuations) from file
-        pre_lines, curr_line, _ = file_obj.get_code_line(sig_line, backward=False, strip_comment=True)
+        pre_lines, curr_line, _ = file_obj.get_code_line(sig_line, forward=False, strip_comment=True)
         line_prefix = get_line_prefix(pre_lines, curr_line, sig_char)
         # Test if scope declaration or end statement
         if SCOPE_DEF_REGEX.match(curr_line) or END_REGEX.match(curr_line):
