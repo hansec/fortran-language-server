@@ -1,3 +1,8 @@
+## 1.7.2
+
+### Fixes
+* Fix bug with definition/hover requests involving intrinsic functions/modules/variables (introduced in v1.7)
+
 ## 1.7.1
 
 ### Fixes
