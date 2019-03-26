@@ -503,7 +503,7 @@ class fortran_scope(fortran_obj):
                         line_number, message='Variable "{0}" masks variable in parent scope'.format(child.name),
                         severity=2, find_word=child.name
                     )
-                    new_diag.add_related(path=parent_var.file.path, line=parent_var.sline-1,
+                    new_diag.add_related(path=parent_var.file_ast.path, line=parent_var.sline-1,
                                          message='First declaration')
                     errors.append(new_diag)
         return errors
@@ -1002,7 +1002,7 @@ class fortran_type(fortran_scope):
                     self.eline - 1, 'Deferred procedure "{0}" not implemented'.format(in_child.name),
                     severity=1
                 )
-                new_diag.add_related(path=in_child.file.path, line=in_child.sline-1,
+                new_diag.add_related(path=in_child.file_ast.path, line=in_child.sline-1,
                                      message='Inherited procedure declaration')
                 errors.append(new_diag)
         return errors
@@ -1049,7 +1049,7 @@ class fortran_type(fortran_scope):
                     line_number, 'Deferred procedure "{0}" not implemented'.format(in_child.name),
                     severity=1
                 )
-                new_diag.add_related(path=in_child.file.path, line=in_child.sline-1,
+                new_diag.add_related(path=in_child.file_ast.path, line=in_child.sline-1,
                                      message='Inherited procedure declaration')
                 diagnostics.append(new_diag)
                 has_edits = True
@@ -1353,7 +1353,8 @@ class fortran_var(fortran_obj):
                             severity=1, find_word=desc_obj_name
                         )
                         type_def = type_info[1]
-                        out_diag.add_related(path=type_def.file.path, line=type_def.sline-1, message='Possible object')
+                        out_diag.add_related(path=type_def.file_ast.path,
+                                             line=type_def.sline-1, message='Possible object')
                     else:
                         out_diag = fortran_diagnostic(
                             self.sline-1, message='Object "{0}" not imported in interface'.format(desc_obj_name),
@@ -1694,11 +1695,12 @@ class fortran_ast:
 
     def check_file(self, obj_tree):
         errors = []
+        diagnostics = []
         tmp_list = self.scope_list[:]
         if self.none_scope is not None:
             tmp_list += [self.none_scope]
         for error in self.parse_errors:
-            errors.append({
+            diagnostics.append({
                 "range": {
                     "start": {"line": error["line"]-1, "character": error["schar"]},
                     "end": {"line": error["line"]-1, "character": error["echar"]}
@@ -1721,7 +1723,6 @@ class fortran_ast:
             errors += scope.check_use(obj_tree)
             errors += scope.check_definitions(obj_tree)
             errors += scope.get_diagnostics()
-        diagnostics = []
         for error in errors:
             diagnostics.append(error.build(self.file))
         return diagnostics
