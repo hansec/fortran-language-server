@@ -83,6 +83,8 @@ class LangServer:
         self.variable_hover = settings.get("variable_hover", False)
         self.sort_keywords = settings.get("sort_keywords", True)
         self.enable_code_actions = settings.get("enable_code_actions", False)
+        self.max_line_length = settings.get("max_line_length", -1)
+        self.max_comment_line_length = settings.get("max_comment_line_length", -1)
         # Set object settings
         set_keyword_ordering(self.sort_keywords)
 
@@ -193,6 +195,9 @@ class LangServer:
                     self.lowercase_intrinsics = config_dict.get("lowercase_intrinsics", self.lowercase_intrinsics)
                     self.debug_log = config_dict.get("debug_log", self.debug_log)
                     self.pp_defs = config_dict.get("pp_defs", {})
+                    self.max_line_length = config_dict.get("max_line_length", self.max_line_length)
+                    self.max_comment_line_length = config_dict.get("max_comment_line_length",
+                                                                   self.max_comment_line_length)
                     if isinstance(self.pp_defs, list):
                         self.pp_defs = {key: "" for key in self.pp_defs}
             except:
@@ -1041,7 +1046,8 @@ class LangServer:
         file_obj = self.workspace.get(filepath)
         if file_obj is not None:
             try:
-                diags = file_obj.ast.check_file(self.obj_tree)
+                diags = file_obj.check_file(self.obj_tree, max_line_length=self.max_line_length,
+                                            max_comment_line_length=self.max_comment_line_length)
             except Exception as e:
                 return None, e
             else:

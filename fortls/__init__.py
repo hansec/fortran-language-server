@@ -64,6 +64,14 @@ def main():
         help="Enable experimental code actions (default: false)"
     )
     parser.add_argument(
+        '--max_line_length', type=int, default=-1,
+        help="Maximum line length (default: disabled)"
+    )
+    parser.add_argument(
+        '--max_comment_line_length', type=int, default=-1,
+        help="Maximum comment line length (default: disabled)"
+    )
+    parser.add_argument(
         '--debug_log', action="store_true",
         help="Generate debug log in project root folder"
     )
@@ -154,7 +162,9 @@ def main():
         "use_signature_help": args.use_signature_help,
         "variable_hover": args.variable_hover,
         "sort_keywords": (not args.preserve_keyword_order),
-        "enable_code_actions": (args.enable_code_actions or args.debug_actions)
+        "enable_code_actions": (args.enable_code_actions or args.debug_actions),
+        "max_line_length": args.max_line_length,
+        "max_comment_line_length": args.max_comment_line_length
     }
     #
     if args.debug_parser:

@@ -1182,6 +1182,44 @@ class fortran_file:
         self.contents_pp = output_file
         return pp_skips, pp_defines
 
+    def check_file(self, obj_tree, max_line_length=-1, max_comment_line_length=-1):
+        diagnostics = []
+        if (max_line_length > 0) or (max_comment_line_length > 0):
+            line_message = 'Line length exceeds "max_line_length" ({0})'.format(max_line_length)
+            comment_message = 'Comment line length exceeds "max_comment_line_length" ({0})'.format(
+                max_comment_line_length
+            )
+            if self.fixed:
+                COMMENT_LINE_MATCH = FIXED_COMMENT_LINE_MATCH
+            else:
+                COMMENT_LINE_MATCH = FREE_COMMENT_LINE_MATCH
+            for (i, line) in enumerate(self.contents_split):
+                if COMMENT_LINE_MATCH.match(line) is None:
+                    if (max_line_length > 0) and (len(line) > max_line_length):
+                        diagnostics.append({
+                            "range": {
+                                "start": {"line": i, "character": max_line_length},
+                                "end": {"line": i, "character": len(line)}
+                            },
+                            "message": line_message,
+                            "severity": 2
+                        })
+                else:
+                    if (max_comment_line_length > 0) and (len(line) > max_comment_line_length):
+                        diagnostics.append({
+                            "range": {
+                                "start": {"line": i, "character": max_comment_line_length},
+                                "end": {"line": i, "character": len(line)}
+                            },
+                            "message": comment_message,
+                            "severity": 2
+                        })
+        errors, diags_ast = self.ast.check_file(obj_tree)
+        diagnostics += diags_ast
+        for error in errors:
+            diagnostics.append(error.build(self))
+        return diagnostics
+
 
 def_tests = [
     read_var_def, read_sub_def, read_fun_def, read_block_def,

@@ -1725,6 +1725,4 @@ class fortran_ast:
             errors += scope.check_use(obj_tree)
             errors += scope.check_definitions(obj_tree)
             errors += scope.get_diagnostics()
-        for error in errors:
-            diagnostics.append(error.build(self.file))
-        return diagnostics
+        return errors, diagnostics
