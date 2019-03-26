@@ -288,7 +288,7 @@ class fortran_obj:
     def resolve_link(self, obj_tree):
         return None
 
-    def get_type(self):
+    def get_type(self, no_link=False):
         return -1
 
     def get_desc(self):
@@ -451,6 +451,7 @@ class fortran_scope(fortran_obj):
                 FQSN_dict[child.FQSN] = child.sline - 1
         #
         contains_line = -1
+        after_contains_list = (SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID)
         if self.get_type() in (MODULE_TYPE_ID, SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID):
             if self.contains_start is None:
                 contains_line = self.eline
@@ -471,7 +472,7 @@ class fortran_scope(fortran_obj):
             if def_error is not None:
                 errors.append(def_error)
             # Detect contains errors
-            if (contains_line >= child.sline) and (child.get_type() in (SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID)):
+            if (contains_line >= child.sline) and (child.get_type(no_link=True) in after_contains_list):
                 new_diag = fortran_diagnostic(
                     line_number, message='Subroutine/Function definition before CONTAINS statement',
                     severity=1
@@ -561,7 +562,7 @@ class fortran_scope(fortran_obj):
 
 
 class fortran_module(fortran_scope):
-    def get_type(self):
+    def get_type(self, no_link=False):
         return MODULE_TYPE_ID
 
     def get_desc(self):
@@ -690,7 +691,7 @@ class fortran_subroutine(fortran_scope):
     def resolve_link(self, obj_tree):
         self.resolve_arg_link(obj_tree)
 
-    def get_type(self):
+    def get_type(self, no_link=False):
         return SUBROUTINE_TYPE_ID
 
     def get_snippet(self, name_replace=None, drop_arg=-1):
@@ -859,7 +860,7 @@ class fortran_function(fortran_subroutine):
                 if child.name.lower() == result_var_lower:
                     self.result_obj = child
 
-    def get_type(self):
+    def get_type(self, no_link=False):
         return FUNCTION_TYPE_ID
 
     def get_desc(self):
@@ -939,7 +940,7 @@ class fortran_type(fortran_scope):
         if self.keywords.count(KEYWORD_ID_DICT['private']) > 0:
             self.vis = -1
 
-    def get_type(self):
+    def get_type(self, no_link=False):
         return CLASS_TYPE_ID
 
     def get_desc(self):
@@ -1072,7 +1073,7 @@ class fortran_block(fortran_scope):
     def __init__(self, file_ast, line_number, name):
         self.base_setup(file_ast, line_number, name)
 
-    def get_type(self):
+    def get_type(self, no_link=False):
         return BLOCK_TYPE_ID
 
     def get_desc(self):
@@ -1089,7 +1090,7 @@ class fortran_do(fortran_block):
     def __init__(self, file_ast, line_number, name):
         self.base_setup(file_ast, line_number, name)
 
-    def get_type(self):
+    def get_type(self, no_link=False):
         return DO_TYPE_ID
 
     def get_desc(self):
@@ -1100,7 +1101,7 @@ class fortran_where(fortran_block):
     def __init__(self, file_ast, line_number, name):
         self.base_setup(file_ast, line_number, name)
 
-    def get_type(self):
+    def get_type(self, no_link=False):
         return WHERE_TYPE_ID
 
     def get_desc(self):
@@ -1111,7 +1112,7 @@ class fortran_if(fortran_block):
     def __init__(self, file_ast, line_number, name):
         self.base_setup(file_ast, line_number, name)
 
-    def get_type(self):
+    def get_type(self, no_link=False):
         return IF_TYPE_ID
 
     def get_desc(self):
@@ -1122,7 +1123,7 @@ class fortran_associate(fortran_block):
     def __init__(self, file_ast, line_number, name):
         self.base_setup(file_ast, line_number, name)
 
-    def get_type(self):
+    def get_type(self, no_link=False):
         return ASSOC_TYPE_ID
 
     def get_desc(self):
@@ -1133,7 +1134,7 @@ class fortran_enum(fortran_block):
     def __init__(self, file_ast, line_number, name):
         self.base_setup(file_ast, line_number, name)
 
-    def get_type(self):
+    def get_type(self, no_link=False):
         return ENUM_TYPE_ID
 
     def get_desc(self):
@@ -1162,7 +1163,7 @@ class fortran_select(fortran_block):
            and file_ast.current_scope.is_type_region():
             file_ast.end_scope(line_number)
 
-    def get_type(self):
+    def get_type(self, no_link=False):
         return SELECT_TYPE_ID
 
     def get_desc(self):
@@ -1200,7 +1201,7 @@ class fortran_int(fortran_scope):
         self.abstract = abstract
         self.external = name.startswith('#GEN_INT') and (not abstract)
 
-    def get_type(self):
+    def get_type(self, no_link=False):
         return INTERFACE_TYPE_ID
 
     def get_desc(self):
@@ -1278,8 +1279,8 @@ class fortran_var(fortran_obj):
             if link_obj is not None:
                 self.link_obj = link_obj
 
-    def get_type(self):
-        if self.link_obj is not None:
+    def get_type(self, no_link=False):
+        if (not no_link) and (self.link_obj is not None):
             return self.link_obj.get_type()
         # Normal variable
         return VAR_TYPE_ID
@@ -1392,8 +1393,8 @@ class fortran_meth(fortran_var):
             return self.link_obj.get_snippet(name, self.drop_arg)
         return None, None
 
-    def get_type(self):
-        if self.link_obj is not None:
+    def get_type(self, no_link=False):
+        if (not no_link) and (self.link_obj is not None):
             return self.link_obj.get_type()
         # Generic
         return METH_TYPE_ID
