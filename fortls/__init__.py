@@ -451,7 +451,7 @@ def main():
                     print('File: "{0}"'.format(path))
                     file_obj = s.workspace.get(path)
                     if file_obj is not None:
-                        file_contents = file_obj['contents']
+                        file_contents = file_obj.contents_split
                         for change in result:
                             start_line = change['range']['start']['line']
                             end_line = change['range']['end']['line']
@@ -463,7 +463,7 @@ def main():
                                 line = file_contents[i]
                                 print('  - {0}'.format(line))
                                 if i == start_line:
-                                    new_contents.append(line[:start_col] + args.debug_rename)
+                                    new_contents.append(line[:start_col] + change['newText'])
                                 if i == end_line:
                                     new_contents[-1] += line[end_col:]
                             for line in new_contents:

@@ -8,7 +8,7 @@ from fortls.parse_fortran import fortran_file, process_file, get_paren_level, \
     get_var_stack, climb_type_tree, expand_name, get_line_context
 from fortls.objects import find_in_scope, find_in_workspace, get_use_tree, \
     set_keyword_ordering, MODULE_TYPE_ID, SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID, \
-    CLASS_TYPE_ID, INTERFACE_TYPE_ID, SELECT_TYPE_ID
+    CLASS_TYPE_ID, INTERFACE_TYPE_ID, SELECT_TYPE_ID, METH_TYPE_ID
 from fortls.intrinsics import get_intrinsic_keywords, load_intrinsics, \
     set_lowercase_intrinsics
 
@@ -741,41 +741,20 @@ class LangServer:
         }
         return req_dict
 
-    def serve_references(self, request):
-        # Get parameters from request
-        params = request["params"]
-        uri = params["textDocument"]["uri"]
-        def_line = params["position"]["line"]
-        def_char = params["position"]["character"]
-        path = path_from_uri(uri)
-        file_obj = self.workspace.get(path)
-        if file_obj is None:
-            return []
-        # Find object
-        def_obj = self.get_definition(file_obj, def_line, def_char)
-        if def_obj is None:
-            return []
-        #
-        restrict_file = None
-        type_mem = False
-        if def_obj.FQSN.count(":") > 2:
-            if def_obj.parent.get_type() == CLASS_TYPE_ID:
-                type_mem = True
-            else:
-                restrict_file = def_obj.file_ast.file
-                if restrict_file is None:
-                    return []
+    def get_all_references(self, def_obj, type_mem, file_obj=None):
         # Search through all files
         def_name = def_obj.name.lower()
         def_fqsn = def_obj.FQSN
         NAME_REGEX = re.compile(r'(?:\W|^)({0})(?:\W|$)'.format(def_name), re.I)
-        if restrict_file is None:
+        if file_obj is None:
             file_set = self.workspace.items()
         else:
-            file_set = ((restrict_file.path, restrict_file), )
+            file_set = ((file_obj.path, file_obj), )
         override_cache = []
-        refs = []
-        for filename, file_obj in sorted(file_set):
+        refs = {}
+        ref_objs = []
+        for filename, file_obj in file_set:
+            file_refs = []
             # Search through file line by line
             for (i, line) in enumerate(file_obj.contents_split):
                 if len(line) == 0:
@@ -801,17 +780,51 @@ class LangServer:
                                and (line.count("=>") == 0):
                                 try:
                                     if var_def.link_obj is def_obj:
+                                        ref_objs.append(var_def)
                                         ref_match = True
                                 except:
                                     pass
                         if ref_match:
-                            refs.append({
-                                "uri": path_to_uri(filename),
-                                "range": {
-                                    "start": {"line": i, "character": match.start(1)},
-                                    "end": {"line": i, "character": match.end(1)}
-                                }
-                            })
+                            file_refs.append([i, match.start(1), match.end(1)])
+            if len(file_refs) > 0:
+                refs[filename] = file_refs
+        return refs, ref_objs
+
+    def serve_references(self, request):
+        # Get parameters from request
+        params = request["params"]
+        uri = params["textDocument"]["uri"]
+        def_line = params["position"]["line"]
+        def_char = params["position"]["character"]
+        path = path_from_uri(uri)
+        # Find object
+        file_obj = self.workspace.get(path)
+        if file_obj is None:
+            return None
+        def_obj = self.get_definition(file_obj, def_line, def_char)
+        if def_obj is None:
+            return None
+        # Determine global accesibility and type membership
+        restrict_file = None
+        type_mem = False
+        if def_obj.FQSN.count(":") > 2:
+            if def_obj.parent.get_type() == CLASS_TYPE_ID:
+                type_mem = True
+            else:
+                restrict_file = def_obj.file_ast.file
+                if restrict_file is None:
+                    return None
+        all_refs, _ = self.get_all_references(def_obj, type_mem, file_obj=restrict_file)
+        refs = []
+        for (filename, file_refs) in all_refs.items():
+            for ref in file_refs:
+                refs.append({
+                    "uri": path_to_uri(filename),
+                    "range": {
+                        "start": {"line": ref[0], "character": ref[1]},
+                        "end": {"line": ref[0], "character": ref[2]}
+                    }
+                })
         return refs
 
     def serve_definition(self, request):
@@ -821,10 +834,10 @@ class LangServer:
         def_line = params["position"]["line"]
         def_char = params["position"]["character"]
         path = path_from_uri(uri)
+        # Find object
         file_obj = self.workspace.get(path)
         if file_obj is None:
             return None
-        # Find object
         var_obj = self.get_definition(file_obj, def_line, def_char)
         if var_obj is None:
             return None
@@ -918,20 +931,67 @@ class LangServer:
         return None
 
     def serve_rename(self, request):
-        all_refs = self.serve_references(request)
-        if all_refs is None:
+        # Get parameters from request
+        params = request["params"]
+        uri = params["textDocument"]["uri"]
+        def_line = params["position"]["line"]
+        def_char = params["position"]["character"]
+        path = path_from_uri(uri)
+        # Find object
+        file_obj = self.workspace.get(path)
+        if file_obj is None:
+            return None
+        def_obj = self.get_definition(file_obj, def_line, def_char)
+        if def_obj is None:
+            return None
+        # Determine global accesibility and type membership
+        restrict_file = None
+        type_mem = False
+        if def_obj.FQSN.count(":") > 2:
+            if def_obj.parent.get_type() == CLASS_TYPE_ID:
+                type_mem = True
+            else:
+                restrict_file = def_obj.file_ast.file
+                if restrict_file is None:
+                    return None
+        all_refs, ref_objs = self.get_all_references(def_obj, type_mem, file_obj=restrict_file)
+        if len(all_refs) == 0:
             self.post_message('Rename failed: No usages found to rename', type=2)
             return None
-        params = request["params"]
+        # Create rename changes
         new_name = params["newName"]
         changes = {}
-        for ref in all_refs:
-            if ref["uri"] not in changes:
-                changes[ref["uri"]] = []
-            changes[ref["uri"]].append({
-                "range": ref["range"],
-                "newText": new_name
-            })
+        for (filename, file_refs) in all_refs.items():
+            file_uri = path_to_uri(filename)
+            changes[file_uri] = []
+            for ref in file_refs:
+                changes[file_uri].append({
+                    "range": {
+                        "start": {"line": ref[0], "character": ref[1]},
+                        "end": {"line": ref[0], "character": ref[2]}
+                    },
+                    "newText": new_name
+                })
+        # Check for implicit procedure implementation naming
+        bind_obj = None
+        if def_obj.get_type(no_link=True) == METH_TYPE_ID:
+            _, curr_line, post_lines = def_obj.file_ast.file.get_code_line(
+                def_obj.sline-1, backward=False, strip_comment=True
+            )
+            if curr_line is not None:
+                full_line = curr_line + ''.join(post_lines)
+                if full_line.find('=>') < 0:
+                    bind_obj = def_obj
+                    bind_change = "{0} => {1}".format(new_name, def_obj.name)
+        elif (len(ref_objs) > 0) and (ref_objs[0].get_type(no_link=True) == METH_TYPE_ID):
+            bind_obj = ref_objs[0]
+            bind_change = "{0} => {1}".format(ref_objs[0].name, new_name)
+        # Replace definition statement with explicit implementation naming
+        if bind_obj is not None:
+            def_uri = path_to_uri(bind_obj.file_ast.file.path)
+            for change in changes[def_uri]:
+                if change['range']['start']['line'] == bind_obj.sline-1:
+                    change["newText"] = bind_change
         return {"changes": changes}
 
     def serve_codeActions(self, request):

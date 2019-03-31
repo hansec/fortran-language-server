@@ -395,15 +395,15 @@ def test_refs():
     #
     free_path = os.path.join(test_dir, "subdir", "test_free.f90")
     check_return(results[1], (
+        [21, 27, os.path.join(test_dir, "test_prog.f08")],
+        [5, 11, os.path.join(test_dir, "test_prog.f08")],
         [8, 14, free_path],
         [9, 15, free_path],
         [14, 20, free_path],
         [6, 12, free_path],
         [6, 12, free_path],
         [6, 12, free_path],
-        [6, 12, free_path],
-        [21, 27, os.path.join(test_dir, "test_prog.f08")],
-        [5, 11, os.path.join(test_dir, "test_prog.f08")]
+        [6, 12, free_path]
     ))
 
 
