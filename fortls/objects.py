@@ -627,7 +627,7 @@ class fortran_submodule(fortran_module):
 class fortran_subroutine(fortran_scope):
     def __init__(self, file_ast, line_number, name, args="", mod_sub=False, keywords=[]):
         self.base_setup(file_ast, line_number, name, keywords=keywords)
-        self.args = args.replace(' ', '').lower()
+        self.args = args.replace(' ', '')
         self.args_snip = self.args
         self.arg_objs = []
         self.in_children = []
@@ -666,6 +666,7 @@ class fortran_subroutine(fortran_scope):
         if self.args == '':
             return
         arg_list = self.args.replace(' ', '').split(',')
+        arg_list_lower = self.args.lower().replace(' ', '').split(',')
         self.arg_objs = [None for arg in arg_list]
         check_objs = self.children
         for child in self.children:
@@ -674,7 +675,7 @@ class fortran_subroutine(fortran_scope):
         self.missing_args = []
         for child in check_objs:
             ind = -1
-            for (i, arg) in enumerate(arg_list):
+            for (i, arg) in enumerate(arg_list_lower):
                 if arg == child.name.lower():
                     ind = i
                     break

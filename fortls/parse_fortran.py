@@ -420,7 +420,7 @@ def read_var_def(line, type_word=None, fun_only=False):
     #
     kind_match = KIND_SPEC_REGEX.match(trailing_line)
     if kind_match is not None:
-        kind_str = kind_match.group(0).strip().lower()
+        kind_str = kind_match.group(0).strip()
         type_word += kind_str
         trailing_line = trailing_line[kind_match.end(0):]
         if kind_str[0] == '(':
@@ -428,11 +428,12 @@ def read_var_def(line, type_word=None, fun_only=False):
             if match_char < 0:
                 return None  # Incomplete type spec
             else:
-                type_word += trailing_line[:match_char+1].strip().lower()
+                kind_word = trailing_line[:match_char+1].strip()
+                type_word += kind_word
                 trailing_line = trailing_line[match_char+1:]
     else:
         # Class and Type statements need a kind spec
-        if type_word.lower() == 'class' or type_word.lower() == 'type':
+        if type_word.lower() in ('type', 'class'):
             return None
         # Make sure next character is space or comma or colon
         if not trailing_line[0] in (' ', ',', ':'):
