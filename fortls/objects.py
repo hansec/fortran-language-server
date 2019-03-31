@@ -4,6 +4,7 @@ import os
 from fortls.jsonrpc import path_to_uri
 CLASS_VAR_REGEX = re.compile(r'(TYPE|CLASS)[ ]*\(', re.I)
 DEF_KIND_REGEX = re.compile(r'([a-z]*)[ ]*\((?:KIND|LEN)?[ =]*([a-z_][a-z0-9_]*)', re.I)
+OBJBREAK_REGEX = re.compile(r'[\/\-(.,+*<>=$: ]', re.I)
 # Keyword identifiers
 KEYWORD_LIST = [
     'pointer',
@@ -206,6 +207,128 @@ def find_in_workspace(obj_tree, query, filter_public=False, exact_match=False):
                 filtered_symbols.append(symbol)
         matching_symbols = filtered_symbols
     return matching_symbols
+
+
+def get_paren_level(line):
+    """Get sub-string corresponding to a single parenthesis level,
+    via backward search up through the line.
+
+    Examples:
+      "CALL sub1(arg1,arg2" -> ("arg1,arg2", [[10, 19]])
+      "CALL sub1(arg1(i),arg2" -> ("arg1,arg2", [[10, 14], [17, 22]])
+    """
+    if line == '':
+        return '', [[0, 0]]
+    level = 0
+    in_string = False
+    string_char = ""
+    i1 = len(line)
+    sections = []
+    for i in range(len(line)-1, -1, -1):
+        char = line[i]
+        if in_string:
+            if char == string_char:
+                in_string = False
+            continue
+        if (char == '(') or (char == '['):
+            level -= 1
+            if level == 0:
+                i1 = i
+            elif level < 0:
+                sections.append([i+1, i1])
+                break
+        elif (char == ')') or (char == ']'):
+            level += 1
+            if level == 1:
+                sections.append([i+1, i1])
+        elif (char == "'") or (char == '"'):
+            in_string = True
+            string_char = char
+    if level == 0:
+        sections.append([i, i1])
+    sections.reverse()
+    out_string = ""
+    for section in sections:
+        out_string += line[section[0]:section[1]]
+    return out_string, sections
+
+
+def get_var_stack(line):
+    """Get user-defined type field sequence terminating the given line
+
+    Examples:
+      "myvar%foo%bar" -> ["myvar", "foo", "bar"]
+      "CALL self%method(this%foo" -> ["this", "foo"]
+    """
+    if len(line) == 0:
+        return None
+    final_var, sections = get_paren_level(line)
+    if final_var == '':
+        return ['']
+    if final_var.find('%') < 0:
+        final_paren = sections[-1]
+        ntail = final_paren[1] - final_paren[0]
+        #
+        if ntail == 0:
+            final_var = ''
+        elif ntail > 0:
+            final_var = final_var[len(final_var)-ntail:]
+    #
+    if final_var is not None:
+        final_op_split = OBJBREAK_REGEX.split(final_var)
+        return final_op_split[-1].split('%')
+    else:
+        return None
+
+
+def climb_type_tree(var_stack, curr_scope, obj_tree):
+    """Walk up user-defined type sequence to determine final field type"""
+    def get_type_name(var_obj):
+        type_desc = get_paren_substring(var_obj.get_desc())
+        if type_desc is not None:
+            type_desc = type_desc.strip().lower()
+        return type_desc
+    # Find base variable in current scope
+    type_name = None
+    type_scope = None
+    iVar = 0
+    var_name = var_stack[iVar].strip().lower()
+    var_obj = find_in_scope(curr_scope, var_name, obj_tree)
+    if var_obj is None:
+        return None
+    else:
+        type_name = get_type_name(var_obj)
+        curr_scope = var_obj.parent
+    # Search for type, then next variable in stack and so on
+    for _ in range(30):
+        # Find variable type in available scopes
+        if type_name is None:
+            break
+        type_scope = find_in_scope(curr_scope, type_name, obj_tree)
+        # Exit if not found
+        if type_scope is None:
+            break
+        curr_scope = type_scope.parent
+        # Go to next variable in stack and exit if done
+        iVar += 1
+        if iVar == len(var_stack)-1:
+            break
+        # Find next variable by name in scope
+        var_name = var_stack[iVar].strip().lower()
+        var_obj = find_in_scope(type_scope, var_name, obj_tree)
+        # Set scope to declaration location if variable is inherited
+        if var_obj is not None:
+            curr_scope = var_obj.parent
+            if (var_obj.parent is not None) and (var_obj.parent.get_type() == CLASS_TYPE_ID):
+                for in_child in var_obj.parent.in_children:
+                    if (in_child.name.lower() == var_name) and (in_child.parent is not None):
+                        curr_scope = in_child.parent
+            type_name = get_type_name(var_obj)
+        else:
+            break
+    else:
+        raise KeyError
+    return type_scope
 
 
 class fortran_diagnostic:
@@ -622,6 +745,9 @@ class fortran_submodule(fortran_module):
                     prototype.resolve_link(obj_tree)
                     child.copy_interface(prototype)
                     break
+        # Recurse into children
+        for child in self.children:
+            child.resolve_link(obj_tree)
 
 
 class fortran_subroutine(fortran_scope):
@@ -691,6 +817,8 @@ class fortran_subroutine(fortran_scope):
 
     def resolve_link(self, obj_tree):
         self.resolve_arg_link(obj_tree)
+        for child in self.children:
+            child.resolve_link(obj_tree)
 
     def get_type(self, no_link=False):
         return SUBROUTINE_TYPE_ID
@@ -860,6 +988,8 @@ class fortran_function(fortran_subroutine):
             for child in self.children:
                 if child.name.lower() == result_var_lower:
                     self.result_obj = child
+        for child in self.children:
+            child.resolve_link(obj_tree)
 
     def get_type(self, no_link=False):
         return FUNCTION_TYPE_ID
@@ -1123,12 +1253,29 @@ class fortran_if(fortran_block):
 class fortran_associate(fortran_block):
     def __init__(self, file_ast, line_number, name):
         self.base_setup(file_ast, line_number, name)
+        self.assoc_links = []
 
     def get_type(self, no_link=False):
         return ASSOC_TYPE_ID
 
     def get_desc(self):
         return 'ASSOCIATE'
+
+    def create_binding_variable(self, file_ast, line_number, bound_name, link_var):
+        new_var = fortran_var(file_ast, line_number, bound_name, 'UNKNOWN', [])
+        self.assoc_links.append([new_var, bound_name, link_var])
+        return new_var
+
+    def resolve_link(self, obj_tree):
+        for assoc_link in self.assoc_links:
+            var_stack = get_var_stack(assoc_link[2])
+            if len(var_stack) > 1:
+                type_scope = climb_type_tree(var_stack, self, obj_tree)
+                if type_scope is None:
+                    continue
+                var_obj = find_in_scope(type_scope, var_stack[-1], obj_tree)
+                if var_obj is not None:
+                    assoc_link[0].link_obj = var_obj
 
 
 class fortran_enum(fortran_block):

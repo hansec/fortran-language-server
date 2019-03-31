@@ -1,12 +1,12 @@
 from __future__ import print_function
 import sys
 import re
-from fortls.objects import get_paren_substring, map_keywords, find_in_scope, \
+from fortls.objects import get_paren_substring, map_keywords, get_paren_level, \
     fortran_ast, fortran_module, fortran_program, fortran_submodule, \
     fortran_subroutine, fortran_function, fortran_block, fortran_select, \
     fortran_type, fortran_enum, fortran_int, fortran_var, fortran_meth, \
     fortran_associate, fortran_do, fortran_where, fortran_if, \
-    INTERFACE_TYPE_ID, SELECT_TYPE_ID, CLASS_TYPE_ID
+    INTERFACE_TYPE_ID, SELECT_TYPE_ID
 PY3K = sys.version_info >= (3, 0)
 if not PY3K:
     import io
@@ -69,7 +69,6 @@ KEYWORD_LIST_REGEX = re.compile(r'[ ]*,[ ]*(PUBLIC|PRIVATE|ALLOCATABLE|'
 TATTR_LIST_REGEX = re.compile(r'[ ]*,[ ]*(PUBLIC|PRIVATE|ABSTRACT|EXTENDS\([a-z0-9_]*\))', re.I)
 VIS_REGEX = re.compile(r'[ ]*(PUBLIC|PRIVATE)', re.I)
 WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
-OBJBREAK_REGEX = re.compile(r'[\/\-(.,+*<>=$: ]', re.I)
 SUB_PAREN_MATCH = re.compile(r'\([a-z0-9_, ]*\)', re.I)
 KIND_SPEC_MATCH = re.compile(r'\([a-z0-9_, =*]*\)', re.I)
 SQ_STRING_REGEX = re.compile(r'\'[^\']*\'', re.I)
@@ -100,90 +99,12 @@ SCOPE_DEF_REGEX = re.compile(r'[ ]*(MODULE|PROGRAM|SUBROUTINE|FUNCTION)[ ]+', re
 END_REGEX = re.compile(r'[ ]*(END)( |MODULE|PROGRAM|SUBROUTINE|FUNCTION|TYPE|DO|IF|SELECT)?', re.I)
 
 
-def get_var_stack(line):
-    """Get user-defined type field sequence terminating the given line
-
-    Examples:
-      "myvar%foo%bar" -> ["myvar", "foo", "bar"]
-      "CALL self%method(this%foo" -> ["this", "foo"]
-    """
-    if len(line) == 0:
-        return None
-    final_var, sections = get_paren_level(line)
-    if final_var == '':
-        return ['']
-    if final_var.find('%') < 0:
-        final_paren = sections[-1]
-        ntail = final_paren[1] - final_paren[0]
-        #
-        if ntail == 0:
-            final_var = ''
-        elif ntail > 0:
-            final_var = final_var[len(final_var)-ntail:]
-    #
-    if final_var is not None:
-        final_op_split = OBJBREAK_REGEX.split(final_var)
-        return final_op_split[-1].split('%')
-    else:
-        return None
-
-
 def expand_name(line, char_poss):
     """Get full word containing given cursor position"""
     for word_match in WORD_REGEX.finditer(line):
         if word_match.start(0) <= char_poss and word_match.end(0) >= char_poss:
             return word_match.group(0)
     return ''
-
-
-def climb_type_tree(var_stack, curr_scope, obj_tree):
-    """Walk up user-defined type sequence to determine final field type"""
-    def get_type_name(var_obj):
-        type_desc = get_paren_substring(var_obj.get_desc())
-        if type_desc is not None:
-            type_desc = type_desc.strip().lower()
-        return type_desc
-    # Find base variable in current scope
-    type_name = None
-    type_scope = None
-    iVar = 0
-    var_name = var_stack[iVar].strip().lower()
-    var_obj = find_in_scope(curr_scope, var_name, obj_tree)
-    if var_obj is None:
-        return None
-    else:
-        type_name = get_type_name(var_obj)
-        curr_scope = var_obj.parent
-    # Search for type, then next variable in stack and so on
-    for _ in range(30):
-        # Find variable type in available scopes
-        if type_name is None:
-            break
-        type_scope = find_in_scope(curr_scope, type_name, obj_tree)
-        # Exit if not found
-        if type_scope is None:
-            break
-        curr_scope = type_scope.parent
-        # Go to next variable in stack and exit if done
-        iVar += 1
-        if iVar == len(var_stack)-1:
-            break
-        # Find next variable by name in scope
-        var_name = var_stack[iVar].strip().lower()
-        var_obj = find_in_scope(type_scope, var_name, obj_tree)
-        # Set scope to declaration location if variable is inherited
-        if var_obj is not None:
-            curr_scope = var_obj.parent
-            if (var_obj.parent is not None) and (var_obj.parent.get_type() == CLASS_TYPE_ID):
-                for in_child in var_obj.parent.in_children:
-                    if (in_child.name.lower() == var_name) and (in_child.parent is not None):
-                        curr_scope = in_child.parent
-            type_name = get_type_name(var_obj)
-        else:
-            break
-    else:
-        raise KeyError
-    return type_scope
 
 
 def get_line_context(line):
@@ -336,50 +257,6 @@ def find_paren_match(test_str):
         if paren_count == 0:
             return i
     return ind
-
-
-def get_paren_level(line):
-    """Get sub-string corresponding to a single parenthesis level,
-    via backward search up through the line.
-
-    Examples:
-      "CALL sub1(arg1,arg2" -> ("arg1,arg2", [[10, 19]])
-      "CALL sub1(arg1(i),arg2" -> ("arg1,arg2", [[10, 14], [17, 22]])
-    """
-    if line == '':
-        return '', [[0, 0]]
-    level = 0
-    in_string = False
-    string_char = ""
-    i1 = len(line)
-    sections = []
-    for i in range(len(line)-1, -1, -1):
-        char = line[i]
-        if in_string:
-            if char == string_char:
-                in_string = False
-            continue
-        if (char == '(') or (char == '['):
-            level -= 1
-            if level == 0:
-                i1 = i
-            elif level < 0:
-                sections.append([i+1, i1])
-                break
-        elif (char == ')') or (char == ']'):
-            level += 1
-            if level == 1:
-                sections.append([i+1, i1])
-        elif (char == "'") or (char == '"'):
-            in_string = True
-            string_char = char
-    if level == 0:
-        sections.append([i, i1])
-    sections.reverse()
-    out_string = ""
-    for section in sections:
-        out_string += line[section[0]:section[1]]
-    return out_string, sections
 
 
 def parse_var_keywords(test_str):
@@ -549,16 +426,23 @@ def read_block_def(line):
         else:
             return 'where', False
     #
-    assoc_match = ASSOCIATE_REGEX.match(line)
-    if assoc_match is not None:
-        return 'assoc', None
-    #
     if_match = IF_REGEX.match(line)
     if if_match is not None:
         then_match = THEN_REGEX.search(line_no_comment)
         if then_match is not None:
             return 'if', None
     return None
+
+
+def read_associate_def(line):
+    assoc_match = ASSOCIATE_REGEX.match(line)
+    if assoc_match is not None:
+        trailing_line = line[assoc_match.end(0):]
+        match_char = find_paren_match(trailing_line)
+        if match_char < 0:
+            return 'assoc', []
+        var_words = separate_def_list(trailing_line[:match_char].strip())
+        return 'assoc', var_words
 
 
 def read_select_def(line):
@@ -1223,7 +1107,7 @@ class fortran_file:
 
 def_tests = [
     read_var_def, read_sub_def, read_fun_def, read_block_def,
-    read_select_def, read_type_def, read_enum_def, read_use_stmt,
+    read_associate_def, read_select_def, read_type_def, read_enum_def, read_use_stmt,
     read_int_def, read_generic_def, read_mod_def, read_prog_def,
     read_submod_def, read_inc_stmt, read_vis_stmnt
 ]
@@ -1557,6 +1441,14 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs=None):
                 name = '#ASSOC{0}'.format(block_counter)
                 new_assoc = fortran_associate(file_ast, line_number, name)
                 file_ast.add_scope(new_assoc, END_ASSOCIATE_WORD, req_container=True)
+                for bound_var in obj:
+                    binding_split = bound_var.split('=>')
+                    if len(binding_split) == 2:
+                        binding_name = binding_split[0].strip()
+                        link_name = binding_split[1].strip()
+                        file_ast.add_variable(new_assoc.create_binding_variable(
+                            file_ast, line_number, binding_name, link_name
+                        ))
                 if(debug):
                     print('{1} !!! ASSOCIATE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'if':

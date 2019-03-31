@@ -5,10 +5,11 @@ import re
 # Local modules
 from fortls.jsonrpc import path_to_uri, path_from_uri
 from fortls.parse_fortran import fortran_file, process_file, get_paren_level, \
-    get_var_stack, climb_type_tree, expand_name, get_line_context
+    expand_name, get_line_context
 from fortls.objects import find_in_scope, find_in_workspace, get_use_tree, \
-    set_keyword_ordering, MODULE_TYPE_ID, SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID, \
-    CLASS_TYPE_ID, INTERFACE_TYPE_ID, SELECT_TYPE_ID, METH_TYPE_ID
+    get_var_stack, climb_type_tree, set_keyword_ordering, MODULE_TYPE_ID, \
+    SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID, CLASS_TYPE_ID, INTERFACE_TYPE_ID, \
+    SELECT_TYPE_ID, METH_TYPE_ID
 from fortls.intrinsics import get_intrinsic_keywords, load_intrinsics, \
     set_lowercase_intrinsics
 
