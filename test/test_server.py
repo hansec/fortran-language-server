@@ -378,11 +378,18 @@ def test_def():
 
 def test_refs():
     def check_return(result_array, checks):
+        def find_in_results(uri, sline):
+            for (i, result) in enumerate(result_array):
+                if (result["uri"] == uri) and (result["range"]["start"]["line"] == sline):
+                    del result_array[i]
+                    return result
+            return None
         assert len(result_array) == len(checks)
-        for (i, check) in enumerate(checks):
-            assert result_array[i]["uri"] == path_to_uri(check[2])
-            assert result_array[i]["range"]["start"]["character"] == check[0]
-            assert result_array[i]["range"]["end"]["character"] == check[1]
+        for check in checks:
+            result = find_in_results(path_to_uri(check[0]), check[1])
+            assert (result is not None)
+            assert result["range"]["start"]["character"] == check[2]
+            assert result["range"]["end"]["character"] == check[3]
     #
     string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
     file_path = os.path.join(test_dir, "test_prog.f08")
@@ -395,15 +402,15 @@ def test_refs():
     #
     free_path = os.path.join(test_dir, "subdir", "test_free.f90")
     check_return(results[1], (
-        [21, 27, os.path.join(test_dir, "test_prog.f08")],
-        [5, 11, os.path.join(test_dir, "test_prog.f08")],
-        [8, 14, free_path],
-        [9, 15, free_path],
-        [14, 20, free_path],
-        [6, 12, free_path],
-        [6, 12, free_path],
-        [6, 12, free_path],
-        [6, 12, free_path]
+        [os.path.join(test_dir, "test_prog.f08"), 2, 21, 27],
+        [os.path.join(test_dir, "test_prog.f08"), 9, 5, 11],
+        [free_path, 8, 8, 14],
+        [free_path, 16, 9, 15],
+        [free_path, 18, 14, 20],
+        [free_path, 36, 6, 12],
+        [free_path, 44, 6, 12],
+        [free_path, 50, 6, 12],
+        [free_path, 76, 6, 12]
     ))
 
 
