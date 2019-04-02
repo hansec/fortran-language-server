@@ -104,6 +104,8 @@ The following global settings can be used when launching the language server.
 * ``--variable_hover`` Show hover information for variables (default: subroutines/functions only)
 * ``--preserve_keyword_order`` Display variable keywords information in original order (default: sort to consistent ordering)
 * ``--enable_code_actions`` Enable experimental code actions (default: false)
+* ``--max_line_length`` Maximum line length (default: disabled)
+* ``--max_comment_line_length`` Maximum comment line length (default: disabled)
 * ``--debug_log`` Write debug information to ``root_dir/fortls_debug.log`` (requires a specified ``root_dir`` during initialization)
 
 **Debug settings:**
