@@ -314,9 +314,12 @@ def main():
                     "position": {"line": args.debug_line-1, "character": args.debug_char-1}
                 }
             })
-            print('  Results:')
-            for obj in completion_results['items']:
-                print('    {0}: {1} -> {2}'.format(obj['kind'], obj['label'], obj['detail']))
+            if completion_results is None:
+                print('  No results!')
+            else:
+                print('  Results:')
+                for obj in completion_results:
+                    print('    {0}: {1} -> {2}'.format(obj['kind'], obj['label'], obj['detail']))
         #
         if args.debug_signature:
             print('\nTesting "textDocument/signatureHelp" request:')
@@ -332,8 +335,8 @@ def main():
                     "position": {"line": args.debug_line-1, "character": args.debug_char-1}
                 }
             })
-            if len(signature_results['signatures']) == 0:
-                print('  No Results')
+            if signature_results is None:
+                print('  No Results!')
             else:
                 print('  Results:')
                 active_param = signature_results.get('activeParameter', 0)

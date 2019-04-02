@@ -191,10 +191,10 @@ def test_workspace_symbols():
 
 def test_comp():
     def check_return(result_array, checks):
-        assert len(result_array["items"]) == checks[0]
+        assert len(result_array) == checks[0]
         if checks[0] > 0:
-            assert result_array["items"][0]["label"] == checks[1]
-            assert result_array["items"][0]["detail"] == checks[2]
+            assert result_array[0]["label"] == checks[1]
+            assert result_array[0]["detail"] == checks[2]
 
     def comp_request(file_path, line, char):
         return write_rpc_request(1, "textDocument/completion", {

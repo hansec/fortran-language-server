@@ -459,13 +459,12 @@ class LangServer:
                 comp_obj["documentation"] = doc_str
             return comp_obj
         # Get parameters from request
-        req_dict = {"isIncomplete": False, "items": []}
         params = request["params"]
         uri = params["textDocument"]["uri"]
         path = path_from_uri(uri)
         file_obj = self.workspace.get(path)
         if file_obj is None:
-            return req_dict
+            return None
         # Check line
         ac_line = params["position"]["line"]
         ac_char = params["position"]["character"]
@@ -473,14 +472,14 @@ class LangServer:
         pre_lines, curr_line, _ = file_obj.get_code_line(ac_line, forward=False, strip_comment=True)
         line_prefix = get_line_prefix(pre_lines, curr_line, ac_char)
         if line_prefix is None:
-            return req_dict
+            return None
         is_member = False
         try:
             var_stack = get_var_stack(line_prefix)
             is_member = (len(var_stack) > 1)
             var_prefix = var_stack[-1].strip()
         except:
-            return req_dict
+            return None
         # print(var_stack)
         item_list = []
         scope_list = file_obj.ast.get_scopes(ac_line+1)
@@ -490,7 +489,7 @@ class LangServer:
         include_globals = True
         line_context, context_info = get_line_context(line_prefix)
         if (line_context == 'skip') or (var_prefix == '' and (not is_member)):
-            return req_dict
+            return None
         if self.autocomplete_no_prefix:
             var_prefix = ''
         # Suggestions for user-defined type members
@@ -499,7 +498,7 @@ class LangServer:
             type_scope = climb_type_tree(var_stack, curr_scope, self.obj_tree)
             # Set enclosing type as scope
             if type_scope is None:
-                return {"isIncomplete": False, "items": []}
+                return None
             else:
                 include_globals = False
                 scope_list = [type_scope]
@@ -516,8 +515,7 @@ class LangServer:
                 if (candidate.get_type() == MODULE_TYPE_ID) and \
                    candidate.name.lower().startswith(var_prefix):
                     item_list.append(build_comp(candidate, name_only=True))
-            req_dict["items"] = item_list
-            return req_dict
+            return item_list
         elif line_context == 'mod_mems':
             # Public module members only (USE ONLY statement)
             name_only = True
@@ -528,7 +526,7 @@ class LangServer:
                 include_globals = False
                 type_mask[4] = False
             else:
-                return {"isIncomplete": False, "items": []}
+                return None
         elif line_context == 'call':
             # Callable objects only ("CALL" statements)
             req_callable = True
@@ -568,8 +566,7 @@ class LangServer:
             for candidate in get_intrinsic_keywords(self.statements, self.keywords, key_context):
                 if candidate.name.lower().startswith(var_prefix):
                     item_list.append(build_comp(candidate))
-            req_dict["items"] = item_list
-            return req_dict
+            return item_list
         elif line_context == 'first':
             # First word -> default context plus Fortran statements
             for candidate in get_intrinsic_keywords(self.statements, self.keywords, 0):
@@ -595,8 +592,7 @@ class LangServer:
                 continue
             #
             item_list.append(build_comp(candidate, name_only=name_only))
-        req_dict["items"] = item_list
-        return req_dict
+        return item_list
 
     def get_definition(self, def_file, def_line, def_char):
         # Get full line (and possible continuations) from file
@@ -661,13 +657,12 @@ class LangServer:
                         return i
             return None
         # Get parameters from request
-        req_dict = {"signatures": []}
         params = request["params"]
         uri = params["textDocument"]["uri"]
         path = path_from_uri(uri)
         file_obj = self.workspace.get(path)
         if file_obj is None:
-            return req_dict
+            return None
         # Check line
         sig_line = params["position"]["line"]
         sig_char = params["position"]["character"]
@@ -675,17 +670,17 @@ class LangServer:
         pre_lines, curr_line, _ = file_obj.get_code_line(sig_line, forward=False, strip_comment=True)
         line_prefix = get_line_prefix(pre_lines, curr_line, sig_char)
         if line_prefix is None:
-            return req_dict
+            return None
         # Test if scope declaration or end statement
         if SCOPE_DEF_REGEX.match(curr_line) or END_REGEX.match(curr_line):
-            return req_dict
+            return None
         is_member = False
         try:
             sub_name, arg_strings, sub_end = get_sub_name(line_prefix)
             var_stack = get_var_stack(sub_name)
             is_member = (len(var_stack) > 1)
         except:
-            return req_dict
+            return None
         #
         curr_scope = file_obj.ast.get_inner_scope(sig_line+1)
         # Traverse type tree if necessary
@@ -719,11 +714,11 @@ class LangServer:
                     var_obj = candidate
                     break
         if var_obj is None:
-            return req_dict
+            return None
         # Build signature
         label, doc_str, params = var_obj.get_signature()
         if label is None:
-            return req_dict
+            return None
         # Find current parameter by index or by
         # looking at last arg with optional name
         param_num = len(arg_strings)-1
