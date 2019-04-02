@@ -151,6 +151,11 @@ the ``source_dirs`` variable in the ``.fortls`` file. When ``source_dirs`` is sp
 recursively, so any nested sub directories must be explicitly listed. However, ``root_dir`` does not need to
 be specified manually as it is always included.
 
+External source files (ex. libraries) can also be included in language server results by specifying their paths
+in the ``ext_source_dirs`` variable in the ``.fortls`` file. These files will be parsed during initialization,
+but will not be updated with any changes made until the language server is restarted. As with ``source_dirs``,
+specified directories are not added recursively, so any nested sub directories must be explicitly listed.
+
 *Note:* The previous naming convention for source file directories (``mod_dirs``) is still supported
 but has been deprecated.
 
@@ -175,6 +180,7 @@ test can be evaluated by the server or if the region is the *default* path (ie. 
       "excl_paths": ["subdir3", "subdir1/file_to_skip.F90"],
       "excl_suffixes": ["_skip.f90"],
       "pp_defs": {"HAVE_PACKAGE": ""},
+      "ext_source_dirs": ["/path/to/fortran/library"],
       "lowercase_intrinsics": false,
       "debug_log": false
     }

@@ -185,6 +185,7 @@ class LangServer:
                     for excl_path in config_dict.get("excl_paths", []):
                         self.excl_paths.append(os.path.join(self.root_path, excl_path))
                     source_dirs = config_dict.get("source_dirs", [])
+                    ext_source_dirs = config_dict.get("ext_source_dirs", [])
                     # Legacy definition
                     if len(source_dirs) == 0:
                         source_dirs = config_dict.get("mod_dirs", [])
@@ -192,6 +193,19 @@ class LangServer:
                         dir_path = os.path.join(self.root_path, source_dir)
                         if os.path.isdir(dir_path):
                             self.source_dirs.append(dir_path)
+                        else:
+                            self.post_messages.append(
+                                [2, r'Source directory "{0}" specified in '
+                                 r'".fortls" settings file does not exist'.format(dir_path)]
+                            )
+                    for ext_source_dir in ext_source_dirs:
+                        if os.path.isdir(ext_source_dir):
+                            self.source_dirs.append(ext_source_dir)
+                        else:
+                            self.post_messages.append(
+                                [2, r'External source directory "{0}" specified in '
+                                 r'".fortls" settings file does not exist'.format(ext_source_dir)]
+                            )
                     self.excl_suffixes = config_dict.get("excl_suffixes", [])
                     self.lowercase_intrinsics = config_dict.get("lowercase_intrinsics", self.lowercase_intrinsics)
                     self.debug_log = config_dict.get("debug_log", self.debug_log)
@@ -202,7 +216,7 @@ class LangServer:
                     if isinstance(self.pp_defs, list):
                         self.pp_defs = {key: "" for key in self.pp_defs}
             except:
-                self.post_messages.append([1, "Error while parsing '.fortls' settings file"])
+                self.post_messages.append([1, 'Error while parsing ".fortls" settings file'])
         # Setup logging
         if self.debug_log and (self.root_path != ""):
             logging.basicConfig(filename=os.path.join(self.root_path, "fortls_debug.log"),
