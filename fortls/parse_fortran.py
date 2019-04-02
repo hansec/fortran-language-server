@@ -118,6 +118,10 @@ def get_line_context(line):
         if test_match[0] == 'var':
             if (test_match[1][2] is None) and (lev1_end == len(line)):
                 return 'var_key', None
+            # Procedure link?
+            type_word = test_match[1][0]
+            if (type_word == 'PROCEDURE') and (line.find("=>") > 0):
+                return 'pro_link', None
             return 'var_only', None
     # Test if in USE statement
     test_match = read_use_stmt(line)
@@ -314,7 +318,7 @@ def read_var_def(line, type_word=None, fun_only=False):
                 trailing_line = trailing_line[match_char+1:]
     else:
         # Class and Type statements need a kind spec
-        if type_word.lower() in ('type', 'class'):
+        if type_word in ('TYPE', 'CLASS'):
             return None
         # Make sure next character is space or comma or colon
         if not trailing_line[0] in (' ', ',', ':'):
