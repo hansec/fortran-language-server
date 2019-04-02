@@ -95,7 +95,8 @@ CALL_REGEX = re.compile(r'[ ]*CALL[ ]+[a-z0-9_%]*$', re.I)
 INT_STMNT_REGEX = re.compile(r'^[ ]*[a-z]*$', re.I)
 TYPE_STMNT_REGEX = re.compile(r'[ ]*(TYPE|CLASS)[ ]*(IS)?[ ]*$', re.I)
 PROCEDURE_STMNT_REGEX = re.compile(r'[ ]*(PROCEDURE)[ ]*$', re.I)
-SCOPE_DEF_REGEX = re.compile(r'[ ]*(MODULE|PROGRAM|SUBROUTINE|FUNCTION)[ ]+', re.I)
+PRO_LINK_REGEX = re.compile(r'[ ]*(MODULE[ ]*PROCEDURE )', re.I)
+SCOPE_DEF_REGEX = re.compile(r'[ ]*(MODULE|PROGRAM|SUBROUTINE|FUNCTION|INTERFACE)[ ]+', re.I)
 END_REGEX = re.compile(r'[ ]*(END)( |MODULE|PROGRAM|SUBROUTINE|FUNCTION|TYPE|DO|IF|SELECT)?', re.I)
 
 
@@ -125,6 +126,9 @@ def get_line_context(line):
             return 'mod_mems', test_match[1][0]
         else:
             return 'mod_only', None
+    # Test for interface procedure link
+    if PRO_LINK_REGEX.match(line):
+        return 'pro_link', None
     # Test if scope declaration or end statement (no completion provided)
     if SCOPE_DEF_REGEX.match(line) or END_REGEX.match(line):
         return 'skip', None

@@ -9,7 +9,7 @@ from fortls.parse_fortran import fortran_file, process_file, get_paren_level, \
 from fortls.objects import find_in_scope, find_in_workspace, get_use_tree, \
     get_var_stack, climb_type_tree, set_keyword_ordering, MODULE_TYPE_ID, \
     SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID, CLASS_TYPE_ID, INTERFACE_TYPE_ID, \
-    SELECT_TYPE_ID, METH_TYPE_ID
+    SELECT_TYPE_ID, VAR_TYPE_ID, METH_TYPE_ID
 from fortls.intrinsics import get_intrinsic_keywords, load_intrinsics, \
     set_lowercase_intrinsics
 
@@ -390,7 +390,8 @@ class LangServer:
         def set_type_mask(def_value):
             return [def_value if i < 8 else True for i in range(15)]
 
-        def get_candidates(scope_list, var_prefix, inc_globals=True, public_only=False, abstract_only=False):
+        def get_candidates(scope_list, var_prefix, inc_globals=True,
+                           public_only=False, abstract_only=False, no_use=False):
             #
             def child_candidates(scope, only_list=[], filter_public=True, req_abstract=False):
                 tmp_list = []
@@ -413,7 +414,8 @@ class LangServer:
             for scope in scope_list:
                 var_list += child_candidates(scope, filter_public=public_only, req_abstract=abstract_only)
                 # Traverse USE tree and add to list
-                use_dict = get_use_tree(scope, use_dict, self.obj_tree)
+                if not no_use:
+                    use_dict = get_use_tree(scope, use_dict, self.obj_tree)
             # Look in found use modules
             for use_mod, only_list in use_dict.items():
                 scope = self.obj_tree[use_mod][0]
@@ -505,9 +507,10 @@ class LangServer:
         # Setup based on context
         req_callable = False
         abstract_only = False
+        no_use = False
         type_mask = set_type_mask(False)
-        type_mask[1] = True
-        type_mask[4] = True
+        type_mask[MODULE_TYPE_ID] = True
+        type_mask[CLASS_TYPE_ID] = True
         if line_context == 'mod_only':
             # Module names only (USE statement)
             for key in self.obj_tree:
@@ -524,35 +527,43 @@ class LangServer:
                 scope_list = [self.obj_tree[mod_name][0]]
                 public_only = True
                 include_globals = False
-                type_mask[4] = False
+                type_mask[CLASS_TYPE_ID] = False
             else:
                 return None
+        elif line_context == 'pro_link':
+            # Link to local subroutine/functions
+            type_mask = set_type_mask(True)
+            type_mask[SUBROUTINE_TYPE_ID] = False
+            type_mask[FUNCTION_TYPE_ID] = False
+            name_only = True
+            include_globals = False
+            no_use = True
         elif line_context == 'call':
             # Callable objects only ("CALL" statements)
             req_callable = True
         elif line_context == 'type_only':
             # User-defined types only (variable definitions, select clauses)
             type_mask = set_type_mask(True)
-            type_mask[4] = False
+            type_mask[CLASS_TYPE_ID] = False
         elif line_context == 'import':
             # Import statement (variables and user-defined types only)
             name_only = True
             type_mask = set_type_mask(True)
-            type_mask[4] = False
-            type_mask[6] = False
+            type_mask[CLASS_TYPE_ID] = False
+            type_mask[VAR_TYPE_ID] = False
         elif line_context == 'int_only':
             # Interfaces only (procedure definitions)
             abstract_only = True
             include_globals = False
             name_only = True
             type_mask = set_type_mask(True)
-            type_mask[2] = False
-            type_mask[3] = False
+            type_mask[SUBROUTINE_TYPE_ID] = False
+            type_mask[FUNCTION_TYPE_ID] = False
         elif line_context == 'var_only':
             # Variables only (variable definitions)
             name_only = True
-            type_mask[2] = True
-            type_mask[3] = True
+            type_mask[SUBROUTINE_TYPE_ID] = True
+            type_mask[FUNCTION_TYPE_ID] = True
         elif line_context == 'var_key':
             # Variable definition keywords only (variable definition)
             key_context = 0
@@ -573,7 +584,8 @@ class LangServer:
                 if candidate.name.lower().startswith(var_prefix):
                     item_list.append(build_comp(candidate))
         # Build completion list
-        for candidate in get_candidates(scope_list, var_prefix, include_globals, public_only, abstract_only):
+        for candidate in get_candidates(scope_list, var_prefix, include_globals,
+                                        public_only, abstract_only, no_use):
             # Skip module names (only valid in USE)
             candidate_type = candidate.get_type()
             if type_mask[candidate_type]:
