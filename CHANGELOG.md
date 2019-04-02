@@ -1,3 +1,12 @@
+## 1.7.3
+
+### Fixes
+* Fix case preservation in hover requests, fixes [#102](https://github.com/hansec/fortran-language-server/issues/102)
+* Fix rename requests for type-bound procedures without an explicit link statement (ie. "=>"), fixes [#104](https://github.com/hansec/fortran-language-server/issues/104)
+* Fix incorrect "CONTAINS" diagnostic errors with procedure pointers and external interfaces
+* Fix bug in diagnostic construction/reporting (introduced in v1.7)
+* Fix bugs caused by accidental modification of child object lists
+
 ## 1.7.2
 
 ### Fixes
