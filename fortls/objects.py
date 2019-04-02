@@ -437,7 +437,7 @@ class fortran_scope(fortran_obj):
                 pub_children.append(child)
             return pub_children
         else:
-            return self.children
+            return copy.copy(self.children)
 
     def check_definitions(self, obj_tree):
         """Check for definition errors in scope"""
@@ -668,7 +668,7 @@ class fortran_subroutine(fortran_scope):
         arg_list = self.args.replace(' ', '').split(',')
         arg_list_lower = self.args.lower().replace(' ', '').split(',')
         self.arg_objs = [None for arg in arg_list]
-        check_objs = self.children
+        check_objs = copy.copy(self.children)
         for child in self.children:
             if child.is_external_int():
                 check_objs += child.get_children()
@@ -1081,7 +1081,7 @@ class fortran_block(fortran_scope):
         return 'BLOCK'
 
     def get_children(self, public_only=False):
-        return self.children
+        return copy.copy(self.children)
 
     def req_named_end(self):
         return True
