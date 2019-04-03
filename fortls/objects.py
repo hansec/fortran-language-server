@@ -789,17 +789,17 @@ class fortran_subroutine(fortran_scope):
         return tmp_list
 
     def resolve_arg_link(self, obj_tree):
-        if self.args == '':
+        if (self.args == '') or (len(self.in_children) > 0):
             return
         arg_list = self.args.replace(' ', '').split(',')
         arg_list_lower = self.args.lower().replace(' ', '').split(',')
         self.arg_objs = [None for arg in arg_list]
-        check_objs = copy.copy(self.children)
-        for child in self.children:
-            if child.is_external_int():
-                check_objs += child.get_children()
+        # check_objs = copy.copy(self.children)
+        # for child in self.children:
+        #     if child.is_external_int():
+        #         check_objs += child.get_children()
         self.missing_args = []
-        for child in check_objs:
+        for child in self.children:
             ind = -1
             for (i, arg) in enumerate(arg_list_lower):
                 if arg == child.name.lower():
@@ -812,7 +812,6 @@ class fortran_subroutine(fortran_scope):
                 self.arg_objs[ind] = child
                 if child.is_optional():
                     arg_list[ind] = "{0}={0}".format(arg_list[ind])
-            child.resolve_link(obj_tree)
         self.args_snip = ",".join(arg_list)
 
     def resolve_link(self, obj_tree):
@@ -1274,6 +1273,10 @@ class fortran_associate(fortran_block):
                 if type_scope is None:
                     continue
                 var_obj = find_in_scope(type_scope, var_stack[-1], obj_tree)
+                if var_obj is not None:
+                    assoc_link[0].link_obj = var_obj
+            else:
+                var_obj = find_in_scope(self, assoc_link[2], obj_tree)
                 if var_obj is not None:
                     assoc_link[0].link_obj = var_obj
 
