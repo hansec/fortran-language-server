@@ -1131,10 +1131,9 @@ class LangServer:
             file_obj.ast.resolve_includes(self.workspace, path=filepath)
         file_obj = self.workspace.get(filepath)
         file_obj.ast.resolve_includes(self.workspace)
-        # Update inheritance
-        for key in self.obj_tree:
-            self.obj_tree[key][0].resolve_inherit(self.obj_tree)
-            self.obj_tree[key][0].resolve_link(self.obj_tree)
+        # Update inheritance/links
+        for _, file_obj in self.workspace.items():
+            file_obj.ast.resolve_links(self.obj_tree)
         self.send_diagnostics(uri)
 
     def add_file(self, filepath):
@@ -1170,9 +1169,7 @@ class LangServer:
             self.obj_tree[key] = [obj, filepath]
         # Update local links/inheritance if necessary
         if update_links:
-            for key, obj in ast_new.global_dict.items():
-                obj.resolve_inherit(self.obj_tree)
-                obj.resolve_link(self.obj_tree)
+            ast_new.resolve_links(self.obj_tree)
         return None
 
     def workspace_init(self):
@@ -1213,10 +1210,9 @@ class LangServer:
         # Update include statements
         for _, file_obj in self.workspace.items():
             file_obj.ast.resolve_includes(self.workspace)
-        # Update inheritance
-        for key in self.obj_tree:
-            self.obj_tree[key][0].resolve_inherit(self.obj_tree)
-            self.obj_tree[key][0].resolve_link(self.obj_tree)
+        # Update inheritance/links
+        for _, file_obj in self.workspace.items():
+            file_obj.ast.resolve_links(self.obj_tree)
 
     def serve_exit(self, request):
         # Exit server

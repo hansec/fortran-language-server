@@ -388,8 +388,14 @@ class fortran_obj:
     def resolve_inherit(self, obj_tree):
         return None
 
+    def require_inherit(self):
+        return False
+
     def resolve_link(self, obj_tree):
         return None
+
+    def require_link(self):
+        return False
 
     def get_type(self, no_link=False):
         return -1
@@ -495,14 +501,6 @@ class fortran_scope(fortran_obj):
 
     def set_inherit(self, inherit_type):
         self.inherit = inherit_type
-
-    def resolve_inherit(self, obj_tree):
-        for child in self.children:
-            child.resolve_inherit(obj_tree)
-
-    def resolve_link(self, obj_tree):
-        for child in self.children:
-            child.resolve_link(obj_tree)
 
     def set_parent(self, parent_obj):
         self.parent = parent_obj
@@ -708,6 +706,9 @@ class fortran_submodule(fortran_module):
         if self.ancestor_name in obj_tree:
             self.ancestor_obj = obj_tree[self.ancestor_name][0]
 
+    def require_inherit(self):
+        return True
+
     def resolve_link(self, obj_tree):
         # Link subroutine/function implementations to prototypes
         if self.ancestor_obj is None:
@@ -728,9 +729,9 @@ class fortran_submodule(fortran_module):
                     prototype.resolve_link(obj_tree)
                     child.copy_interface(prototype)
                     break
-        # Recurse into children
-        for child in self.children:
-            child.resolve_link(obj_tree)
+
+    def require_link(self):
+        return True
 
 
 class fortran_subroutine(fortran_scope):
@@ -799,8 +800,9 @@ class fortran_subroutine(fortran_scope):
 
     def resolve_link(self, obj_tree):
         self.resolve_arg_link(obj_tree)
-        for child in self.children:
-            child.resolve_link(obj_tree)
+
+    def require_link(self):
+        return True
 
     def get_type(self, no_link=False):
         return SUBROUTINE_TYPE_ID
@@ -970,8 +972,6 @@ class fortran_function(fortran_subroutine):
             for child in self.children:
                 if child.name.lower() == result_var_lower:
                     self.result_obj = child
-        for child in self.children:
-            child.resolve_link(obj_tree)
 
     def get_type(self, no_link=False):
         return FUNCTION_TYPE_ID
@@ -1087,6 +1087,9 @@ class fortran_type(fortran_scope):
             for child in self.inherit_var.get_children():
                 if child.name.lower() not in child_names:
                     self.in_children.append(child)
+
+    def require_inherit(self):
+        return True
 
     def get_overriden(self, field_name):
         ret_list = []
@@ -1263,6 +1266,9 @@ class fortran_associate(fortran_block):
                 if var_obj is not None:
                     assoc_link[0].link_obj = var_obj
 
+    def require_link(self):
+        return True
+
 
 class fortran_enum(fortran_block):
     def __init__(self, file_ast, line_number, name):
@@ -1358,8 +1364,9 @@ class fortran_int(fortran_scope):
             mem_obj = find_in_scope(self.parent, member, obj_tree)
             if mem_obj is not None:
                 self.mems.append(mem_obj)
-        for child in self.children:
-            child.resolve_link(obj_tree)
+
+    def require_link(self):
+        return True
 
 
 class fortran_var(fortran_obj):
@@ -1414,6 +1421,9 @@ class fortran_var(fortran_obj):
             link_obj = find_in_scope(self.parent, self.link_name, obj_tree)
             if link_obj is not None:
                 self.link_obj = link_obj
+
+    def require_link(self):
+        return (self.link_name is not None)
 
     def get_type(self, no_link=False):
         if (not no_link) and (self.link_obj is not None):
@@ -1639,6 +1649,8 @@ class fortran_ast:
         self.include_stmnts = []
         self.end_errors = []
         self.parse_errors = []
+        self.inherit_objs = []
+        self.linkable_objs = []
         self.none_scope = None
         self.inc_scope = None
         self.current_scope = None
@@ -1662,6 +1674,10 @@ class fortran_ast:
 
     def add_scope(self, new_scope, END_SCOPE_WORD, exportable=True, req_container=False):
         self.scope_list.append(new_scope)
+        if new_scope.require_inherit():
+            self.inherit_objs.append(new_scope)
+        if new_scope.require_link():
+            self.linkable_objs.append(new_scope)
         if self.current_scope is None:
             if req_container:
                 self.create_none_scope()
@@ -1705,6 +1721,8 @@ class fortran_ast:
             new_var.FQSN = self.none_scope.FQSN + "::" + new_var.name.lower()
         self.current_scope.add_child(new_var)
         self.variable_list.append(new_var)
+        if new_var.require_link():
+            self.linkable_objs.append(new_var)
         self.last_obj = new_var
         if self.pending_doc is not None:
             self.last_obj.add_doc(self.pending_doc)
@@ -1823,6 +1841,12 @@ class fortran_ast:
                         child.update_fqsn(parent_scope.FQSN)
                     include_ast.none_scope = parent_scope
                     include_path[2] = added_entities
+
+    def resolve_links(self, obj_tree):
+        for inherit_obj in self.inherit_objs:
+            inherit_obj.resolve_inherit(obj_tree)
+        for linkable_obj in self.linkable_objs:
+            linkable_obj.resolve_link(obj_tree)
 
     def close_file(self, line_number):
         # Close open scopes
