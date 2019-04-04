@@ -125,7 +125,7 @@ def get_use_tree(scope, use_dict, obj_tree, only_list=[]):
     return use_dict
 
 
-def find_in_scope(scope, var_name, obj_tree, interface=False):
+def find_in_scope(scope, var_name, obj_tree, interface=False, local_only=False):
     def check_scope(local_scope, var_name_lower, filter_public=False):
         for child in local_scope.get_children():
             if child.name.startswith("#GEN_INT"):
@@ -142,7 +142,7 @@ def find_in_scope(scope, var_name, obj_tree, interface=False):
     var_name_lower = var_name.lower()
     # Check local scope
     tmp_var = check_scope(scope, var_name_lower)
-    if tmp_var is not None:
+    if local_only or (tmp_var is not None):
         return tmp_var
     # Setup USE search
     use_dict = get_use_tree(scope, {}, obj_tree)
@@ -283,52 +283,32 @@ def get_var_stack(line):
 
 def climb_type_tree(var_stack, curr_scope, obj_tree):
     """Walk up user-defined type sequence to determine final field type"""
-    def get_type_name(var_obj):
-        type_desc = get_paren_substring(var_obj.get_desc())
-        if type_desc is not None:
-            type_desc = type_desc.strip().lower()
-        return type_desc
     # Find base variable in current scope
-    type_name = None
-    type_scope = None
     iVar = 0
     var_name = var_stack[iVar].strip().lower()
     var_obj = find_in_scope(curr_scope, var_name, obj_tree)
     if var_obj is None:
         return None
-    else:
-        type_name = get_type_name(var_obj)
-        curr_scope = var_obj.parent
     # Search for type, then next variable in stack and so on
     for _ in range(30):
-        # Find variable type in available scopes
-        if type_name is None:
-            break
-        type_scope = find_in_scope(curr_scope, type_name, obj_tree)
-        # Exit if not found
-        if type_scope is None:
-            break
-        curr_scope = type_scope.parent
+        # Find variable type object
+        type_obj = var_obj.get_type_obj(obj_tree)
+        # Return if not found
+        if type_obj is None:
+            return None
         # Go to next variable in stack and exit if done
         iVar += 1
         if iVar == len(var_stack)-1:
             break
-        # Find next variable by name in scope
+        # Find next variable by name in type
         var_name = var_stack[iVar].strip().lower()
-        var_obj = find_in_scope(type_scope, var_name, obj_tree)
-        # Set scope to declaration location if variable is inherited
-        if var_obj is not None:
-            curr_scope = var_obj.parent
-            if (var_obj.parent is not None) and (var_obj.parent.get_type() == CLASS_TYPE_ID):
-                for in_child in var_obj.parent.in_children:
-                    if (in_child.name.lower() == var_name) and (in_child.parent is not None):
-                        curr_scope = in_child.parent
-            type_name = get_type_name(var_obj)
-        else:
-            break
+        var_obj = find_in_scope(type_obj, var_name, obj_tree, local_only=True)
+        # Return if not found
+        if var_obj is None:
+            return None
     else:
         raise KeyError
-    return type_scope
+    return type_obj
 
 
 class fortran_diagnostic:
@@ -413,6 +393,9 @@ class fortran_obj:
 
     def get_type(self, no_link=False):
         return -1
+
+    def get_type_obj(self, obj_tree):
+        return None
 
     def get_desc(self):
         return 'unknown'
@@ -1401,6 +1384,7 @@ class fortran_var(fortran_obj):
         self.vis = 0
         self.parent = None
         self.link_obj = None
+        self.type_obj = None
         if link_obj is not None:
             self.link_name = link_obj.lower()
         else:
@@ -1423,6 +1407,7 @@ class fortran_var(fortran_obj):
             child.update_fqsn(self.FQSN)
 
     def resolve_link(self, obj_tree):
+        self.link_obj = None
         if self.link_name is None:
             return
         if self.parent is not None:
@@ -1441,6 +1426,18 @@ class fortran_var(fortran_obj):
             return self.link_obj.get_desc()
         # Normal variable
         return self.desc
+
+    def get_type_obj(self, obj_tree):
+        if self.link_obj is not None:
+            return self.link_obj.get_type_obj(obj_tree)
+        if (self.type_obj is None) and (self.parent is not None):
+            type_name = get_paren_substring(self.desc)
+            if type_name is not None:
+                type_name = type_name.strip().lower()
+                type_obj = find_in_scope(self.parent, type_name, obj_tree)
+                if type_obj is not None:
+                    self.type_obj = type_obj
+        return self.type_obj
 
     def set_dim(self, dim_str):
         if KEYWORD_ID_DICT['dimension'] not in self.keywords:
