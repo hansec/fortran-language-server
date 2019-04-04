@@ -385,7 +385,7 @@ class fortran_obj:
     def end(self, line_number):
         self.eline = line_number
 
-    def resolve_inherit(self, obj_tree):
+    def resolve_inherit(self, obj_tree, inherit_version):
         return None
 
     def require_inherit(self):
@@ -700,7 +700,7 @@ class fortran_submodule(fortran_module):
             return [self.ancestor_obj]
         return []
 
-    def resolve_inherit(self, obj_tree):
+    def resolve_inherit(self, obj_tree, inherit_version):
         if self.ancestor_name is None:
             return
         if self.ancestor_name in obj_tree:
@@ -1048,6 +1048,7 @@ class fortran_type(fortran_scope):
         self.inherit = None
         self.inherit_var = None
         self.inherit_tmp = None
+        self.inherit_version = -1
         if self.keywords.count(KEYWORD_ID_DICT['public']) > 0:
             self.vis = 1
         if self.keywords.count(KEYWORD_ID_DICT['private']) > 0:
@@ -1064,24 +1065,22 @@ class fortran_type(fortran_scope):
         tmp_list.extend(self.in_children)
         return tmp_list
 
-    def resolve_inherit(self, obj_tree):
-        if self.inherit is None:
+    def resolve_inherit(self, obj_tree, inherit_version):
+        if (self.inherit is None) or (self.inherit_version == inherit_version):
             return
-        #
+        self.inherit_version = inherit_version
         self.inherit_var = find_in_scope(self.parent, self.inherit, obj_tree)
         if self.inherit_var is not None:
-            # Disable "resolve_inherit" to allow circular type references
+            # Resolve parent inheritance while avoiding circular recursion
             self.inherit_tmp = self.inherit
             self.inherit = None
-            self.inherit_var.resolve_inherit(obj_tree)
+            self.inherit_var.resolve_inherit(obj_tree, inherit_version)
+            self.inherit = self.inherit_tmp
+            self.inherit_tmp = None
             # Get current fields
             child_names = []
             for child in self.children:
                 child_names.append(child.name.lower())
-                child.resolve_inherit(obj_tree)
-            # Re-enable "resolve_inherit" to allow circular type references
-            self.inherit = self.inherit_tmp
-            self.inherit_tmp = None
             # Import for parent objects
             self.in_children = []
             for child in self.inherit_var.get_children():
@@ -1842,9 +1841,9 @@ class fortran_ast:
                     include_ast.none_scope = parent_scope
                     include_path[2] = added_entities
 
-    def resolve_links(self, obj_tree):
+    def resolve_links(self, obj_tree, link_version):
         for inherit_obj in self.inherit_objs:
-            inherit_obj.resolve_inherit(obj_tree)
+            inherit_obj.resolve_inherit(obj_tree, inherit_version=link_version)
         for linkable_obj in self.linkable_objs:
             linkable_obj.resolve_link(obj_tree)
 

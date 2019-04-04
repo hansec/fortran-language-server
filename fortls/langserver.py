@@ -64,6 +64,7 @@ class LangServer:
         self.all_symbols = None
         self.workspace = {}
         self.obj_tree = {}
+        self.link_version = 0
         self.source_dirs = []
         self.excl_paths = []
         self.excl_suffixes = []
@@ -1132,8 +1133,9 @@ class LangServer:
         file_obj = self.workspace.get(filepath)
         file_obj.ast.resolve_includes(self.workspace)
         # Update inheritance/links
+        self.link_version = (self.link_version + 1) % 1000
         for _, file_obj in self.workspace.items():
-            file_obj.ast.resolve_links(self.obj_tree)
+            file_obj.ast.resolve_links(self.obj_tree, self.link_version)
         self.send_diagnostics(uri)
 
     def add_file(self, filepath):
@@ -1169,7 +1171,8 @@ class LangServer:
             self.obj_tree[key] = [obj, filepath]
         # Update local links/inheritance if necessary
         if update_links:
-            ast_new.resolve_links(self.obj_tree)
+            self.link_version = (self.link_version + 1) % 1000
+            ast_new.resolve_links(self.obj_tree, self.link_version)
         return None
 
     def workspace_init(self):
@@ -1211,8 +1214,9 @@ class LangServer:
         for _, file_obj in self.workspace.items():
             file_obj.ast.resolve_includes(self.workspace)
         # Update inheritance/links
+        self.link_version = (self.link_version + 1) % 1000
         for _, file_obj in self.workspace.items():
-            file_obj.ast.resolve_links(self.obj_tree)
+            file_obj.ast.resolve_links(self.obj_tree, self.link_version)
 
     def serve_exit(self, request):
         # Exit server
