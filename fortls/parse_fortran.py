@@ -699,11 +699,11 @@ class fortran_file:
         try:
             if PY3K:
                 with open(self.path, 'r', encoding='utf-8', errors='replace') as fhandle:
-                    contents = re.sub(r'\t', r'  ', fhandle.read())
+                    contents = re.sub(r'\t', r' ', fhandle.read())
                     self.contents_split = contents.splitlines()
             else:
                 with io.open(self.path, 'r', encoding='utf-8', errors='replace') as fhandle:
-                    contents = re.sub(r'\t', r'  ', fhandle.read())
+                    contents = re.sub(r'\t', r' ', fhandle.read())
                     self.contents_split = contents.splitlines()
             self.fixed = detect_fixed_format(self.contents_split)
             self.contents_pp = self.contents_split
