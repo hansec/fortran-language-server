@@ -1108,10 +1108,8 @@ class LangServer:
         for _, tmp_file in self.workspace.items():
             tmp_file.ast.resolve_includes(self.workspace, path=path)
         file_obj.ast.resolve_includes(self.workspace)
-        # Update inheritance (currently only on open/save)
-        # for key in self.obj_tree:
-        #     self.obj_tree[key][0].resolve_inherit(self.obj_tree)
-        #     self.obj_tree[key][0].resolve_link(self.obj_tree)
+        # Update inheritance (currently file only)
+        # tmp_file.ast.resolve_links(self.obj_tree, self.link_version)
 
     def serve_onClose(self, request):
         self.serve_onSave(request, test_exist=True)
