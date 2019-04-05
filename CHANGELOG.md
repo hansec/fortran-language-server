@@ -1,3 +1,14 @@
+## 1.8.0
+
+### Improvements
+* Add full support for ASSOCIATE statements, fixes [#101](https://github.com/hansec/fortran-language-server/issues/101)
+* Filter completion suggestions after "MODULE PROCEDURE" statements, fixes [#103](https://github.com/hansec/fortran-language-server/issues/103)
+* Filter completion suggestions in type-bound procedure links
+* Add support for including external source file directories
+* Diagnostics: Line length exceeds maximum length errors
+* Speedup language server initialization
+* Speedup "textDocument/references" requests
+
 ## 1.7.3
 
 ### Fixes
