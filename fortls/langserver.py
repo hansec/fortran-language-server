@@ -29,11 +29,7 @@ def init_file(filepath, pp_defs):
         return None, err_str
     #
     try:
-        _, file_ext = os.path.splitext(os.path.basename(filepath))
-        if file_ext == file_ext.upper():
-            file_ast = process_file(file_obj, True, pp_defs=pp_defs)
-        else:
-            file_ast = process_file(file_obj, True)
+        file_ast = process_file(file_obj, True, pp_defs=pp_defs)
     except:
         log.error("Error while parsing file %s", filepath, exc_info=True)
         return None, 'Error during parsing'
@@ -1089,27 +1085,33 @@ class LangServer:
             return
         else:
             # Update file contents with changes
+            reparse_req = True
             if self.sync_type == 1:
                 file_obj.apply_change(params["contentChanges"][0])
             else:
                 try:
+                    reparse_req = False
                     for change in params["contentChanges"]:
-                        _ = file_obj.apply_change(change)
+                        reparse_flag = file_obj.apply_change(change)
+                        reparse_req = (reparse_req or reparse_flag)
                 except:
                     self.post_message('Change request failed for file "{0}": Could not apply change'.format(path))
                     log.error('Change request failed for file "%s": Could not apply change', path, exc_info=True)
                     return
         # Parse newly updated file
-        err_str = self.update_workspace_file(path, update_links=True)
-        if err_str is not None:
-            self.post_message('Change request failed for file "{0}": {1}'.format(path, err_str))
-            return
-        # Update include statements linking to this file
-        for _, tmp_file in self.workspace.items():
-            tmp_file.ast.resolve_includes(self.workspace, path=path)
-        file_obj.ast.resolve_includes(self.workspace)
-        # Update inheritance (currently file only)
-        # tmp_file.ast.resolve_links(self.obj_tree, self.link_version)
+        if reparse_req:
+            err_str = self.update_workspace_file(path, update_links=True)
+            if err_str is not None:
+                self.post_message('Change request failed for file "{0}": {1}'.format(path, err_str))
+                return
+            # Update include statements linking to this file
+            for _, tmp_file in self.workspace.items():
+                tmp_file.ast.resolve_includes(self.workspace, path=path)
+            file_obj.ast.resolve_includes(self.workspace)
+            # Update inheritance (currently file only)
+            # tmp_file.ast.resolve_links(self.obj_tree, self.link_version)
+        elif file_obj.preproc:
+            file_obj.preprocess(pp_defs=self.pp_defs)
 
     def serve_onClose(self, request):
         self.serve_onSave(request, test_exist=True)
@@ -1147,11 +1149,7 @@ class LangServer:
                 if file_obj is None:
                     file_obj = fortran_file(filepath)
                 file_obj.load_from_disk()
-            _, file_ext = os.path.splitext(os.path.basename(filepath))
-            if file_ext == file_ext.upper():
-                ast_new = process_file(file_obj, True, pp_defs=self.pp_defs)
-            else:
-                ast_new = process_file(file_obj, True)
+            ast_new = process_file(file_obj, True, pp_defs=self.pp_defs)
         except:
             log.error("Error while parsing file %s", filepath, exc_info=True)
             return 'Error during parsing'  # Error during parsing

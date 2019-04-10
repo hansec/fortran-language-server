@@ -1,5 +1,6 @@
 from __future__ import print_function
 import sys
+import os
 import re
 from fortls.objects import get_paren_substring, map_keywords, get_paren_level, \
     fortran_ast, fortran_module, fortran_program, fortran_submodule, \
@@ -682,6 +683,14 @@ def read_vis_stmnt(line):
         return 'vis', [vis_type, mod_words]
 
 
+def_tests = [
+    read_var_def, read_sub_def, read_fun_def, read_block_def,
+    read_associate_def, read_select_def, read_type_def, read_enum_def, read_use_stmt,
+    read_int_def, read_generic_def, read_mod_def, read_prog_def,
+    read_submod_def, read_inc_stmt, read_vis_stmnt
+]
+
+
 class fortran_file:
     def __init__(self, path=None):
         self.path = path
@@ -690,6 +699,11 @@ class fortran_file:
         self.nLines = 0
         self.fixed = False
         self.ast = None
+        if path is not None:
+            _, file_ext = os.path.splitext(os.path.basename(path))
+            self.preproc = (file_ext == file_ext.upper())
+        else:
+            self.preproc = False
 
     def copy(self):
         """Copy content to new file object (does not copy objects)"""
@@ -719,6 +733,46 @@ class fortran_file:
 
     def apply_change(self, change):
         """Apply a change to the file."""
+        def check_change_reparse(line_number):
+            if (line_number < 0) or (line_number > self.nLines-1):
+                return True
+            pre_lines, curr_line, _ = self.get_code_line(line_number, forward=False)
+            # Skip comment lines
+            if self.fixed:
+                if FIXED_COMMENT_LINE_MATCH.match(curr_line):
+                    return False
+            else:
+                if FREE_COMMENT_LINE_MATCH.match(curr_line):
+                    return False
+            # Check for line labels and semicolons
+            full_line = ''.join(pre_lines) + curr_line
+            full_line, line_label = strip_line_label(full_line)
+            if line_label is not None:
+                return True
+            line_stripped = strip_strings(full_line, maintain_len=True)
+            if line_stripped.find(';') >= 0:
+                return True
+            # Find trailing comments
+            comm_ind = line_stripped.find('!')
+            if comm_ind >= 0:
+                line_no_comment = full_line[:comm_ind]
+            else:
+                line_no_comment = full_line
+            # Various single line tests
+            if END_WORD_REGEX.match(line_no_comment):
+                return True
+            if IMPLICIT_REGEX.match(line_no_comment):
+                return True
+            if CONTAINS_REGEX.match(line_no_comment):
+                return True
+            # Generic "non-definition" line
+            if NON_DEF_REGEX.match(line_no_comment):
+                return False
+            # Loop through tests
+            for test in def_tests:
+                if test(line_no_comment):
+                    return True
+            return False
         text = change.get('text', "")
         change_range = change.get('range')
         if not PY3K:
@@ -734,7 +788,7 @@ class fortran_file:
         if change_range is None:
             # The whole file has changed
             self.set_contents(text_split)
-            return -1
+            return True
 
         start_line = change_range['start']['line']
         start_col = change_range['start']['character']
@@ -744,14 +798,14 @@ class fortran_file:
         # Check for an edit occuring at the very end of the file
         if start_line == self.nLines:
             self.set_contents(self.contents_split + text_split)
-            return -1
+            return True
 
         # Check for single line edit
         if (start_line == end_line) and (len(text_split) == 1):
             prev_line = self.contents_split[start_line]
             self.contents_split[start_line] = prev_line[:start_col] + text + prev_line[end_col:]
-            self.set_contents(self.contents_split, detect_format=False)
-            return start_line
+            self.contents_pp[start_line] = self.contents_split[start_line]
+            return check_change_reparse(start_line)
 
         # Apply standard change to document
         new_contents = []
@@ -770,7 +824,7 @@ class fortran_file:
             if i == end_line:
                 new_contents[-1] += line[end_col:]
         self.set_contents(new_contents)
-        return -1
+        return True
 
     def set_contents(self, contents_split, detect_format=True):
         """Set file contents"""
@@ -914,7 +968,7 @@ class fortran_file:
                     return line_number, i0, i1
         return line_number, i0, i1
 
-    def preprocess(self, pp_defs=None, debug=False):
+    def preprocess(self, pp_defs={}, debug=False):
         # Look for and mark excluded preprocessor paths in file
         # Initial implementation only looks for "if" and "ifndef" statements.
         # For "if" statements all blocks are excluded except the "else" block if present
@@ -1117,27 +1171,10 @@ class fortran_file:
         return diagnostics
 
 
-def_tests = [
-    read_var_def, read_sub_def, read_fun_def, read_block_def,
-    read_associate_def, read_select_def, read_type_def, read_enum_def, read_use_stmt,
-    read_int_def, read_generic_def, read_mod_def, read_prog_def,
-    read_submod_def, read_inc_stmt, read_vis_stmnt
-]
-
-
-def process_file(file_obj, close_open_scopes, debug=False, pp_defs=None):
+def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}):
     """Build file AST by parsing file"""
-    #
-    if file_obj.fixed:
-        COMMENT_LINE_MATCH = FIXED_COMMENT_LINE_MATCH
-        DOC_COMMENT_MATCH = FIXED_DOC_MATCH
-    else:
-        COMMENT_LINE_MATCH = FREE_COMMENT_LINE_MATCH
-        DOC_COMMENT_MATCH = FREE_DOC_MATCH
-    #
     file_ast = fortran_ast(file_obj)
-    #
-    if pp_defs is not None:
+    if file_obj.preproc:
         if debug:
             print("=== PreProc Pass ===\n")
         pp_skips, pp_defines = file_obj.preprocess(pp_defs=pp_defs, debug=debug)
@@ -1147,6 +1184,8 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs=None):
         if debug:
             print("\n=== Parsing Pass ===\n")
     else:
+        if debug:
+            print("=== No PreProc ===\n")
         pp_skips = []
         pp_defines = []
     #
@@ -1162,6 +1201,12 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs=None):
     line_ind = 0
     semi_split = []
     doc_string = None
+    if file_obj.fixed:
+        COMMENT_LINE_MATCH = FIXED_COMMENT_LINE_MATCH
+        DOC_COMMENT_MATCH = FIXED_DOC_MATCH
+    else:
+        COMMENT_LINE_MATCH = FREE_COMMENT_LINE_MATCH
+        DOC_COMMENT_MATCH = FREE_DOC_MATCH
     while((next_line_ind < file_obj.nLines) or (len(semi_split) > 0)):
         if (doc_string is not None) and (doc_string != ''):
             file_ast.add_doc('!! ' + doc_string)
