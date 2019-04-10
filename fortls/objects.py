@@ -258,6 +258,7 @@ def get_var_stack(line):
 
     Examples:
       "myvar%foo%bar" -> ["myvar", "foo", "bar"]
+      "myarray(i)%foo%bar" -> ["myarray", "foo", "bar"]
       "CALL self%method(this%foo" -> ["this", "foo"]
     """
     if len(line) == 0:
@@ -265,14 +266,14 @@ def get_var_stack(line):
     final_var, sections = get_paren_level(line)
     if final_var == '':
         return ['']
-    if final_var.find('%') < 0:
-        final_paren = sections[-1]
-        ntail = final_paren[1] - final_paren[0]
-        #
-        if ntail == 0:
-            final_var = ''
-        elif ntail > 0:
-            final_var = final_var[len(final_var)-ntail:]
+    # Continuation of variable after paren requires '%' character
+    iLast = 0
+    for (i, section) in enumerate(sections):
+        if (not line[section[0]:section[1]].startswith('%')):
+            iLast = i
+    final_var = ''
+    for section in sections[iLast:]:
+        final_var += line[section[0]:section[1]]
     #
     if final_var is not None:
         final_op_split = OBJBREAK_REGEX.split(final_var)
