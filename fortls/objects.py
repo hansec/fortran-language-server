@@ -569,6 +569,8 @@ class fortran_scope(fortran_obj):
         errors = []
         known_types = {}
         for child in self.children:
+            if child.name.startswith('#'):
+                continue
             line_number = child.sline - 1
             # Check for type definition in scope
             def_error, known_types = child.check_definition(
