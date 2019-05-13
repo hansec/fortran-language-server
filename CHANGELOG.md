@@ -1,3 +1,11 @@
+## 1.8.2
+
+### Fixes
+* Fix parsing single line WHERE statements with trailing parentheses, fixes [#106](https://github.com/hansec/fortran-language-server/issues/106)
+* Fix erroneous object duplication diagnostics for DO, INTERFACE, etc. blocks
+* Remove erroneous "unimplemented procedure" diagnostics from abstract type definitions
+* Fix parsing bugs with semicolons in trailing comments
+
 ## 1.8.1
 
 ### Fixes
