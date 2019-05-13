@@ -23,7 +23,8 @@ KEYWORD_LIST = [
     'pass',
     'pure',
     'elemental',
-    'recursive'
+    'recursive',
+    'abstract'
 ]
 KEYWORD_ID_DICT = {keyword: ind for (ind, keyword) in enumerate(KEYWORD_LIST)}
 # Type identifiers
@@ -1052,6 +1053,10 @@ class fortran_type(fortran_scope):
         self.inherit_var = None
         self.inherit_tmp = None
         self.inherit_version = -1
+        if keywords.count(KEYWORD_ID_DICT['abstract']) > 0:
+            self.abstract = True
+        else:
+            self.abstract = False
         if self.keywords.count(KEYWORD_ID_DICT['public']) > 0:
             self.vis = 1
         if self.keywords.count(KEYWORD_ID_DICT['private']) > 0:
@@ -1116,7 +1121,7 @@ class fortran_type(fortran_scope):
     def get_diagnostics(self):
         errors = []
         for in_child in self.in_children:
-            if in_child.keywords.count(KEYWORD_ID_DICT['deferred']) > 0:
+            if (not self.abstract) and (in_child.keywords.count(KEYWORD_ID_DICT['deferred']) > 0):
                 new_diag = fortran_diagnostic(
                     self.eline - 1, 'Deferred procedure "{0}" not implemented'.format(in_child.name),
                     severity=1
