@@ -2,7 +2,7 @@
 
 ### Fixes
 * Fix bug with requests in lines with tab characters, fixes [#93](https://github.com/hansec/fortran-language-server/issues/93)
-* Fix bug with requests following "WRITE(*,*)" statements
+* Fix bug with requests following "WRITE(\*,\*)" statements
 
 ## 1.8.0
 
