@@ -1114,14 +1114,22 @@ class LangServer:
             file_obj.preprocess(pp_defs=self.pp_defs)
 
     def serve_onClose(self, request):
-        self.serve_onSave(request, test_exist=True)
+        self.serve_onSave(request, did_close=True)
 
-    def serve_onSave(self, request, test_exist=False):
+    def serve_onSave(self, request, did_close=False):
         # Update workspace from file on disk
         params = request["params"]
         uri = params["textDocument"]["uri"]
         filepath = path_from_uri(uri)
-        if test_exist and (not os.path.isfile(filepath)):
+        # Skip update and remove objects if file is deleted
+        if did_close and (not os.path.isfile(filepath)):
+            # Remove old objects from tree
+            file_obj = self.workspace.get(filepath)
+            if file_obj is not None:
+                ast_old = file_obj.ast
+                if ast_old is not None:
+                    for key in ast_old.global_dict:
+                        self.obj_tree.pop(key, None)
             return
         did_change, err_str = self.add_file(filepath)
         if err_str is not None:
