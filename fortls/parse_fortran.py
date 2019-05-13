@@ -2,6 +2,7 @@ from __future__ import print_function
 import sys
 import os
 import re
+import hashlib
 from fortls.objects import get_paren_substring, map_keywords, get_paren_level, \
     fortran_ast, fortran_module, fortran_program, fortran_submodule, \
     fortran_subroutine, fortran_function, fortran_block, fortran_select, \
@@ -699,6 +700,7 @@ class fortran_file:
         self.nLines = 0
         self.fixed = False
         self.ast = None
+        self.hash = None
         if path is not None:
             _, file_ext = os.path.splitext(os.path.basename(path))
             self.preproc = (file_ext == file_ext.upper())
@@ -718,10 +720,12 @@ class fortran_file:
             if PY3K:
                 with open(self.path, 'r', encoding='utf-8', errors='replace') as fhandle:
                     contents = re.sub(r'\t', r' ', fhandle.read())
+                    self.hash = hashlib.md5(contents.encode('utf-8')).hexdigest()
                     self.contents_split = contents.splitlines()
             else:
                 with io.open(self.path, 'r', encoding='utf-8', errors='replace') as fhandle:
                     contents = re.sub(r'\t', r' ', fhandle.read())
+                    self.hash = hashlib.md5(contents.encode('utf-8')).hexdigest()
                     self.contents_split = contents.splitlines()
             self.fixed = detect_fixed_format(self.contents_split)
             self.contents_pp = self.contents_split
@@ -773,6 +777,7 @@ class fortran_file:
                 if test(line_no_comment):
                     return True
             return False
+        self.hash = None
         text = change.get('text', "")
         change_range = change.get('range')
         if not PY3K:

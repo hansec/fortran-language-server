@@ -1100,7 +1100,7 @@ class LangServer:
                     return
         # Parse newly updated file
         if reparse_req:
-            err_str = self.update_workspace_file(path, update_links=True)
+            _, err_str = self.update_workspace_file(path, update_links=True)
             if err_str is not None:
                 self.post_message('Change request failed for file "{0}": {1}'.format(path, err_str))
                 return
@@ -1123,19 +1123,20 @@ class LangServer:
         filepath = path_from_uri(uri)
         if test_exist and (not os.path.isfile(filepath)):
             return
-        err_str = self.add_file(filepath)
+        did_change, err_str = self.add_file(filepath)
         if err_str is not None:
             self.post_message('Save request failed for file "{0}": {1}'.format(filepath, err_str))
             return
-        # Update include statements linking to this file
-        for _, file_obj in self.workspace.items():
-            file_obj.ast.resolve_includes(self.workspace, path=filepath)
-        file_obj = self.workspace.get(filepath)
-        file_obj.ast.resolve_includes(self.workspace)
-        # Update inheritance/links
-        self.link_version = (self.link_version + 1) % 1000
-        for _, file_obj in self.workspace.items():
-            file_obj.ast.resolve_links(self.obj_tree, self.link_version)
+        if did_change:
+            # Update include statements linking to this file
+            for _, file_obj in self.workspace.items():
+                file_obj.ast.resolve_includes(self.workspace, path=filepath)
+            file_obj = self.workspace.get(filepath)
+            file_obj.ast.resolve_includes(self.workspace)
+            # Update inheritance/links
+            self.link_version = (self.link_version + 1) % 1000
+            for _, file_obj in self.workspace.items():
+                file_obj.ast.resolve_links(self.obj_tree, self.link_version)
         self.send_diagnostics(uri)
 
     def add_file(self, filepath):
@@ -1148,11 +1149,14 @@ class LangServer:
             if read_file:
                 if file_obj is None:
                     file_obj = fortran_file(filepath)
+                hash_old = file_obj.hash
                 file_obj.load_from_disk()
+                if hash_old == file_obj.hash:
+                    return False, None
             ast_new = process_file(file_obj, True, pp_defs=self.pp_defs)
         except:
             log.error("Error while parsing file %s", filepath, exc_info=True)
-            return 'Error during parsing'  # Error during parsing
+            return False, 'Error during parsing'  # Error during parsing
         # Remove old objects from tree
         ast_old = file_obj.ast
         if ast_old is not None:
@@ -1169,7 +1173,7 @@ class LangServer:
         if update_links:
             self.link_version = (self.link_version + 1) % 1000
             ast_new.resolve_links(self.obj_tree, self.link_version)
-        return None
+        return True, None
 
     def workspace_init(self):
         # Get filenames
