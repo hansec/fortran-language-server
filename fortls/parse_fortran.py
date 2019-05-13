@@ -1224,6 +1224,15 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs=None):
         # print(line)
         line, line_label = strip_line_label(line)
         line_stripped = strip_strings(line, maintain_len=True)
+        # Find trailing comments
+        comm_ind = line_stripped.find('!')
+        if comm_ind >= 0:
+            line_no_comment = line[:comm_ind]
+            line_post_comment = line[comm_ind:]
+            line_stripped = line_stripped[:comm_ind]
+        else:
+            line_no_comment = line
+            line_post_comment = None
         # Split lines with semicolons
         semi_colon_ind = line_stripped.find(';')
         if semi_colon_ind > 0:
@@ -1242,14 +1251,6 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs=None):
                 line = semi_split[0]
                 semi_split = semi_split[1:]
                 line_stripped = strip_strings(line, maintain_len=True)
-        # Find trailing comments
-        comm_ind = line_stripped.find('!')
-        if comm_ind >= 0:
-            line_no_comment = line[:comm_ind]
-            line_post_comment = line[comm_ind:]
-        else:
-            line_no_comment = line
-            line_post_comment = None
         # Test for scope end
         if file_ast.END_SCOPE_WORD is not None:
             match = END_WORD_REGEX.match(line_no_comment)
