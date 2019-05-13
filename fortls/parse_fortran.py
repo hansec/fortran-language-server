@@ -429,7 +429,11 @@ def read_block_def(line):
     #
     where_match = WHERE_REGEX.match(line)
     if where_match is not None:
-        if (line.count(')') == 0) or (WORD_REGEX.match(line.split(')')[-1].strip()) is not None):
+        trailing_line = line[where_match.end(0):]
+        close_paren = find_paren_match(trailing_line)
+        if close_paren < 0:
+            return 'where', True
+        if WORD_REGEX.match(trailing_line[close_paren+1:].strip()):
             return 'where', True
         else:
             return 'where', False
