@@ -57,8 +57,8 @@ GEN_ASSIGN_REGEX = re.compile(r'(ASSIGNMENT|OPERATOR)\(', re.I)
 END_TYPED_WORD = r'TYPE'
 ENUM_DEF_REGEX = re.compile(r'[ ]*ENUM[, ]+', re.I)
 END_ENUMD_WORD = r'ENUM'
-NAT_VAR_REGEX = re.compile(r'[ ]*(INTEGER|REAL|DOUBLE PRECISION|COMPLEX'
-                           r'|DOUBLE COMPLEX|CHARACTER|LOGICAL|PROCEDURE'
+NAT_VAR_REGEX = re.compile(r'[ ]*(INTEGER|REAL|DOUBLE ?PRECISION|COMPLEX'
+                           r'|DOUBLE ?COMPLEX|CHARACTER|LOGICAL|PROCEDURE'
                            r'|EXTERNAL|CLASS|TYPE)', re.I)
 KIND_SPEC_REGEX = re.compile(r'([ ]*\([ ]*[a-z0-9_*:]|\*[0-9:]*)', re.I)
 KEYWORD_LIST_REGEX = re.compile(r'[ ]*,[ ]*(PUBLIC|PRIVATE|ALLOCATABLE|'
