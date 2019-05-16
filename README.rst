@@ -102,6 +102,7 @@ The following global settings can be used when launching the language server.
 * ``--lowercase_intrinsics`` Use lowercase for intrinsics and keywords in autocomplete requests
 * ``--use_signature_help`` Use signature help instead of snippets for subroutines/functions
 * ``--variable_hover`` Show hover information for variables (default: subroutines/functions only)
+* ``--hover_signature`` Show signature information in hover for argument (also enables '--variable_hover')
 * ``--preserve_keyword_order`` Display variable keywords information in original order (default: sort to consistent ordering)
 * ``--enable_code_actions`` Enable experimental code actions (default: false)
 * ``--max_line_length`` Maximum line length (default: disabled)

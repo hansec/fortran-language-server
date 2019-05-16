@@ -418,7 +418,7 @@ def test_hover():
     def check_return(result_array, checks):
         assert len(result_array) == len(checks)
         for (i, check) in enumerate(checks):
-            assert result_array[i]['contents']['value'] == check
+            assert result_array[i]['contents'][0]['value'] == check
     #
     string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
     file_path = os.path.join(test_dir, "subdir", "test_abstract.f90")
@@ -437,7 +437,7 @@ def test_hover():
 def test_docs():
     def check_return(result_array, checks):
         comm_lines = []
-        for (i, hover_line) in enumerate(result_array['contents']['value'].splitlines()):
+        for (i, hover_line) in enumerate(result_array['contents'][0]['value'].splitlines()):
             if hover_line.count('!!') > 0:
                 comm_lines.append((i, hover_line))
         assert len(comm_lines) == len(checks)

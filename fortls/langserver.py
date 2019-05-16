@@ -79,6 +79,7 @@ class LangServer:
         self.lowercase_intrinsics = settings.get("lowercase_intrinsics", False)
         self.use_signature_help = settings.get("use_signature_help", False)
         self.variable_hover = settings.get("variable_hover", False)
+        self.hover_signature = settings.get("hover_signature", False)
         self.sort_keywords = settings.get("sort_keywords", True)
         self.enable_code_actions = settings.get("enable_code_actions", False)
         self.max_line_length = settings.get("max_line_length", -1)
@@ -905,11 +906,11 @@ class LangServer:
             return None
         # Construct hover information
         var_type = var_obj.get_type()
-        hover_str = None
+        hover_array = []
         if (var_type == SUBROUTINE_TYPE_ID) or (var_type == FUNCTION_TYPE_ID):
             hover_str, highlight = var_obj.get_hover(long=True)
+            hover_array.append(create_hover(hover_str, highlight))
         elif var_type == INTERFACE_TYPE_ID:
-            hover_array = []
             for member in var_obj.mems:
                 hover_str, highlight = member.get_hover(long=True)
                 if hover_str is not None:
@@ -917,9 +918,27 @@ class LangServer:
             return {"contents": hover_array}
         elif self.variable_hover and (var_type == 6):
             hover_str, highlight = var_obj.get_hover()
+            hover_array.append(create_hover(hover_str, highlight))
+            if self.hover_signature:
+                sig_request = request.copy()
+                sig_result = self.serve_signature(sig_request)
+                try:
+                    arg_id = sig_result.get("activeParameter")
+                    if arg_id is not None:
+                        arg_info = sig_result["signatures"][0]["parameters"][arg_id]
+                        arg_doc = arg_info["documentation"]
+                        doc_split = arg_doc.find("\n !!")
+                        if doc_split < 0:
+                            arg_string = "{0} :: {1}".format(arg_doc, arg_info["label"])
+                        else:
+                            arg_string = "{0} :: {1}{2}".format(arg_doc[:doc_split],
+                                                                arg_info["label"], arg_doc[doc_split:])
+                        hover_array.append(create_hover(arg_string, True))
+                except:
+                    pass
         #
-        if hover_str is not None:
-            return {"contents": create_hover(hover_str, highlight)}
+        if len(hover_array) > 0:
+            return {"contents": hover_array}
         return None
 
     def serve_implementation(self, request):
