@@ -118,6 +118,7 @@ The following settings can be used to perform `standalone debug tests <https://g
 * ``--debug_rootpath=DEBUG_ROOTPATH`` Root path for language server tests
 * ``--debug_line=DEBUG_LINE`` Line position for language server tests (1-indexed)
 * ``--debug_char=DEBUG_CHAR`` Character position for language server tests (1-indexed)
+* ``--debug_full_result`` Print full result object instead of condensed version
 * ``--debug_parser`` Test source code parser on specified file
 * ``--debug_diagnostics`` Test diagnostic notifications for specified file
 * ``--debug_symbols`` Test symbol request for specified file
