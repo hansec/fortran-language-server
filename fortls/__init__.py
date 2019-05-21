@@ -44,6 +44,10 @@ def main():
         help="Do not filter autocomplete results by variable prefix"
     )
     parser.add_argument(
+        '--autocomplete_no_snippets', action="store_true",
+        help="Do not use snippets with place holders in autocomplete results"
+    )
+    parser.add_argument(
         '--lowercase_intrinsics', action="store_true",
         help="Use lowercase for intrinsics and keywords in autocomplete requests"
     )
@@ -162,6 +166,7 @@ def main():
         "symbol_include_mem": (not args.symbol_skip_mem),
         "sync_type": 2 if args.incremental_sync else 1,
         "autocomplete_no_prefix": args.autocomplete_no_prefix,
+        "autocomplete_no_snippets": args.autocomplete_no_snippets,
         "lowercase_intrinsics": args.lowercase_intrinsics,
         "use_signature_help": args.use_signature_help,
         "variable_hover": (args.variable_hover or args.hover_signature),

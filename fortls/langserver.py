@@ -76,6 +76,7 @@ class LangServer:
         self.symbol_include_mem = settings.get("symbol_include_mem", True)
         self.sync_type = settings.get("sync_type", 1)
         self.autocomplete_no_prefix = settings.get("autocomplete_no_prefix", False)
+        self.autocomplete_no_snippets = settings.get("autocomplete_no_snippets", False)
         self.lowercase_intrinsics = settings.get("lowercase_intrinsics", False)
         self.use_signature_help = settings.get("use_signature_help", False)
         self.variable_hover = settings.get("variable_hover", False)
@@ -457,6 +458,8 @@ class LangServer:
                 if name_replace is not None:
                     comp_obj["label"] = name_replace
                 call_sig, snippet = candidate.get_snippet(name_replace)
+                if self.autocomplete_no_snippets:
+                    snippet = call_sig
                 if snippet is not None:
                     if self.use_signature_help and (not is_interface):
                         arg_open = snippet.find('(')
