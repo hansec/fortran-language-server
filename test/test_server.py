@@ -166,6 +166,7 @@ def test_workspace_symbols():
             ["test_inherit", 2, 0],
             ["test_mod", 2, 0],
             ["test_program", 2, 0],
+            ["test_rename_sub", 6, 9],
             ["test_select", 2, 0],
             ["test_select_sub", 6, 16],
             ["test_sig_Sub", 6, 67],
@@ -350,6 +351,9 @@ def test_def():
     string += def_request(file_path, 10, 2)
     file_path = os.path.join(test_dir, "subdir", "test_inc2.f90")
     string += def_request(file_path, 3, 2)
+    file_path = os.path.join(test_dir, "subdir", "test_rename.F90")
+    string += def_request(file_path, 13, 5)
+    string += def_request(file_path, 14, 5)
     errcode, results = run_request(string)
     assert errcode == 0
     #
@@ -369,7 +373,10 @@ def test_def():
         # test_inc.f90
         [0, 0, os.path.join(test_dir, "subdir", "test_inc2.f90")],
         # subdir/test_inc2.f90
-        [4, 4, os.path.join(test_dir, "test_inc.f90")]
+        [4, 4, os.path.join(test_dir, "test_inc.f90")],
+        # subdir/test_rename.F90
+        [6, 6, os.path.join(test_dir, "subdir", "test_rename.F90")],
+        [1, 1, os.path.join(test_dir, "subdir", "test_rename.F90")]
     )
     assert len(exp_results)+1 == len(results)
     for i in range(len(exp_results)):

@@ -79,14 +79,6 @@ def get_keywords(keywords, keyword_info={}):
     return keyword_strings
 
 
-def intersect_lists(l1, l2):
-    tmp_list = []
-    for val1 in l1:
-        if l2.count(val1) > 0:
-            tmp_list.append(val1)
-    return tmp_list
-
-
 def get_paren_substring(test_str):
     i1 = test_str.find('(')
     i2 = test_str.rfind(')')
@@ -96,33 +88,50 @@ def get_paren_substring(test_str):
         return None
 
 
-def get_use_tree(scope, use_dict, obj_tree, only_list=[]):
+def get_use_tree(scope, use_dict, obj_tree, only_list=[], rename_map={}):
+    def intersect_only(new_only, new_map):
+        tmp_list = []
+        tmp_map = rename_map.copy()
+        for val1 in only_list:
+            mapped1 = tmp_map.get(val1, val1)
+            if new_only.count(mapped1) > 0:
+                tmp_list.append(val1)
+                new_rename = new_map.get(mapped1, None)
+                if new_rename is not None:
+                    tmp_map[val1] = new_rename
+            else:
+                tmp_map.pop(val1, None)
+        return tmp_list, tmp_map
     # Add recursively
     for use_stmnt in scope.use:
         use_mod = use_stmnt[0]
         if len(only_list) == 0:
             merged_use_list = use_stmnt[1]
+            merged_rename = use_stmnt[3]
         elif len(use_stmnt[1]) == 0:
             merged_use_list = only_list
+            merged_rename = rename_map
         else:
-            merged_use_list = intersect_lists(only_list, use_stmnt[1])
+            merged_use_list, merged_rename = intersect_only(use_stmnt[1], use_stmnt[3])
             if len(merged_use_list) == 0:
                 continue
         if use_mod in obj_tree:
             if use_mod in use_dict:
-                old_len = len(use_dict[use_mod])
+                old_len = len(use_dict[use_mod][0])
                 if (old_len > 0) and (len(merged_use_list) > 0):
-                    for only_name in use_stmnt[1]:
+                    for only_name in merged_use_list:
                         if use_dict[use_mod].count(only_name) == 0:
-                            use_dict[use_mod].append(only_name)
+                            use_dict[use_mod][0].append(only_name)
                 else:
-                    use_dict[use_mod] = []
+                    use_dict[use_mod] = [[], []]
                 # Skip if we have already visited module with the same only list
-                if old_len == len(use_dict[use_mod]):
+                if old_len == len(use_dict[use_mod][0]):
                     continue
             else:
-                use_dict[use_mod] = merged_use_list
-            use_dict = get_use_tree(obj_tree[use_mod][0], use_dict, obj_tree, merged_use_list)
+                use_dict[use_mod] = [merged_use_list, merged_rename]
+            # Use renaming
+            use_dict = get_use_tree(obj_tree[use_mod][0], use_dict, obj_tree,
+                                    merged_use_list, merged_rename)
     return use_dict
 
 
@@ -148,16 +157,19 @@ def find_in_scope(scope, var_name, obj_tree, interface=False, local_only=False):
     # Setup USE search
     use_dict = get_use_tree(scope, {}, obj_tree)
     # Look in found use modules
-    for use_mod, only_list in use_dict.items():
+    for use_mod, only_info in use_dict.items():
         use_scope = obj_tree[use_mod][0]
         # Module name is request
         if use_mod.lower() == var_name_lower:
             return use_scope
         # Filter children by only_list
+        only_list = only_info[0]
+        only_renames = only_info[1]
         if len(only_list) > 0:
             if var_name_lower not in only_list:
                 continue
-        tmp_var = check_scope(use_scope, var_name_lower, filter_public=True)
+        mod_name = only_renames.get(var_name_lower, var_name_lower)
+        tmp_var = check_scope(use_scope, mod_name, filter_public=True)
         if tmp_var is not None:
             return tmp_var
     # Only search local and imported names for interfaces
@@ -495,11 +507,10 @@ class fortran_scope(fortran_obj):
         else:
             self.FQSN = self.name.lower()
 
-    def add_use(self, use_mod, line_number, only_list=[]):
-        lower_only = []
-        for only in only_list:
-            lower_only.append(only.lower())
-        self.use.append([use_mod.lower(), lower_only, line_number])
+    def add_use(self, use_mod, line_number, only_list=[], rename_map={}):
+        lower_only = [only.lower() for only in only_list]
+        rename_lower = {key.lower(): value.lower() for key, value in rename_map.items()}
+        self.use.append([use_mod.lower(), lower_only, line_number, rename_lower])
 
     def set_inherit(self, inherit_type):
         self.inherit = inherit_type
@@ -1744,10 +1755,10 @@ class fortran_ast:
     def add_public(self, name):
         self.public_list.append(self.enc_scope_name+'::'+name)
 
-    def add_use(self, mod_word, line_number, only_list):
+    def add_use(self, mod_word, line_number, only_list=[], rename_map={}):
         if self.current_scope is None:
             self.create_none_scope()
-        self.current_scope.add_use(mod_word, line_number, only_list)
+        self.current_scope.add_use(mod_word, line_number, only_list, rename_map)
 
     def add_include(self, path, line_number):
         self.include_stmnts.append([line_number, path, []])

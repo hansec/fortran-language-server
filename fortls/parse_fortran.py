@@ -655,9 +655,15 @@ def read_use_stmt(line):
         trailing_line = line[use_match.end(0):].lower()
         use_mod = use_match.group(2)
         only_list = []
+        rename_map = {}
         if use_match.group(3) is not None:
-            only_list = [only_stmt.split('=>')[0].strip() for only_stmt in trailing_line.split(',')]
-        return 'use', [use_mod, only_list]
+            for only_stmt in trailing_line.split(','):
+                only_split = only_stmt.split('=>')
+                only_name = only_split[0].strip()
+                only_list.append(only_name)
+                if len(only_split) == 2:
+                    rename_map[only_name] = only_split[1].strip()
+        return 'use', [use_mod, only_list, rename_map]
 
 
 def read_inc_stmt(line):
@@ -1573,7 +1579,7 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}):
                 if(debug):
                     print('{1} !!! INTERFACE-PRO statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'use':
-                file_ast.add_use(obj[0], line_number, obj[1])
+                file_ast.add_use(obj[0], line_number, obj[1], obj[2])
                 if(debug):
                     print('{1} !!! USE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'import':
