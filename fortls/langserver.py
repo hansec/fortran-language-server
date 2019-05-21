@@ -430,8 +430,9 @@ class LangServer:
                 if not no_use:
                     use_dict = get_use_tree(scope, use_dict, self.obj_tree)
             # Look in found use modules
-            for use_mod, only_list in use_dict.items():
+            for use_mod, only_info in use_dict.items():
                 scope = self.obj_tree[use_mod][0]
+                only_list = only_info[0]
                 var_list += child_candidates(scope, only_list, req_abstract=abstract_only)
             # Add globals
             if inc_globals:

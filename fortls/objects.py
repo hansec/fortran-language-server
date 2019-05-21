@@ -106,11 +106,11 @@ def get_use_tree(scope, use_dict, obj_tree, only_list=[], rename_map={}):
     for use_stmnt in scope.use:
         use_mod = use_stmnt[0]
         if len(only_list) == 0:
-            merged_use_list = use_stmnt[1]
-            merged_rename = use_stmnt[3]
+            merged_use_list = use_stmnt[1][:]
+            merged_rename = use_stmnt[3].copy()
         elif len(use_stmnt[1]) == 0:
-            merged_use_list = only_list
-            merged_rename = rename_map
+            merged_use_list = only_list[:]
+            merged_rename = rename_map.copy()
         else:
             merged_use_list, merged_rename = intersect_only(use_stmnt[1], use_stmnt[3])
             if len(merged_use_list) == 0:
@@ -123,7 +123,7 @@ def get_use_tree(scope, use_dict, obj_tree, only_list=[], rename_map={}):
                         if use_dict[use_mod].count(only_name) == 0:
                             use_dict[use_mod][0].append(only_name)
                 else:
-                    use_dict[use_mod] = [[], []]
+                    use_dict[use_mod] = [[], {}]
                 # Skip if we have already visited module with the same only list
                 if old_len == len(use_dict[use_mod][0]):
                     continue
