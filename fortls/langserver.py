@@ -17,6 +17,7 @@ log = logging.getLogger(__name__)
 # Global regexes
 FORTRAN_EXT_REGEX = re.compile(r'^\.F(77|90|95|03|08|OR|PP)?$', re.I)
 INT_STMNT_REGEX = re.compile(r'^[ ]*[a-z]*$', re.I)
+TYPE_DEF_REGEX = re.compile(r'[ ]*(TYPE|CLASS)[ ]*\([a-z0-9_ ]*$', re.I)
 SCOPE_DEF_REGEX = re.compile(r'[ ]*(MODULE|PROGRAM|SUBROUTINE|FUNCTION)[ ]+', re.I)
 END_REGEX = re.compile(r'[ ]*(END)( |MODULE|PROGRAM|SUBROUTINE|FUNCTION|TYPE|DO|IF|SELECT)?', re.I)
 
@@ -644,18 +645,21 @@ class LangServer:
             type_scope = climb_type_tree(var_stack, curr_scope, self.obj_tree)
             # Set enclosing type as scope
             if type_scope is None:
-                curr_scope = None
+                return None
             else:
                 curr_scope = type_scope
         # Find in available scopes
         var_obj = None
         if curr_scope is not None:
             if (curr_scope.get_type() == CLASS_TYPE_ID) and (not is_member) and \
-               line_prefix.lstrip().lower().startswith('procedure') and (line_prefix.count("=>") > 0):
+               ((line_prefix.lstrip().lower().startswith('procedure') and (line_prefix.count("=>") > 0))
+               or TYPE_DEF_REGEX.match(line_prefix)):
                 curr_scope = curr_scope.parent
             var_obj = find_in_scope(curr_scope, def_name, self.obj_tree)
         # Search in global scope
         if var_obj is None:
+            if is_member:
+                return None
             key = def_name.lower()
             if key in self.obj_tree:
                 return self.obj_tree[key][0]

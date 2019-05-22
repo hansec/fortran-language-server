@@ -1461,10 +1461,14 @@ class fortran_var(fortran_obj):
         if (self.type_obj is None) and (self.parent is not None):
             type_name = get_paren_substring(self.desc)
             if type_name is not None:
-                type_name = type_name.strip().lower()
-                type_obj = find_in_scope(self.parent, type_name, obj_tree)
-                if type_obj is not None:
-                    self.type_obj = type_obj
+                search_scope = self.parent
+                if search_scope.get_type() == CLASS_TYPE_ID:
+                    search_scope = search_scope.parent
+                if search_scope is not None:
+                    type_name = type_name.strip().lower()
+                    type_obj = find_in_scope(search_scope, type_name, obj_tree)
+                    if type_obj is not None:
+                        self.type_obj = type_obj
         return self.type_obj
 
     def set_dim(self, dim_str):
