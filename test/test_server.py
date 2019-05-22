@@ -241,6 +241,9 @@ def test_comp():
     string += comp_request(file_path, 13, 10)
     file_path = os.path.join(test_dir, "subdir", "test_inherit.f90")
     string += comp_request(file_path, 10, 11)
+    file_path = os.path.join(test_dir, "subdir", "test_rename.F90")
+    string += comp_request(file_path, 13, 5)
+    string += comp_request(file_path, 14, 5)
     errcode, results = run_request(string)
     assert errcode == 0
     #
@@ -281,7 +284,10 @@ def test_comp():
         # subdir/test_generic.f90
         [2, "my_gen", "SUBROUTINE my_gen(self, a, b)"],
         # subdir/test_inherit.f90
-        [1, "val", "REAL(8)"]
+        [1, "val", "REAL(8)"],
+        # subdir/test_rename.F90
+        [1, "localname", "INTEGER"],
+        [1, "renamed_var2", "REAL(8)"]
     )
     assert len(exp_results)+1 == len(results)
     for i in range(len(exp_results)):

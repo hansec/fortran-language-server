@@ -431,24 +431,42 @@ class LangServer:
                 if not no_use:
                     use_dict = get_use_tree(scope, use_dict, self.obj_tree)
             # Look in found use modules
+            rename_list = [None for _ in var_list]
             for use_mod, only_info in use_dict.items():
                 scope = self.obj_tree[use_mod][0]
                 only_list = only_info[0]
-                var_list += child_candidates(scope, only_list, req_abstract=abstract_only)
+                rename_map = only_info[1]
+                if len(rename_map) > 0:
+                    only_list = [rename_map.get(only_name, only_name) for only_name in only_list]
+                tmp_list = child_candidates(scope, only_list, req_abstract=abstract_only)
+                # Setup renaming
+                if len(rename_map) > 0:
+                    rename_reversed = {value: key for (key, value) in rename_map.items()}
+                    for tmp_obj in tmp_list:
+                        var_list.append(tmp_obj)
+                        rename_list.append(rename_reversed.get(tmp_obj.name.lower(), None))
+                else:
+                    var_list += tmp_list
+                    rename_list += [None for _ in tmp_list]
             # Add globals
             if inc_globals:
-                for _, obj in self.obj_tree.items():
-                    var_list.append(obj[0])
-                var_list += self.intrinsic_funs
+                tmp_list = [obj[0] for (_, obj) in self.obj_tree.items()]
+                var_list += tmp_list + self.intrinsic_funs
+                rename_list += [None for _ in tmp_list + self.intrinsic_funs]
             # Filter by prefix if necessary
             if var_prefix == '':
-                return var_list
+                return var_list, rename_list
             else:
                 tmp_list = []
-                for var in var_list:
-                    if var.name.lower().startswith(var_prefix):
+                tmp_rename = []
+                for (i, var) in enumerate(var_list):
+                    var_name = rename_list[i]
+                    if var_name is None:
+                        var_name = var.name
+                    if var_name.lower().startswith(var_prefix):
                         tmp_list.append(var)
-                return tmp_list
+                        tmp_rename.append(rename_list[i])
+                return tmp_list, tmp_rename
 
         def build_comp(candidate, name_only=False, name_replace=None, is_interface=False):
             comp_obj = {}
@@ -601,8 +619,10 @@ class LangServer:
                 if candidate.name.lower().startswith(var_prefix):
                     item_list.append(build_comp(candidate))
         # Build completion list
-        for candidate in get_candidates(scope_list, var_prefix, include_globals,
-                                        public_only, abstract_only, no_use):
+        candidate_list, rename_list = get_candidates(
+            scope_list, var_prefix, include_globals, public_only, abstract_only, no_use
+        )
+        for (i, candidate) in enumerate(candidate_list):
             # Skip module names (only valid in USE)
             candidate_type = candidate.get_type()
             if type_mask[candidate_type]:
@@ -610,17 +630,20 @@ class LangServer:
             if req_callable and (not candidate.is_callable()):
                 continue
             #
+            name_replace = rename_list[i]
             if candidate_type == INTERFACE_TYPE_ID:
                 tmp_list = []
+                if name_replace is None:
+                    name_replace = candidate.name
                 for member in candidate.mems:
-                    tmp_text, _ = member.get_snippet(candidate.name)
+                    tmp_text, _ = member.get_snippet(name_replace)
                     if tmp_list.count(tmp_text) > 0:
                         continue
                     tmp_list.append(tmp_text)
-                    item_list.append(build_comp(member, name_replace=candidate.name, is_interface=True))
+                    item_list.append(build_comp(member, name_replace=name_replace, is_interface=True))
                 continue
             #
-            item_list.append(build_comp(candidate, name_only=name_only))
+            item_list.append(build_comp(candidate, name_only=name_only, name_replace=name_replace))
         return item_list
 
     def get_definition(self, def_file, def_line, def_char):

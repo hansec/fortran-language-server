@@ -1,5 +1,5 @@
 module rename_mod1
-integer :: var1
+real(8) :: var1
 end module rename_mod1
 !
 module rename_mod2
