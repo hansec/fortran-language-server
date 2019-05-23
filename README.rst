@@ -100,6 +100,7 @@ The following global settings can be used when launching the language server.
 * ``--incremental_sync`` Use incremental document synchronization
 * ``--autocomplete_no_prefix`` Do not filter autocomplete results by variable prefix
 * ``--autocomplete_no_snippets`` Do not use snippets with place holders in autocomplete results
+* ``--autocomplete_name_only`` Complete only the name of procedures and not the parameters
 * ``--lowercase_intrinsics`` Use lowercase for intrinsics and keywords in autocomplete requests
 * ``--use_signature_help`` Use signature help instead of snippets for subroutines/functions
 * ``--variable_hover`` Show hover information for variables (default: subroutines/functions only)

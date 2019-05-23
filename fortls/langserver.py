@@ -78,6 +78,7 @@ class LangServer:
         self.sync_type = settings.get("sync_type", 1)
         self.autocomplete_no_prefix = settings.get("autocomplete_no_prefix", False)
         self.autocomplete_no_snippets = settings.get("autocomplete_no_snippets", False)
+        self.autocomplete_name_only = settings.get("autocomplete_name_only", False)
         self.lowercase_intrinsics = settings.get("lowercase_intrinsics", False)
         self.use_signature_help = settings.get("use_signature_help", False)
         self.variable_hover = settings.get("variable_hover", False)
@@ -468,7 +469,8 @@ class LangServer:
                         tmp_rename.append(rename_list[i])
                 return tmp_list, tmp_rename
 
-        def build_comp(candidate, name_only=False, name_replace=None, is_interface=False):
+        def build_comp(candidate, name_only=self.autocomplete_name_only,
+                name_replace=None, is_interface=False):
             comp_obj = {}
             call_sig = None
             if name_only:
