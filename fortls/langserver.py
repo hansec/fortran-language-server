@@ -470,7 +470,7 @@ class LangServer:
                 return tmp_list, tmp_rename
 
         def build_comp(candidate, name_only=self.autocomplete_name_only,
-                name_replace=None, is_interface=False):
+                       name_replace=None, is_interface=False):
             comp_obj = {}
             call_sig = None
             if name_only:
@@ -523,7 +523,7 @@ class LangServer:
         item_list = []
         scope_list = file_obj.ast.get_scopes(ac_line+1)
         # Get context
-        name_only = False
+        name_only = self.autocomplete_name_only
         public_only = False
         include_globals = True
         line_context, context_info = get_line_context(line_prefix)
