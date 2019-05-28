@@ -1,3 +1,17 @@
+## 1.9.0
+
+### Improvements
+* Add support for USE statement renaming requests, ref [#109](https://github.com/hansec/fortran-language-server/issues/109)
+* Add support for argument information in variable hover requests, fixes [#107](https://github.com/hansec/fortran-language-server/issues/107)
+* Add support for disabling snippets in autocomplete results, fixes [#112](https://github.com/hansec/fortran-language-server/issues/112)
+* Prevent file AST updates on Open/Close requests when contents have not changed, ref [#105](https://github.com/hansec/fortran-language-server/issues/105)
+* Reduce unnecessary parsing with single line file changes
+* Debugging: Add support for printing full result object
+
+### Fixes
+* Remove required space between "DOUBLE PRECISION" and "DOUBLE COMPLEX" definitions, fixes [#110](https://github.com/hansec/fortran-language-server/issues/110)
+* Fix requests when a user-defined type variable has the same name as a defined type used in that scope
+
 ## 1.8.2
 
 ### Fixes
