@@ -49,6 +49,10 @@ def main():
         help="Do not use snippets with place holders in autocomplete results"
     )
     parser.add_argument(
+        '--autocomplete_name_only', action="store_true",
+        help="Complete only the name of procedures and not the parameters"
+    )
+    parser.add_argument(
         '--lowercase_intrinsics', action="store_true",
         help="Use lowercase for intrinsics and keywords in autocomplete requests"
     )
@@ -172,6 +176,7 @@ def main():
         "sync_type": 2 if args.incremental_sync else 1,
         "autocomplete_no_prefix": args.autocomplete_no_prefix,
         "autocomplete_no_snippets": args.autocomplete_no_snippets,
+        "autocomplete_name_only": args.autocomplete_name_only,
         "lowercase_intrinsics": args.lowercase_intrinsics,
         "use_signature_help": args.use_signature_help,
         "variable_hover": (args.variable_hover or args.hover_signature),
