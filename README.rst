@@ -165,7 +165,12 @@ specified directories are not added recursively, so any nested sub directories m
 *Note:* The previous naming convention for source file directories (``mod_dirs``) is still supported
 but has been deprecated.
 
-**Preprocessor definitions:**
+**Preprocessing:**
+
+File suffixes for preprocessing can be controlled with the variable ``pp_suffixes`` in a workspace's
+``.fortls`` file. When this variable is used _only_ those files with the specified suffixes will be
+preprocessed. If an empty array is specified then _no_ preprocessing will be performed on any files.
+By default, or if the variable is ommited or ``null``, only files with upper case suffixes are preprocessed.
 
 Preprocessor definitions can be set for each project, to improve support for Fortran files using conditional
 compilation, using the ``pp_defs`` variable in the ``.fortls`` file. Preprocessing is performed _only_ for files
@@ -185,6 +190,7 @@ test can be evaluated by the server or if the region is the *default* path (ie. 
       "source_dirs": ["subdir1", "subdir2"],
       "excl_paths": ["subdir3", "subdir1/file_to_skip.F90"],
       "excl_suffixes": ["_skip.f90"],
+      "pp_suffixes": [".f03", ".F90"],
       "pp_defs": {"HAVE_PACKAGE": ""},
       "ext_source_dirs": ["/path/to/fortran/library"],
       "lowercase_intrinsics": false,

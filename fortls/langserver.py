@@ -22,9 +22,9 @@ SCOPE_DEF_REGEX = re.compile(r'[ ]*(MODULE|PROGRAM|SUBROUTINE|FUNCTION)[ ]+', re
 END_REGEX = re.compile(r'[ ]*(END)( |MODULE|PROGRAM|SUBROUTINE|FUNCTION|TYPE|DO|IF|SELECT)?', re.I)
 
 
-def init_file(filepath, pp_defs):
+def init_file(filepath, pp_defs, pp_suffixes):
     #
-    file_obj = fortran_file(filepath)
+    file_obj = fortran_file(filepath, pp_suffixes)
     err_str = file_obj.load_from_disk()
     if err_str is not None:
         return None, err_str
@@ -66,6 +66,7 @@ class LangServer:
         self.excl_paths = []
         self.excl_suffixes = []
         self.post_messages = []
+        self.pp_suffixes = None
         self.pp_defs = {}
         self.streaming = True
         self.debug_log = debug_log
@@ -210,6 +211,7 @@ class LangServer:
                     self.excl_suffixes = config_dict.get("excl_suffixes", [])
                     self.lowercase_intrinsics = config_dict.get("lowercase_intrinsics", self.lowercase_intrinsics)
                     self.debug_log = config_dict.get("debug_log", self.debug_log)
+                    self.pp_suffixes = config_dict.get("pp_suffixes", None)
                     self.pp_defs = config_dict.get("pp_defs", {})
                     self.max_line_length = config_dict.get("max_line_length", self.max_line_length)
                     self.max_comment_line_length = config_dict.get("max_comment_line_length",
@@ -1208,7 +1210,7 @@ class LangServer:
             file_obj = self.workspace.get(filepath)
             if read_file:
                 if file_obj is None:
-                    file_obj = fortran_file(filepath)
+                    file_obj = fortran_file(filepath, self.pp_suffixes)
                 hash_old = file_obj.hash
                 file_obj.load_from_disk()
                 if hash_old == file_obj.hash:
@@ -1257,7 +1259,7 @@ class LangServer:
         pool = Pool(processes=self.nthreads)
         results = {}
         for filepath in file_list:
-            results[filepath] = pool.apply_async(init_file, args=(filepath, self.pp_defs))
+            results[filepath] = pool.apply_async(init_file, args=(filepath, self.pp_defs, self.pp_suffixes))
         pool.close()
         pool.join()
         for path, result in results.items():

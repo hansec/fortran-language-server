@@ -699,7 +699,7 @@ def_tests = [
 
 
 class fortran_file:
-    def __init__(self, path=None):
+    def __init__(self, path=None, pp_suffixes=None):
         self.path = path
         self.contents_split = []
         self.contents_pp = []
@@ -709,13 +709,17 @@ class fortran_file:
         self.hash = None
         if path is not None:
             _, file_ext = os.path.splitext(os.path.basename(path))
-            self.preproc = (file_ext == file_ext.upper())
+            if pp_suffixes is not None:
+                self.preproc = (file_ext in pp_suffixes)
+            else:
+                self.preproc = (file_ext == file_ext.upper())
         else:
             self.preproc = False
 
     def copy(self):
         """Copy content to new file object (does not copy objects)"""
         copy_obj = fortran_file(self.path)
+        copy_obj.preproc = self.preproc
         copy_obj.fixed = self.fixed
         copy_obj.set_contents(self.contents_split)
         return copy_obj

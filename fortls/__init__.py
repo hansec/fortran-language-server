@@ -194,6 +194,7 @@ def main():
         if file_exists is False:
             error_exit("Specified 'debug_filepath' does not exist")
         # Get preprocessor definitions from config file
+        pp_suffixes = None
         pp_defs = {}
         if args.debug_rootpath:
             config_path = os.path.join(args.debug_rootpath, ".fortls")
@@ -202,6 +203,7 @@ def main():
                 try:
                     with open(config_path, 'r') as fhandle:
                         config_dict = json.load(fhandle)
+                        pp_suffixes = config_dict.get("pp_suffixes", None)
                         pp_defs = config_dict.get("pp_defs", {})
                         if isinstance(pp_defs, list):
                             pp_defs = {key: "" for key in pp_defs}
@@ -210,14 +212,19 @@ def main():
         #
         print('\nTesting parser')
         print('  File = "{0}"'.format(args.debug_filepath))
-        file_obj = fortran_file(args.debug_filepath)
+        file_obj = fortran_file(args.debug_filepath, pp_suffixes)
         err_str = file_obj.load_from_disk()
         if err_str is not None:
             error_exit("Reading file failed: {0}".format(err_str))
         print('  Detected format: {0}'.format("fixed" if file_obj.fixed else "free"))
         print("\n=========\nParser Output\n=========\n")
         _, file_ext = os.path.splitext(os.path.basename(args.debug_filepath))
-        if file_ext == file_ext.upper():
+        preproc_file = False
+        if pp_suffixes is not None:
+            preproc_file = (file_ext in pp_suffixes)
+        else:
+            preproc_file = (file_ext == file_ext.upper())
+        if preproc_file:
             file_ast = process_file(file_obj, True, debug=True, pp_defs=pp_defs)
         else:
             file_ast = process_file(file_obj, True, debug=True)
