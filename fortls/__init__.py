@@ -196,6 +196,7 @@ def main():
         # Get preprocessor definitions from config file
         pp_suffixes = None
         pp_defs = {}
+        include_dirs = []
         if args.debug_rootpath:
             config_path = os.path.join(args.debug_rootpath, ".fortls")
             config_exists = os.path.isfile(config_path)
@@ -205,10 +206,15 @@ def main():
                         config_dict = json.load(fhandle)
                         pp_suffixes = config_dict.get("pp_suffixes", None)
                         pp_defs = config_dict.get("pp_defs", {})
+                        include_dirs = config_dict.get("include_dirs", [])
                         if isinstance(pp_defs, list):
                             pp_defs = {key: "" for key in pp_defs}
                 except:
                     print("Error while parsing '.fortls' settings file")
+                # Make relative include paths absolute
+                for (i, include_dir) in enumerate(include_dirs):
+                    if not os.path.isabs(include_dir):
+                        include_dirs[i] = os.path.abspath(os.path.join(args.debug_rootpath, include_dir))
         #
         print('\nTesting parser')
         print('  File = "{0}"'.format(args.debug_filepath))
@@ -225,7 +231,7 @@ def main():
         else:
             preproc_file = (file_ext == file_ext.upper())
         if preproc_file:
-            file_ast = process_file(file_obj, True, debug=True, pp_defs=pp_defs)
+            file_ast = process_file(file_obj, True, debug=True, pp_defs=pp_defs, include_dirs=include_dirs)
         else:
             file_ast = process_file(file_obj, True, debug=True)
         print("\n=========\nObject Tree\n=========\n")

@@ -92,6 +92,7 @@ FREE_FORMAT_TEST = re.compile(r'[ ]{1,4}[a-z]', re.I)
 PP_REGEX = re.compile(r'#(if |ifdef|ifndef|else|elif|endif)')
 PP_DEF_REGEX = re.compile(r'#(define|undef)[ ]*([a-z0-9_]+)', re.I)
 PP_DEF_TEST_REGEX = re.compile(r'(![ ]*)?defined[ ]*\([ ]*([a-z0-9_]*)[ ]*\)$', re.I)
+PP_INCLUDE_REGEX = re.compile(r'#include[ ]*([\"a-z0-9_\.]*)', re.I)
 # Context matching rules
 CALL_REGEX = re.compile(r'[ ]*CALL[ ]+[a-z0-9_%]*$', re.I)
 INT_STMNT_REGEX = re.compile(r'^[ ]*[a-z]*$', re.I)
@@ -983,168 +984,9 @@ class fortran_file:
                     return line_number, i0, i1
         return line_number, i0, i1
 
-    def preprocess(self, pp_defs={}, debug=False):
-        # Look for and mark excluded preprocessor paths in file
-        # Initial implementation only looks for "if" and "ifndef" statements.
-        # For "if" statements all blocks are excluded except the "else" block if present
-        # For "ifndef" statements all blocks excluding the first block are exlucded
-        def eval_pp_if(text, defs={}):
-            def replace_ops(expr):
-                expr = expr.replace("&&", " and ")
-                expr = expr.replace("||", " or ")
-                expr = expr.replace("!=", " <> ")
-                expr = expr.replace("!", " not ")
-                expr = expr.replace(" <> ", " != ")
-                return expr
-
-            def replace_defined(line):
-                DEFINED_REGEX = re.compile(r'defined[ ]*\([ ]*([a-z_][a-z0-9_]*)[ ]*\)', re.I)
-                i0 = 0
-                out_line = ""
-                for match in DEFINED_REGEX.finditer(line):
-                    if match.group(1) in defs:
-                        out_line += line[i0:match.start(0)] + "($@)"
-                    else:
-                        out_line += line[i0:match.start(0)] + "($%)"
-                    i0 = match.end(0)
-                if i0 < len(line):
-                    out_line += line[i0:]
-                return out_line
-
-            def replace_vars(line):
-                WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
-                i0 = 0
-                out_line = ""
-                for match in WORD_REGEX.finditer(line):
-                    if match.group(0) in defs:
-                        out_line += line[i0:match.start(0)] + defs[match.group(0)]
-                    else:
-                        out_line += line[i0:match.start(0)] + "False"
-                    i0 = match.end(0)
-                if i0 < len(line):
-                    out_line += line[i0:]
-                out_line = out_line.replace("$@", "True")
-                out_line = out_line.replace("$%", "False")
-                return out_line
-            out_line = replace_defined(text)
-            out_line = replace_vars(out_line)
-            try:
-                line_res = eval(replace_ops(out_line))
-            except:
-                return False
-            else:
-                return line_res
-        #
-        pp_skips = []
-        pp_defines = []
-        pp_stack = []
-        defs_tmp = pp_defs.copy()
-        output_file = []
-        def_cont_name = None
-        for (i, line) in enumerate(self.contents_split):
-            # Handle multiline macro continuation
-            if def_cont_name is not None:
-                output_file.append("")
-                if line.rstrip()[-1] != '\\':
-                    defs_tmp[def_cont_name] += line.strip()
-                    def_cont_name = None
-                else:
-                    defs_tmp[def_cont_name] += line[0:-1].strip()
-                continue
-            match = PP_REGEX.match(line)
-            if (match is not None):
-                output_file.append(line)
-                def_name = None
-                if_start = False
-                if match.group(1) == 'if ':
-                    is_path = eval_pp_if(line[match.end(1):], defs_tmp)
-                    if_start = True
-                elif match.group(1) == 'ifdef':
-                    if_start = True
-                    def_name = line[match.end(0):].strip()
-                    is_path = (def_name in defs_tmp)
-                elif match.group(1) == 'ifndef':
-                    if_start = True
-                    def_name = line[match.end(0):].strip()
-                    is_path = not (def_name in defs_tmp)
-                if if_start:
-                    if is_path:
-                        pp_stack.append([-1, -1])
-                        if debug:
-                            print('{1} !!! Conditional TRUE({0})'.format(i+1, line.strip()))
-                    else:
-                        pp_stack.append([i+1, -1])
-                        if debug:
-                            print('{1} !!! Conditional FALSE({0})'.format(i+1, line.strip()))
-                    continue
-                if len(pp_stack) == 0:
-                    continue
-                #
-                inc_start = False
-                exc_start = False
-                if (match.group(1) == 'elif'):
-                    if (pp_stack[-1][0] < 0):
-                        pp_stack[-1][0] = i+1
-                        exc_start = True
-                    else:
-                        if eval_pp_if(line[match.end(1):], defs_tmp):
-                            pp_stack[-1][1] = i-1
-                            pp_stack.append([-1, -1])
-                            inc_start = True
-                elif match.group(1) == 'else':
-                    if pp_stack[-1][0] < 0:
-                        pp_stack[-1][0] = i+1
-                        exc_start = True
-                    else:
-                        pp_stack[-1][1] = i+1
-                        inc_start = True
-                elif match.group(1) == 'endif':
-                    if pp_stack[-1][0] < 0:
-                        pp_stack.pop()
-                        continue
-                    if pp_stack[-1][1] < 0:
-                        pp_stack[-1][1] = i+1
-                        if debug:
-                            print('{1} !!! Conditional FALSE/END({0})'.format(i+1, line.strip()))
-                    pp_skips.append(pp_stack.pop())
-                if debug:
-                    if inc_start:
-                        print('{1} !!! Conditional TRUE({0})'.format(i+1, line.strip()))
-                    elif exc_start:
-                        print('{1} !!! Conditional FALSE({0})'.format(i+1, line.strip()))
-                continue
-            #
-            match = PP_DEF_REGEX.match(line)
-            if (match is not None) and ((len(pp_stack) == 0) or (pp_stack[-1][0] < 0)):
-                output_file.append(line)
-                pp_defines.append(i+1)
-                def_name = match.group(2)
-                if (match.group(1) == 'define') and (def_name not in defs_tmp):
-                    eq_ind = line[match.end(0):].find(' ')
-                    if eq_ind >= 0:
-                        # Handle multiline macros
-                        if line.rstrip()[-1] == "\\":
-                            defs_tmp[def_name] = line[match.end(0)+eq_ind:-1].strip()
-                            def_cont_name = def_name
-                        else:
-                            defs_tmp[def_name] = line[match.end(0)+eq_ind:].strip()
-                    else:
-                        defs_tmp[def_name] = "True"
-                elif (match.group(1) == 'undef') and (def_name in defs_tmp):
-                    defs_tmp.pop(def_name, None)
-                if debug:
-                    print('{1} !!! Define statement({0})'.format(i+1, line.strip()))
-                continue
-            #
-            for def_tmp, value in defs_tmp.items():
-                if line.find(def_tmp) >= 0:
-                    if debug:
-                        print('{1} !!! Macro sub({0}) "{2}" -> "{3}"'.format(
-                            i+1, line.strip(), def_tmp, value
-                        ))
-                    line = line.replace(def_tmp, value)
-            output_file.append(line)
-        self.contents_pp = output_file
+    def preprocess(self, pp_defs={}, include_dirs=[], debug=False):
+        self.contents_pp, pp_skips, pp_defines, _ = \
+            preprocess_file(self.contents_split, self.path, pp_defs=pp_defs, include_dirs=include_dirs, debug=debug)
         return pp_skips, pp_defines
 
     def check_file(self, obj_tree, max_line_length=-1, max_comment_line_length=-1):
@@ -1186,13 +1028,214 @@ class fortran_file:
         return diagnostics
 
 
-def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}):
+def preprocess_file(contents_split, file_path=None, pp_defs={}, include_dirs=[], debug=False):
+    # Look for and mark excluded preprocessor paths in file
+    # Initial implementation only looks for "if" and "ifndef" statements.
+    # For "if" statements all blocks are excluded except the "else" block if present
+    # For "ifndef" statements all blocks excluding the first block are exlucded
+    def eval_pp_if(text, defs={}):
+        def replace_ops(expr):
+            expr = expr.replace("&&", " and ")
+            expr = expr.replace("||", " or ")
+            expr = expr.replace("!=", " <> ")
+            expr = expr.replace("!", " not ")
+            expr = expr.replace(" <> ", " != ")
+            return expr
+
+        def replace_defined(line):
+            DEFINED_REGEX = re.compile(r'defined[ ]*\([ ]*([a-z_][a-z0-9_]*)[ ]*\)', re.I)
+            i0 = 0
+            out_line = ""
+            for match in DEFINED_REGEX.finditer(line):
+                if match.group(1) in defs:
+                    out_line += line[i0:match.start(0)] + "($@)"
+                else:
+                    out_line += line[i0:match.start(0)] + "($%)"
+                i0 = match.end(0)
+            if i0 < len(line):
+                out_line += line[i0:]
+            return out_line
+
+        def replace_vars(line):
+            WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
+            i0 = 0
+            out_line = ""
+            for match in WORD_REGEX.finditer(line):
+                if match.group(0) in defs:
+                    out_line += line[i0:match.start(0)] + defs[match.group(0)]
+                else:
+                    out_line += line[i0:match.start(0)] + "False"
+                i0 = match.end(0)
+            if i0 < len(line):
+                out_line += line[i0:]
+            out_line = out_line.replace("$@", "True")
+            out_line = out_line.replace("$%", "False")
+            return out_line
+        out_line = replace_defined(text)
+        out_line = replace_vars(out_line)
+        try:
+            line_res = eval(replace_ops(out_line))
+        except:
+            return False
+        else:
+            return line_res
+    #
+    if file_path is not None:
+        include_dirs = [os.path.dirname(file_path)] + include_dirs
+    pp_skips = []
+    pp_defines = []
+    pp_stack = []
+    defs_tmp = pp_defs.copy()
+    output_file = []
+    def_cont_name = None
+    for (i, line) in enumerate(contents_split):
+        # Handle multiline macro continuation
+        if def_cont_name is not None:
+            output_file.append("")
+            if line.rstrip()[-1] != '\\':
+                defs_tmp[def_cont_name] += line.strip()
+                def_cont_name = None
+            else:
+                defs_tmp[def_cont_name] += line[0:-1].strip()
+            continue
+        # Handle conditional statements
+        match = PP_REGEX.match(line)
+        if (match is not None):
+            output_file.append(line)
+            def_name = None
+            if_start = False
+            # Opening conditional statements
+            if match.group(1) == 'if ':
+                is_path = eval_pp_if(line[match.end(1):], defs_tmp)
+                if_start = True
+            elif match.group(1) == 'ifdef':
+                if_start = True
+                def_name = line[match.end(0):].strip()
+                is_path = (def_name in defs_tmp)
+            elif match.group(1) == 'ifndef':
+                if_start = True
+                def_name = line[match.end(0):].strip()
+                is_path = not (def_name in defs_tmp)
+            if if_start:
+                if is_path:
+                    pp_stack.append([-1, -1])
+                    if debug:
+                        print('{1} !!! Conditional TRUE({0})'.format(i+1, line.strip()))
+                else:
+                    pp_stack.append([i+1, -1])
+                    if debug:
+                        print('{1} !!! Conditional FALSE({0})'.format(i+1, line.strip()))
+                continue
+            if len(pp_stack) == 0:
+                continue
+            # Closing/middle conditional statements
+            inc_start = False
+            exc_start = False
+            if (match.group(1) == 'elif'):
+                if (pp_stack[-1][0] < 0):
+                    pp_stack[-1][0] = i+1
+                    exc_start = True
+                else:
+                    if eval_pp_if(line[match.end(1):], defs_tmp):
+                        pp_stack[-1][1] = i-1
+                        pp_stack.append([-1, -1])
+                        inc_start = True
+            elif match.group(1) == 'else':
+                if pp_stack[-1][0] < 0:
+                    pp_stack[-1][0] = i+1
+                    exc_start = True
+                else:
+                    pp_stack[-1][1] = i+1
+                    inc_start = True
+            elif match.group(1) == 'endif':
+                if pp_stack[-1][0] < 0:
+                    pp_stack.pop()
+                    continue
+                if pp_stack[-1][1] < 0:
+                    pp_stack[-1][1] = i+1
+                    if debug:
+                        print('{1} !!! Conditional FALSE/END({0})'.format(i+1, line.strip()))
+                pp_skips.append(pp_stack.pop())
+            if debug:
+                if inc_start:
+                    print('{1} !!! Conditional TRUE({0})'.format(i+1, line.strip()))
+                elif exc_start:
+                    print('{1} !!! Conditional FALSE({0})'.format(i+1, line.strip()))
+            continue
+        # Handle variable/macro definitions files
+        match = PP_DEF_REGEX.match(line)
+        if (match is not None) and ((len(pp_stack) == 0) or (pp_stack[-1][0] < 0)):
+            output_file.append(line)
+            pp_defines.append(i+1)
+            def_name = match.group(2)
+            if (match.group(1) == 'define') and (def_name not in defs_tmp):
+                eq_ind = line[match.end(0):].find(' ')
+                if eq_ind >= 0:
+                    # Handle multiline macros
+                    if line.rstrip()[-1] == "\\":
+                        defs_tmp[def_name] = line[match.end(0)+eq_ind:-1].strip()
+                        def_cont_name = def_name
+                    else:
+                        defs_tmp[def_name] = line[match.end(0)+eq_ind:].strip()
+                else:
+                    defs_tmp[def_name] = "True"
+            elif (match.group(1) == 'undef') and (def_name in defs_tmp):
+                defs_tmp.pop(def_name, None)
+            if debug:
+                print('{1} !!! Define statement({0})'.format(i+1, line.strip()))
+            continue
+        # Handle include files
+        match = PP_INCLUDE_REGEX.match(line)
+        if (match is not None) and ((len(pp_stack) == 0) or (pp_stack[-1][0] < 0)):
+            if debug:
+                print('{1} !!! Include statement({0})'.format(i+1, line.strip()))
+            include_filename = match.group(1).replace('"', '')
+            include_path = None
+            for include_dir in include_dirs:
+                include_path_tmp = os.path.join(include_dir, include_filename)
+                if os.path.isfile(include_path_tmp):
+                    include_path = os.path.abspath(include_path_tmp)
+                    break
+            if include_path is not None:
+                try:
+                    include_file = fortran_file(include_path)
+                    err_string = include_file.load_from_disk()
+                    if err_string is None:
+                        if debug:
+                            print('\n!!! Parsing include file "{0}"'.format(include_path))
+                        _, _, _, defs_tmp = preprocess_file(include_file.contents_split,
+                                                            file_path=include_path, pp_defs=defs_tmp,
+                                                            include_dirs=include_dirs, debug=debug)
+                        if debug:
+                            print('!!! Completed parsing include file\n')
+                    else:
+                        if debug:
+                            print('!!! Failed to parse include file: {0}'.format(err_string))
+                except:
+                    if debug:
+                        print('!!! Failed to parse include file: exception')
+            else:
+                if debug:
+                    print('{1} !!! Could not locate include file ({0})'.format(i+1, line.strip()))
+        #
+        for def_tmp, value in defs_tmp.items():
+            if line.find(def_tmp) >= 0:
+                if debug:
+                    print('{1} !!! Macro sub({0}) "{2}" -> "{3}"'.format(
+                        i+1, line.strip(), def_tmp, value
+                    ))
+                line = line.replace(def_tmp, value)
+        output_file.append(line)
+    return output_file, pp_skips, pp_defines, defs_tmp
+
+
+def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_dirs=[]):
     """Build file AST by parsing file"""
     file_ast = fortran_ast(file_obj)
     if file_obj.preproc:
         if debug:
             print("=== PreProc Pass ===\n")
-        pp_skips, pp_defines = file_obj.preprocess(pp_defs=pp_defs, debug=debug)
+        pp_skips, pp_defines = file_obj.preprocess(pp_defs=pp_defs, include_dirs=include_dirs, debug=debug)
         for pp_reg in pp_skips:
             file_ast.start_ppif(pp_reg[0])
             file_ast.end_ppif(pp_reg[1])

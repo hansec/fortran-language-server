@@ -22,7 +22,7 @@ SCOPE_DEF_REGEX = re.compile(r'[ ]*(MODULE|PROGRAM|SUBROUTINE|FUNCTION)[ ]+', re
 END_REGEX = re.compile(r'[ ]*(END)( |MODULE|PROGRAM|SUBROUTINE|FUNCTION|TYPE|DO|IF|SELECT)?', re.I)
 
 
-def init_file(filepath, pp_defs, pp_suffixes):
+def init_file(filepath, pp_defs, pp_suffixes, include_dirs):
     #
     file_obj = fortran_file(filepath, pp_suffixes)
     err_str = file_obj.load_from_disk()
@@ -30,7 +30,7 @@ def init_file(filepath, pp_defs, pp_suffixes):
         return None, err_str
     #
     try:
-        file_ast = process_file(file_obj, True, pp_defs=pp_defs)
+        file_ast = process_file(file_obj, True, pp_defs=pp_defs, include_dirs=include_dirs)
     except:
         log.error("Error while parsing file %s", filepath, exc_info=True)
         return None, 'Error during parsing'
@@ -68,6 +68,7 @@ class LangServer:
         self.post_messages = []
         self.pp_suffixes = None
         self.pp_defs = {}
+        self.include_dirs = []
         self.streaming = True
         self.debug_log = debug_log
         # Intrinsic (re-loaded during initialize)
@@ -213,6 +214,7 @@ class LangServer:
                     self.debug_log = config_dict.get("debug_log", self.debug_log)
                     self.pp_suffixes = config_dict.get("pp_suffixes", None)
                     self.pp_defs = config_dict.get("pp_defs", {})
+                    self.include_dirs = config_dict.get("include_dirs", [])
                     self.max_line_length = config_dict.get("max_line_length", self.max_line_length)
                     self.max_comment_line_length = config_dict.get("max_comment_line_length",
                                                                    self.max_comment_line_length)
@@ -220,6 +222,10 @@ class LangServer:
                         self.pp_defs = {key: "" for key in self.pp_defs}
             except:
                 self.post_messages.append([1, 'Error while parsing ".fortls" settings file'])
+            # Make relative include paths absolute
+            for (i, include_dir) in enumerate(self.include_dirs):
+                if not os.path.isabs(include_dir):
+                    self.include_dirs[i] = os.path.abspath(os.path.join(self.root_path, include_dir))
         # Setup logging
         if self.debug_log and (self.root_path != ""):
             logging.basicConfig(filename=os.path.join(self.root_path, "fortls_debug.log"),
@@ -1215,7 +1221,7 @@ class LangServer:
                 file_obj.load_from_disk()
                 if hash_old == file_obj.hash:
                     return False, None
-            ast_new = process_file(file_obj, True, pp_defs=self.pp_defs)
+            ast_new = process_file(file_obj, True, pp_defs=self.pp_defs, include_dirs=self.include_dirs)
         except:
             log.error("Error while parsing file %s", filepath, exc_info=True)
             return False, 'Error during parsing'  # Error during parsing
@@ -1259,7 +1265,9 @@ class LangServer:
         pool = Pool(processes=self.nthreads)
         results = {}
         for filepath in file_list:
-            results[filepath] = pool.apply_async(init_file, args=(filepath, self.pp_defs, self.pp_suffixes))
+            results[filepath] = pool.apply_async(init_file, args=(
+                filepath, self.pp_defs, self.pp_suffixes, self.include_dirs
+            ))
         pool.close()
         pool.join()
         for path, result in results.items():

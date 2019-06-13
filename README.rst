@@ -49,40 +49,11 @@ Language Server Features
 
   - Generate type-bound procedures and implementation templates for deferred procedures
 
-**Notes/Limitations:**
+Notes/Limitations:
+^^^^^^^^^^^^^^^^^^
 
 - Signature help is not available for overloaded subroutines/functions
 - Diagnostics are only updated when files are saved or opened/closed
-
-**Editor examples (Atom):**
-
-Document symbols (``textDocument/documentSymbol``):
-
-.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_outline.png
-
-Auto-complete (``textDocument/completion``):
-
-.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_autocomplete.gif
-
-Signature help (``textDocument/signatureHelp``):
-
-.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_sigHelp.gif
-
-Goto definition (``textDocument/definition``):
-
-.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_gotodef.gif
-
-Hover (``textDocument/hover``):
-
-.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_hover.gif
-
-Find references (``textDocument/references``):
-
-.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_refs.png
-
-Diagnostics:
-
-.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_diag.png
 
 Installation
 ------------
@@ -111,7 +82,8 @@ The following global settings can be used when launching the language server.
 * ``--max_comment_line_length`` Maximum comment line length (default: disabled)
 * ``--debug_log`` Write debug information to ``root_dir/fortls_debug.log`` (requires a specified ``root_dir`` during initialization)
 
-**Debug settings:**
+Debug settings:
+^^^^^^^^^^^^^^^
 
 The following settings can be used to perform `standalone debug tests <https://github.com/hansec/fortran-language-server/wiki>`_ on the language server.
 
@@ -142,7 +114,8 @@ in the ``root_dir`` directory.
 * ``lowercase_intrinsics`` Use lowercase for intrinsics and keywords in autocomplete requests (default: false)
 * ``debug_log`` Write debug information to ``root_dir/fortls_debug.log`` (default: false)
 
-**Setup source file search paths:**
+Setup source file search paths:
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 By default all files with the suffix ``F,F77,F90,F95,F03,F08,FOR,FPP`` (case-insensitive) in the
 ``root_dir`` directory, specified during initialization, and all its sub-directories are parsed and included in
@@ -162,26 +135,36 @@ in the ``ext_source_dirs`` variable in the ``.fortls`` file. These files will be
 but will not be updated with any changes made until the language server is restarted. As with ``source_dirs``,
 specified directories are not added recursively, so any nested sub directories must be explicitly listed.
 
-*Note:* The previous naming convention for source file directories (``mod_dirs``) is still supported
+**Note:** The previous naming convention for source file directories (``mod_dirs``) is still supported
 but has been deprecated.
 
-**Preprocessing:**
+Preprocessing:
+^^^^^^^^^^^^^^
+
+**Note:** Preprocessor support is not "complete", see below. For preprocessed files the language server
+will only analyze code within preprocessor conditional regions if the conditional test can be
+evaluated by the server or if the region is the *default* path (ie. a bare ``#else`` region).
+
+**Note:** Currently, ``#include`` statements are only used for preprocessing (ie. tracking definitions).
+Fortran objects defined in these files will not be processed.
 
 File suffixes for preprocessing can be controlled with the variable ``pp_suffixes`` in a workspace's
-``.fortls`` file. When this variable is used _only_ those files with the specified suffixes will be
-preprocessed. If an empty array is specified then _no_ preprocessing will be performed on any files.
+``.fortls`` file. When this variable is used *only* those files with the specified suffixes will be
+preprocessed. If an empty array is specified then *no* preprocessing will be performed on any files.
 By default, or if the variable is ommited or ``null``, only files with upper case suffixes are preprocessed.
 
 Preprocessor definitions can be set for each project, to improve support for Fortran files using conditional
-compilation, using the ``pp_defs`` variable in the ``.fortls`` file. Preprocessing is performed _only_ for files
+compilation, using the ``pp_defs`` variable in the ``.fortls`` file. Preprocessing is performed *only* for files
 where the file extension is all caps (ie. ".F90", ".F", etc.). Currently, support for preprocessing is limited
 to variables declared in the project's ``.fortls`` file or in the source file of interest as ``#include`` files
 and inheritance through ``USE`` statements are yet not supported. Variable substitution is also performed
 within files, but is currently limited to non-recursive cases. For example, ``#define PP_VAR1 PP_VAR2`` will
 cause ``PP_VAR1`` to be replaced with the text ``PP_VAR2`` throughout the file, not that value of ``PP_VAR2``.
 
-*Note:* The language server will only analyze code within preprocessor conditional regions if the conditional
-test can be evaluated by the server or if the region is the *default* path (ie. a bare ``#else`` region).
+Include directories can be specified using the variable ``include_dirs`` in a workspace's ``.fortls`` file.
+These directories are *only* used to search for preprocessor ``#include``'d files. The directory containing
+the file where an ``#include`` statement is encountered is always searched. File search is performed starting
+with the containing directory followed by the specified ``include_dirs`` specified paths, in order (left to right).
 
 
 ::
@@ -192,6 +175,7 @@ test can be evaluated by the server or if the region is the *default* path (ie. 
       "excl_suffixes": ["_skip.f90"],
       "pp_suffixes": [".f03", ".F90"],
       "pp_defs": {"HAVE_PACKAGE": ""},
+      "include_dirs": ["rel_include/dir_path", "/abs/include/dir/path"],
       "ext_source_dirs": ["/path/to/fortran/library"],
       "lowercase_intrinsics": false,
       "debug_log": false
@@ -204,9 +188,40 @@ When `filing bugs <https://github.com/hansec/fortran-language-server/issues/new>
 License
 -------
 
-This project is made available under the MIT License.
+This project is made available under the `MIT License <https://github.com/hansec/fortran-language-server/blob/master/LICENSE>`_.
 
 Support
 -------
 
 If you *really* like `this package <https://github.com/hansec/fortran-language-server>`_ you can `buy me a coffee <https://paypal.me/hansec>`_ to say thanks.
+
+Editor examples (Atom):
+-----------------------
+
+Document symbols (``textDocument/documentSymbol``):
+
+.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_outline.png
+
+Auto-complete (``textDocument/completion``):
+
+.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_autocomplete.gif
+
+Signature help (``textDocument/signatureHelp``):
+
+.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_sigHelp.gif
+
+Goto definition (``textDocument/definition``):
+
+.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_gotodef.gif
+
+Hover (``textDocument/hover``):
+
+.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_hover.gif
+
+Find references (``textDocument/references``):
+
+.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_refs.png
+
+Diagnostics:
+
+.. image:: https://raw.githubusercontent.com/hansec/fortran-language-server/master/images/fortls_diag.png
