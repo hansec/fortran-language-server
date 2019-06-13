@@ -1436,10 +1436,11 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}):
                     else:
                         name_stripped = var_name.split('=')[0]
                     # Add dimension if specified
+                    key_tmp = obj[1][:]
                     if name_stripped.find('(') > -1:
-                        obj[1].append('dimension({0})'.format(get_paren_substring(name_stripped)))
+                        key_tmp.append('dimension({0})'.format(get_paren_substring(name_stripped)))
                     name_stripped = name_stripped.split('(')[0].strip()
-                    keywords, keyword_info = map_keywords(obj[1])
+                    keywords, keyword_info = map_keywords(key_tmp)
                     if procedure_def:
                         new_var = fortran_meth(file_ast, line_number, name_stripped, desc_string,
                                                keywords, keyword_info=keyword_info, link_obj=link_name)
