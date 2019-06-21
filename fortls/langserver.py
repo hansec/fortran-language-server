@@ -327,13 +327,14 @@ class LangServer:
         return sorted(matching_symbols, key=lambda k: k['name'])
 
     def serve_document_symbols(self, request):
-        def map_types(type):
+        def map_types(type, in_class=False):
             if type == 1:
                 return 2
-            elif type == 2:
-                return 6
-            elif type == 3:
-                return 12
+            elif (type == 2) or (type == 3):
+                if in_class:
+                    return 6
+                else:
+                    return 12
             elif type == 4:
                 return 5
             elif type == 5:
@@ -386,7 +387,7 @@ class LangServer:
                 for child in scope.children:
                     tmp_out = {}
                     tmp_out["name"] = child.name
-                    tmp_out["kind"] = map_types(child.get_type())
+                    tmp_out["kind"] = map_types(child.get_type(), True)
                     tmp_out["location"] = {
                         "uri": uri,
                         "range": {
@@ -403,6 +404,8 @@ class LangServer:
         def map_types(type):
             if type == 1:
                 return 9
+            elif type == 2:
+                return 3
             elif type == 4:
                 return 7
             elif type == 6:
@@ -478,7 +481,7 @@ class LangServer:
                 return tmp_list, tmp_rename
 
         def build_comp(candidate, name_only=self.autocomplete_name_only,
-                       name_replace=None, is_interface=False):
+                       name_replace=None, is_interface=False, is_member=False):
             comp_obj = {}
             call_sig = None
             if name_only:
@@ -498,6 +501,8 @@ class LangServer:
                     comp_obj["insertText"] = snippet
                     comp_obj["insertTextFormat"] = 2
             comp_obj["kind"] = map_types(candidate.get_type())
+            if is_member and (comp_obj["kind"] == 3):
+                comp_obj["kind"] = 2
             comp_obj["detail"] = candidate.get_desc()
             if call_sig is not None:
                 comp_obj["detail"] += ' ' + call_sig
@@ -650,7 +655,9 @@ class LangServer:
                     if tmp_list.count(tmp_text) > 0:
                         continue
                     tmp_list.append(tmp_text)
-                    item_list.append(build_comp(member, name_replace=name_replace, is_interface=True))
+                    item_list.append(build_comp(
+                        member, name_replace=name_replace, is_interface=True, is_member=is_member
+                    ))
                 continue
             #
             item_list.append(build_comp(candidate, name_only=name_only, name_replace=name_replace))

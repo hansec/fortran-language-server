@@ -121,20 +121,20 @@ def test_symbols():
             ["v", 13, 10, 10],
             ["bound_nopass", 6, 11, 11],
             ["create", 6, 13, 13],
-            ["norm", 12, 14, 14],
+            ["norm", 6, 14, 14],
             ["bound_pass", 6, 15, 15],
             ["scaled_vector", 5, 18, 23],
             ["scale", 13, 19, 19],
             ["set_scale", 6, 21, 21],
-            ["norm", 12, 22, 22],
+            ["norm", 6, 22, 22],
             ["fort_wrap", 11, 26, 29],
-            ["vector_create", 6, 35, 41],
+            ["vector_create", 12, 35, 41],
             ["vector_norm", 12, 43, 47],
-            ["scaled_vector_set", 6, 49, 53],
+            ["scaled_vector_set", 12, 49, 53],
             ["scaled_vector_norm", 12, 55, 59],
             ["unscaled_norm", 12, 61, 65],
-            ["test_sig_Sub", 6, 67, 70],
-            ["bound_pass", 6, 72, 78]
+            ["test_sig_Sub", 12, 67, 70],
+            ["bound_pass", 12, 72, 78]
         )
         assert len(result_array) == len(objs)
         for i, obj in enumerate(objs):
