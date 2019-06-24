@@ -1266,11 +1266,6 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
         COMMENT_LINE_MATCH = FREE_COMMENT_LINE_MATCH
         DOC_COMMENT_MATCH = FREE_DOC_MATCH
     while((next_line_ind < file_obj.nLines) or (len(semi_split) > 0)):
-        if (doc_string is not None) and (doc_string != ''):
-            file_ast.add_doc('!! ' + doc_string)
-            if(debug):
-                print('{1} !!! Doc string({0})'.format(line_number, doc_string))
-            doc_string = None
         # Get next line
         if len(semi_split) > 0:
             line = semi_split[0]
@@ -1294,6 +1289,9 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
                 if doc_match.group(1) == '>':
                     doc_forward = True
                 else:
+                    if (doc_string is not None) and (doc_string != ''):
+                        doc_lines = [doc_string] + doc_lines
+                        doc_string = None
                     doc_forward = False
                 if next_line_ind < file_obj.nLines:
                     next_line = file_obj.get_line(next_line_ind, pp_content=True)
@@ -1314,6 +1312,13 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
                 if line_sum > 0:
                     file_ast.add_doc('!! ' + '\n!! '.join(doc_lines), forward=doc_forward)
             continue
+        # Handle trailing doc strings
+        if (doc_string is not None) and (doc_string != ''):
+            file_ast.add_doc('!! ' + doc_string)
+            if(debug):
+                print('{1} !!! Doc string({0})'.format(line_number, doc_string))
+            doc_string = None
+        # Handle preprocessing regions
         do_skip = False
         for pp_reg in pp_skips:
             if (line_number >= pp_reg[0]) and (line_number <= pp_reg[1]):
