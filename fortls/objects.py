@@ -22,6 +22,7 @@ KEYWORD_LIST = [
     'intent',
     'pass',
     'pure',
+    'impure',
     'elemental',
     'recursive',
     'abstract'
