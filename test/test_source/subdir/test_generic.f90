@@ -6,6 +6,7 @@ CONTAINS
   GENERIC :: OPERATOR(+) => plusop1, plusop2
   GENERIC :: my_gen2 =>
 END TYPE test_gen_type
+CONTAINS
 !
 SUBROUTINE gen1(self,a,b)
 CLASS(test_gen_type) :: self

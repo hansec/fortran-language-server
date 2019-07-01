@@ -239,7 +239,7 @@ def test_comp():
     string += comp_request(file_path, 5, 4)
     string += comp_request(file_path, 8, 6)
     file_path = os.path.join(test_dir, "subdir", "test_generic.f90")
-    string += comp_request(file_path, 13, 10)
+    string += comp_request(file_path, 14, 10)
     file_path = os.path.join(test_dir, "subdir", "test_inherit.f90")
     string += comp_request(file_path, 10, 11)
     file_path = os.path.join(test_dir, "subdir", "test_rename.F90")
