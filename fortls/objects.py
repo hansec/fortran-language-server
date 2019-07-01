@@ -581,7 +581,8 @@ class fortran_scope(fortran_obj):
                 contains_line = self.contains_start
         # Get list of imported objects for interfaces
         is_interface = False
-        if (self.parent is not None) and (self.parent.get_type() == INTERFACE_TYPE_ID):
+        if (self.parent is not None) and (self.parent.get_type() == INTERFACE_TYPE_ID) and \
+           (not self.is_mod_scope()):
             is_interface = True
         errors = []
         known_types = {}
@@ -1535,17 +1536,17 @@ class fortran_var(fortran_obj):
                 if type_info[0] == 1:
                     if interface:
                         out_diag = fortran_diagnostic(
+                            self.sline-1, message='Object "{0}" not imported in interface'.format(desc_obj_name),
+                            severity=1, find_word=desc_obj_name
+                        )
+                    else:
+                        out_diag = fortran_diagnostic(
                             self.sline-1, message='Object "{0}" not found in scope'.format(desc_obj_name),
                             severity=1, find_word=desc_obj_name
                         )
                         type_def = type_info[1]
                         out_diag.add_related(path=type_def.file_ast.path,
                                              line=type_def.sline-1, message='Possible object')
-                    else:
-                        out_diag = fortran_diagnostic(
-                            self.sline-1, message='Object "{0}" not imported in interface'.format(desc_obj_name),
-                            severity=1, find_word=desc_obj_name
-                        )
                     return out_diag, known_types
         return None, known_types
 
