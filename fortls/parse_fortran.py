@@ -69,7 +69,7 @@ KEYWORD_LIST_REGEX = re.compile(r'[ ]*,[ ]*(PUBLIC|PRIVATE|ALLOCATABLE|'
                                 r'PASS\([a-z0-9_]*\)|SAVE|PARAMETER|'
                                 r'CONTIGUOUS)', re.I)
 TATTR_LIST_REGEX = re.compile(r'[ ]*,[ ]*(PUBLIC|PRIVATE|ABSTRACT|EXTENDS\([a-z0-9_]*\))', re.I)
-VIS_REGEX = re.compile(r'[ ]*(PUBLIC|PRIVATE)', re.I)
+VIS_REGEX = re.compile(r'[ ]*(PUBLIC|PRIVATE)[ :]', re.I)
 WORD_REGEX = re.compile(r'[a-z_][a-z0-9_]*', re.I)
 SUB_PAREN_MATCH = re.compile(r'\([a-z0-9_, ]*\)', re.I)
 KIND_SPEC_MATCH = re.compile(r'\([a-z0-9_, =*]*\)', re.I)
@@ -142,6 +142,9 @@ def get_line_context(line):
     # Test if import statement
     if IMPORT_REGEX.match(line):
         return 'import', None
+    # Test if visibility statement
+    if VIS_REGEX.match(line):
+        return 'vis', None
     # In type-def
     type_def = False
     if TYPE_DEF_REGEX.match(line) is not None:

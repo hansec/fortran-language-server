@@ -534,7 +534,6 @@ class LangServer:
             return None
         # print(var_stack)
         item_list = []
-        scope_list = file_obj.ast.get_scopes(ac_line+1)
         # Get context
         name_only = self.autocomplete_name_only
         public_only = False
@@ -554,6 +553,8 @@ class LangServer:
             else:
                 include_globals = False
                 scope_list = [type_scope]
+        else:
+            scope_list = file_obj.ast.get_scopes(ac_line+1)
         # Setup based on context
         req_callable = False
         abstract_only = False
@@ -601,6 +602,16 @@ class LangServer:
             type_mask = set_type_mask(True)
             type_mask[CLASS_TYPE_ID] = False
             type_mask[VAR_TYPE_ID] = False
+        elif line_context == 'vis':
+            # Visibility statement (local objects only)
+            include_globals = False
+            name_only = True
+            type_mask = set_type_mask(True)
+            type_mask[CLASS_TYPE_ID] = False
+            type_mask[VAR_TYPE_ID] = False
+            type_mask[SUBROUTINE_TYPE_ID] = False
+            type_mask[FUNCTION_TYPE_ID] = False
+            curr_scope = [file_obj.ast.get_inner_scope(ac_line+1)]
         elif line_context == 'int_only':
             # Interfaces only (procedure definitions)
             abstract_only = True

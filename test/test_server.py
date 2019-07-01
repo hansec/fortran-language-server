@@ -172,7 +172,8 @@ def test_workspace_symbols():
             ["test_sig_Sub", 6, 67],
             ["test_str1", 13, 5],
             ["test_str2", 13, 5],
-            ["test_sub", 6, 8]
+            ["test_sub", 6, 8],
+            ["test_vis_mod", 2, 0]
         )
         assert len(result_array) == len(objs)
         for i, obj in enumerate(objs):
@@ -244,6 +245,8 @@ def test_comp():
     file_path = os.path.join(test_dir, "subdir", "test_rename.F90")
     string += comp_request(file_path, 13, 5)
     string += comp_request(file_path, 14, 5)
+    file_path = os.path.join(test_dir, "subdir", "test_vis.f90")
+    string += comp_request(file_path, 8, 10)
     errcode, results = run_request(string)
     assert errcode == 0
     #
@@ -287,7 +290,9 @@ def test_comp():
         [1, "val", "REAL(8)"],
         # subdir/test_rename.F90
         [1, "localname", "INTEGER"],
-        [1, "renamed_var2", "REAL(8)"]
+        [1, "renamed_var2", "REAL(8)"],
+        # subdir/test_vis.f90
+        [3, "some_type", "TYPE"]
     )
     assert len(exp_results)+1 == len(results)
     for i in range(len(exp_results)):
