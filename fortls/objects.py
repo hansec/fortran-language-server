@@ -89,7 +89,7 @@ def get_paren_substring(test_str):
         return None
 
 
-def get_use_tree(scope, use_dict, obj_tree, only_list=[], rename_map={}):
+def get_use_tree(scope, use_dict, obj_tree, only_list=[], rename_map={}, curr_path=[]):
     def intersect_only(new_only, new_map):
         tmp_list = []
         tmp_map = rename_map.copy()
@@ -103,6 +103,10 @@ def get_use_tree(scope, use_dict, obj_tree, only_list=[], rename_map={}):
             else:
                 tmp_map.pop(val1, None)
         return tmp_list, tmp_map
+    # Detect and break circular references
+    if scope.FQSN in curr_path:
+        return use_dict
+    new_path = curr_path + [scope.FQSN]
     # Add recursively
     for use_stmnt in scope.use:
         use_mod = use_stmnt[0]
@@ -132,7 +136,7 @@ def get_use_tree(scope, use_dict, obj_tree, only_list=[], rename_map={}):
                 use_dict[use_mod] = [merged_use_list, merged_rename]
             # Use renaming
             use_dict = get_use_tree(obj_tree[use_mod][0], use_dict, obj_tree,
-                                    merged_use_list, merged_rename)
+                                    merged_use_list, merged_rename, new_path)
     return use_dict
 
 
