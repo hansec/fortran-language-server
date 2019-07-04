@@ -131,8 +131,14 @@ def get_use_tree(scope, use_dict, obj_tree, only_list=[], rename_map={}, curr_pa
         if use_stmnt.mod_name in use_dict:
             old_len = len(use_dict[use_stmnt.mod_name].only_list)
             if (old_len > 0) and (len(merged_use_list) > 0):
+                only_len = old_len
                 for only_name in merged_use_list:
                     use_dict[use_stmnt.mod_name].only_list.add(only_name)
+                    if len(use_dict[use_stmnt.mod_name].only_list) != only_len:
+                        only_len = len(use_dict[use_stmnt.mod_name].only_list)
+                        new_rename = merged_rename.get(only_name, None)
+                        if new_rename is not None:
+                            use_dict[use_stmnt.mod_name].rename_map = new_rename
             else:
                 use_dict[use_stmnt.mod_name] = USE_info(set(), {})
             # Skip if we have already visited module with the same only list
