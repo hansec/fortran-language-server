@@ -1,10 +1,16 @@
 import copy
 import re
 import os
+from collections import namedtuple
 from fortls.jsonrpc import path_to_uri
+# Global variables
+sort_keywords = True
+# Regexes
 CLASS_VAR_REGEX = re.compile(r'(TYPE|CLASS)[ ]*\(', re.I)
 DEF_KIND_REGEX = re.compile(r'([a-z]*)[ ]*\((?:KIND|LEN)?[ =]*([a-z_][a-z0-9_]*)', re.I)
 OBJBREAK_REGEX = re.compile(r'[\/\-(.,+*<>=$: ]', re.I)
+# Helper types
+USE_info = namedtuple('USE_info', ['only_list', 'rename_map'])
 # Keyword identifiers
 KEYWORD_LIST = [
     'pointer',
@@ -43,7 +49,6 @@ WHERE_TYPE_ID = 11
 IF_TYPE_ID = 12
 ASSOC_TYPE_ID = 13
 ENUM_TYPE_ID = 14
-sort_keywords = True
 
 
 def set_keyword_ordering(sorted):
@@ -90,14 +95,14 @@ def get_paren_substring(test_str):
 
 
 def get_use_tree(scope, use_dict, obj_tree, only_list=[], rename_map={}, curr_path=[]):
-    def intersect_only(new_only, new_map):
+    def intersect_only(use_stmnt):
         tmp_list = []
         tmp_map = rename_map.copy()
         for val1 in only_list:
             mapped1 = tmp_map.get(val1, val1)
-            if new_only.count(mapped1) > 0:
+            if mapped1 in use_stmnt.only_list:
                 tmp_list.append(val1)
-                new_rename = new_map.get(mapped1, None)
+                new_rename = use_stmnt.rename_map.get(mapped1, None)
                 if new_rename is not None:
                     tmp_map[val1] = new_rename
             else:
@@ -109,33 +114,35 @@ def get_use_tree(scope, use_dict, obj_tree, only_list=[], rename_map={}, curr_pa
     new_path = curr_path + [scope.FQSN]
     # Add recursively
     for use_stmnt in scope.use:
-        use_mod = use_stmnt[0]
+        if use_stmnt.mod_name not in obj_tree:
+            continue
+        # Intersect parent and current ONLY list and renaming
         if len(only_list) == 0:
-            merged_use_list = use_stmnt[1][:]
-            merged_rename = use_stmnt[3].copy()
-        elif len(use_stmnt[1]) == 0:
+            merged_use_list = use_stmnt.only_list[:]
+            merged_rename = use_stmnt.rename_map.copy()
+        elif len(use_stmnt.only_list) == 0:
             merged_use_list = only_list[:]
             merged_rename = rename_map.copy()
         else:
-            merged_use_list, merged_rename = intersect_only(use_stmnt[1], use_stmnt[3])
+            merged_use_list, merged_rename = intersect_only(use_stmnt)
             if len(merged_use_list) == 0:
                 continue
-        if use_mod in obj_tree:
-            if use_mod in use_dict:
-                old_len = len(use_dict[use_mod][0])
-                if (old_len > 0) and (len(merged_use_list) > 0):
-                    for only_name in merged_use_list:
-                        use_dict[use_mod][0].add(only_name)
-                else:
-                    use_dict[use_mod] = [set(), {}]
-                # Skip if we have already visited module with the same only list
-                if old_len == len(use_dict[use_mod][0]):
-                    continue
+        # Update ONLY list and renaming for current module
+        if use_stmnt.mod_name in use_dict:
+            old_len = len(use_dict[use_stmnt.mod_name].only_list)
+            if (old_len > 0) and (len(merged_use_list) > 0):
+                for only_name in merged_use_list:
+                    use_dict[use_stmnt.mod_name].only_list.add(only_name)
             else:
-                use_dict[use_mod] = [set(merged_use_list), merged_rename]
-            # Use renaming
-            use_dict = get_use_tree(obj_tree[use_mod][0], use_dict, obj_tree,
-                                    merged_use_list, merged_rename, new_path)
+                use_dict[use_stmnt.mod_name] = USE_info(set(), {})
+            # Skip if we have already visited module with the same only list
+            if old_len == len(use_dict[use_stmnt.mod_name].only_list):
+                continue
+        else:
+            use_dict[use_stmnt.mod_name] = USE_info(set(merged_use_list), merged_rename)
+        # Descend USE tree
+        use_dict = get_use_tree(obj_tree[use_stmnt.mod_name][0], use_dict, obj_tree,
+                                merged_use_list, merged_rename, new_path)
     return use_dict
 
 
@@ -161,27 +168,25 @@ def find_in_scope(scope, var_name, obj_tree, interface=False, local_only=False):
     # Setup USE search
     use_dict = get_use_tree(scope, {}, obj_tree)
     # Look in found use modules
-    for use_mod, only_info in use_dict.items():
+    for use_mod, use_info in use_dict.items():
         use_scope = obj_tree[use_mod][0]
         # Module name is request
         if use_mod.lower() == var_name_lower:
             return use_scope
         # Filter children by only_list
-        only_list = only_info[0]
-        only_renames = only_info[1]
-        if len(only_list) > 0:
-            if var_name_lower not in only_list:
+        if len(use_info.only_list) > 0:
+            if var_name_lower not in use_info.only_list:
                 continue
-        mod_name = only_renames.get(var_name_lower, var_name_lower)
+        mod_name = use_info.rename_map.get(var_name_lower, var_name_lower)
         tmp_var = check_scope(use_scope, mod_name, filter_public=True)
         if tmp_var is not None:
             return tmp_var
     # Only search local and imported names for interfaces
     if interface:
         in_import = False
-        for use_line in scope.use:
-            if use_line[0].startswith('#import'):
-                if use_line[1].count(var_name_lower) > 0:
+        for use_stmnt in scope.use:
+            if use_stmnt.mod_name.startswith('#import'):
+                if var_name_lower in use_stmnt.only_list:
                     in_import = True
                     break
         if not in_import:
@@ -329,6 +334,15 @@ def climb_type_tree(var_stack, curr_scope, obj_tree):
     return type_obj
 
 
+# Helper classes
+class USE_line:
+    def __init__(self, mod_name, line_number, only_list=[], rename_map={}):
+        self.mod_name = mod_name.lower()
+        self.line_number = line_number
+        self.only_list = [only.lower() for only in only_list]
+        self.rename_map = {key.lower(): value.lower() for key, value in rename_map.items()}
+
+
 class fortran_diagnostic:
     def __init__(self, sline, message, severity=1, find_word=None):
         self.sline = sline
@@ -376,6 +390,7 @@ class fortran_diagnostic:
         return diag
 
 
+# Fortran object classes
 class fortran_obj:
     def __init__(self):
         self.vis = 0
@@ -512,9 +527,7 @@ class fortran_scope(fortran_obj):
             self.FQSN = self.name.lower()
 
     def add_use(self, use_mod, line_number, only_list=[], rename_map={}):
-        lower_only = [only.lower() for only in only_list]
-        rename_lower = {key.lower(): value.lower() for key, value in rename_map.items()}
-        self.use.append([use_mod.lower(), lower_only, line_number, rename_lower])
+        self.use.append(USE_line(use_mod, line_number, only_list, rename_map))
 
     def set_inherit(self, inherit_type):
         self.inherit = inherit_type
@@ -636,20 +649,19 @@ class fortran_scope(fortran_obj):
     def check_use(self, obj_tree):
         errors = []
         last_use_line = -1
-        for use_line in self.use:
-            use_mod = use_line[0]
-            last_use_line = max(last_use_line, use_line[2])
-            if use_mod.startswith('#import'):
+        for use_stmnt in self.use:
+            last_use_line = max(last_use_line, use_stmnt.line_number)
+            if use_stmnt.mod_name.startswith('#import'):
                 if (self.parent is None) or (self.parent.get_type() != INTERFACE_TYPE_ID):
                     new_diag = fortran_diagnostic(
-                        use_line[2]-1, message='IMPORT statement outside of interface', severity=1
+                        use_stmnt.line_number-1, message='IMPORT statement outside of interface', severity=1
                     )
                     errors.append(new_diag)
                 continue
-            if use_mod not in obj_tree:
+            if use_stmnt.mod_name not in obj_tree:
                 new_diag = fortran_diagnostic(
-                    use_line[2]-1, message='Module "{0}" not found in project'.format(use_mod),
-                    severity=3, find_word=use_mod
+                    use_stmnt.line_number-1, message='Module "{0}" not found in project'.format(use_stmnt.mod_name),
+                    severity=3, find_word=use_stmnt.mod_name
                 )
                 errors.append(new_diag)
         if (self.implicit_line is not None) and (last_use_line >= self.implicit_line):

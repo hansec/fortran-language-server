@@ -444,16 +444,15 @@ class LangServer:
                     use_dict = get_use_tree(scope, use_dict, self.obj_tree)
             # Look in found use modules
             rename_list = [None for _ in var_list]
-            for use_mod, only_info in use_dict.items():
+            for use_mod, use_info in use_dict.items():
                 scope = self.obj_tree[use_mod][0]
-                only_list = only_info[0]
-                rename_map = only_info[1]
-                if len(rename_map) > 0:
-                    only_list = [rename_map.get(only_name, only_name) for only_name in only_list]
+                only_list = use_info.only_list
+                if len(use_info.rename_map) > 0:
+                    only_list = [use_info.rename_map.get(only_name, only_name) for only_name in only_list]
                 tmp_list = child_candidates(scope, only_list, req_abstract=abstract_only)
                 # Setup renaming
-                if len(rename_map) > 0:
-                    rename_reversed = {value: key for (key, value) in rename_map.items()}
+                if len(use_info.rename_map) > 0:
+                    rename_reversed = {value: key for (key, value) in use_info.rename_map.items()}
                     for tmp_obj in tmp_list:
                         var_list.append(tmp_obj)
                         rename_list.append(rename_reversed.get(tmp_obj.name.lower(), None))
