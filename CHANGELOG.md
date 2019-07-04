@@ -1,3 +1,8 @@
+## 1.9.1
+
+### Fixes
+* Fix bug in USE ONLY accounting used for graph pruning, fixes [#122](https://github.com/hansec/fortran-language-server/issues/122)
+
 ## 1.9.0
 
 ### Improvements
