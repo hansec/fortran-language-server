@@ -3,6 +3,7 @@ import sys
 import os
 import re
 import hashlib
+from collections import namedtuple
 from fortls.objects import get_paren_substring, map_keywords, get_paren_level, \
     fortran_ast, fortran_module, fortran_program, fortran_submodule, \
     fortran_subroutine, fortran_function, fortran_block, fortran_select, \
@@ -101,6 +102,17 @@ PROCEDURE_STMNT_REGEX = re.compile(r'[ ]*(PROCEDURE)[ ]*$', re.I)
 PRO_LINK_REGEX = re.compile(r'[ ]*(MODULE[ ]*PROCEDURE )', re.I)
 SCOPE_DEF_REGEX = re.compile(r'[ ]*(MODULE|PROGRAM|SUBROUTINE|FUNCTION|INTERFACE)[ ]+', re.I)
 END_REGEX = re.compile(r'[ ]*(END)( |MODULE|PROGRAM|SUBROUTINE|FUNCTION|TYPE|DO|IF|SELECT)?', re.I)
+# Helper types
+VAR_info = namedtuple('VAR_info', ['type_word', 'keywords', 'var_names'])
+SUB_info = namedtuple('SUB_info', ['name', 'args', 'mod_flag', 'keywords'])
+FUN_info = namedtuple('FUN_info', ['name', 'args', 'return_type', 'return_var', 'mod_flag', 'keywords'])
+SELECT_info = namedtuple('SELECT_info', ['type', 'binding', 'desc'])
+CLASS_info = namedtuple('CLASS_info', ['name', 'parent', 'keywords'])
+USE_info = namedtuple('USE_info', ['mod_name', 'only_list', 'rename_map'])
+GEN_info = namedtuple('GEN_info', ['bound_name', 'pro_links'])
+SMOD_info = namedtuple('SMOD_info', ['name', 'parent'])
+INT_info = namedtuple('INT_info', ['name', 'abstract'])
+VIS_info = namedtuple('VIS_info', ['type', 'obj_names'])
 
 
 def expand_name(line, char_poss):
@@ -119,18 +131,17 @@ def get_line_context(line):
     test_match = read_var_def(line)
     if test_match is not None:
         if test_match[0] == 'var':
-            if (test_match[1][2] is None) and (lev1_end == len(line)):
+            if (test_match[1].var_names is None) and (lev1_end == len(line)):
                 return 'var_key', None
             # Procedure link?
-            type_word = test_match[1][0]
-            if (type_word == 'PROCEDURE') and (line.find("=>") > 0):
+            if (test_match[1].type_word == 'PROCEDURE') and (line.find("=>") > 0):
                 return 'pro_link', None
             return 'var_only', None
     # Test if in USE statement
     test_match = read_use_stmt(line)
     if test_match is not None:
-        if len(test_match[1][1]) > 0:
-            return 'mod_mems', test_match[1][0]
+        if len(test_match[1].only_list) > 0:
+            return 'mod_mems', test_match[1].mod_name
         else:
             return 'mod_only', None
     # Test for interface procedure link
@@ -349,10 +360,10 @@ def read_var_def(line, type_word=None, fun_only=False):
         if var_words is None:
             var_words = []
     #
-    return 'var', [type_word, keywords, var_words]
+    return 'var', VAR_info(type_word, keywords, var_words)
 
 
-def read_fun_def(line, return_type=None, mod_fun=False):
+def read_fun_def(line, return_type=None, mod_flag=False):
     """Attempt to read FUNCTION definition line"""
     mod_match = SUB_MOD_REGEX.match(line)
     mods_found = False
@@ -389,10 +400,10 @@ def read_fun_def(line, return_type=None, mod_fun=False):
         results_match = RESULT_REGEX.match(trailing_line)
         if results_match is not None:
             return_var = results_match.group(1).strip().lower()
-    return 'fun', [name, args, [return_type, return_var], mod_fun, keywords]
+    return 'fun', FUN_info(name, args, return_type, return_var, mod_flag, keywords)
 
 
-def read_sub_def(line, mod_sub=False):
+def read_sub_def(line, mod_flag=False):
     """Attempt to read SUBROUTINE definition line"""
     keywords = []
     mod_match = SUB_MOD_REGEX.match(line)
@@ -416,7 +427,7 @@ def read_sub_def(line, mod_sub=False):
             word_match = [word for word in word_match]
             args = ','.join(word_match)
         trailing_line = trailing_line[paren_match.end(0):]
-    return 'sub', [name, args, mod_sub, keywords]
+    return 'sub', SUB_info(name, args, mod_flag, keywords)
 
 
 def read_block_def(line):
@@ -426,12 +437,12 @@ def read_block_def(line):
         name = block_match.group(1)
         if name is not None:
             name = name.replace(':', ' ').strip()
-        return 'block', [name]
+        return 'block', name
     #
     line_no_comment = line.split('!')[0].rstrip()
     do_match = DO_REGEX.match(line_no_comment)
     if do_match is not None:
-        return 'do', [do_match.group(1).strip()]
+        return 'do', do_match.group(1).strip()
     #
     where_match = WHERE_REGEX.match(line)
     if where_match is not None:
@@ -475,7 +486,7 @@ def read_select_def(line):
             if select_default_match is None:
                 return None
             else:
-                return 'select', [4, None, None]
+                return 'select', SELECT_info(4, None, None)
         select_type = 3
         select_desc = select_type_match.group(1).upper()
         select_binding = select_type_match.group(2)
@@ -487,7 +498,7 @@ def read_select_def(line):
         elif select_word.lower().startswith('type'):
             select_type = 2
         select_binding = select_match.group(2)
-    return 'select', [select_type, select_binding, select_desc]
+    return 'select', SELECT_info(select_type, select_binding, select_desc)
 
 
 def read_type_def(line):
@@ -529,7 +540,7 @@ def read_type_def(line):
     else:
         return None
     #
-    return 'typ', [name, parent, keywords]
+    return 'typ', CLASS_info(name, parent, keywords)
 
 
 def read_enum_def(line):
@@ -565,7 +576,7 @@ def read_generic_def(line):
     if len(pro_out) == 0:
         return None
     #
-    return 'gen', [bound_name, pro_out]
+    return 'gen', GEN_info(bound_name, pro_out)
 
 
 def read_mod_def(line):
@@ -584,14 +595,13 @@ def read_mod_def(line):
             return 'int_pro', pro_names
         # Check for submodule definition
         trailing_line = line[mod_match.start(1):]
-        sub_res = read_sub_def(trailing_line, mod_sub=True)
+        sub_res = read_sub_def(trailing_line, mod_flag=True)
         if sub_res is not None:
             return sub_res
         fun_res = read_var_def(trailing_line, fun_only=True)
         if fun_res is not None:
-            fun_res[1][3] = True
-            return fun_res
-        fun_res = read_fun_def(trailing_line, mod_fun=True)
+            return fun_res[0], fun_res[1]._replace(mod_flag=True)
+        fun_res = read_fun_def(trailing_line, mod_flag=True)
         if fun_res is not None:
             return fun_res
         return 'mod', name
@@ -618,7 +628,7 @@ def read_submod_def(line):
         name_match = WORD_REGEX.match(trailing_line)
         if name_match is not None:
             name = name_match.group(0).lower()
-        return 'smod', [name, parent_name]
+        return 'smod', SMOD_info(name, parent_name)
 
 
 def read_prog_def(line):
@@ -639,10 +649,10 @@ def read_int_def(line):
         int_name = int_match.group(2).lower()
         is_abstract = int_match.group(1) is not None
         if int_name == '':
-            return 'int', [None, is_abstract]
+            return 'int', INT_info(None, is_abstract)
         if int_name == 'assignment' or int_name == 'operator':
-            return 'int', [None, False]
-        return 'int', [int_match.group(2), is_abstract]
+            return 'int', INT_info(None, False)
+        return 'int', INT_info(int_match.group(2), is_abstract)
 
 
 def read_use_stmt(line):
@@ -651,7 +661,7 @@ def read_use_stmt(line):
     if import_match is not None:
         trailing_line = line[import_match.end(0)-1:].lower()
         import_list = [import_obj.strip() for import_obj in trailing_line.split(',')]
-        return 'import', [import_list]
+        return 'import', import_list
     use_match = USE_REGEX.match(line)
     if use_match is None:
         return None
@@ -667,7 +677,7 @@ def read_use_stmt(line):
                 only_list.append(only_name)
                 if len(only_split) == 2:
                     rename_map[only_name] = only_split[1].strip()
-        return 'use', [use_mod, only_list, rename_map]
+        return 'use', USE_info(use_mod, only_list, rename_map)
 
 
 def read_inc_stmt(line):
@@ -677,7 +687,7 @@ def read_inc_stmt(line):
         return None
     else:
         inc_path = inc_match.group(1)
-        return 'inc', [inc_path]
+        return 'inc', inc_path
 
 
 def read_vis_stmnt(line):
@@ -691,7 +701,7 @@ def read_vis_stmnt(line):
             vis_type = 1
         trailing_line = line[vis_match.end(0):].split('!')[0]
         mod_words = WORD_REGEX.findall(trailing_line)
-        return 'vis', [vis_type, mod_words]
+        return 'vis', VIS_info(vis_type, mod_words)
 
 
 def_tests = [
@@ -1459,24 +1469,23 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
         #
         if obj_read is not None:
             obj_type = obj_read[0]
-            obj = obj_read[1]
+            obj_info = obj_read[1]
             if obj_type == 'var':
-                var_names = obj[2]
-                if var_names is None:
+                if obj_info.var_names is None:
                     continue
-                desc_string = obj[0]
+                desc_string = obj_info.type_word
                 link_name = None
                 procedure_def = False
                 if desc_string[:3] == 'PRO':
                     if file_ast.current_scope.get_type() == INTERFACE_TYPE_ID:
-                        for var_name in var_names:
+                        for var_name in obj_info.var_names:
                             file_ast.add_int_member(var_name)
                         if(debug):
                             print('{1} !!! INTERFACE-PRO statement({0})'.format(line_number, line.strip()))
                         continue
                     procedure_def = True
                     link_name = get_paren_substring(desc_string)
-                for var_name in var_names:
+                for var_name in obj_info.var_names:
                     link_name = None
                     if var_name.find('=>') > -1:
                         name_split = var_name.split('=>')
@@ -1487,7 +1496,7 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
                     else:
                         name_stripped = var_name.split('=')[0]
                     # Add dimension if specified
-                    key_tmp = obj[1][:]
+                    key_tmp = obj_info.keywords[:]
                     if name_stripped.find('(') > -1:
                         key_tmp.append('dimension({0})'.format(get_paren_substring(name_stripped)))
                     name_stripped = name_stripped.split('(')[0].strip()
@@ -1502,40 +1511,41 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
                 if(debug):
                     print('{1} !!! VARIABLE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'mod':
-                new_mod = fortran_module(file_ast, line_number, obj)
+                new_mod = fortran_module(file_ast, line_number, obj_info)
                 file_ast.add_scope(new_mod, END_MOD_WORD)
                 if(debug):
                     print('{1} !!! MODULE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'smod':
-                new_smod = fortran_submodule(file_ast, line_number, obj[0], ancestor_name=obj[1])
+                new_smod = fortran_submodule(file_ast, line_number, obj_info.name, ancestor_name=obj_info.parent)
                 file_ast.add_scope(new_smod, END_SMOD_WORD)
                 if(debug):
                     print('{1} !!! SUBMODULE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'prog':
-                new_prog = fortran_program(file_ast, line_number, obj)
+                new_prog = fortran_program(file_ast, line_number, obj_info)
                 file_ast.add_scope(new_prog, END_PROG_WORD)
                 if(debug):
                     print('{1} !!! PROGRAM statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'sub':
-                keywords, _ = map_keywords(obj[3])
-                new_sub = fortran_subroutine(file_ast, line_number, obj[0], args=obj[1], mod_sub=obj[2],
-                                             keywords=keywords)
+                keywords, _ = map_keywords(obj_info.keywords)
+                new_sub = fortran_subroutine(file_ast, line_number, obj_info.name, args=obj_info.args,
+                                             mod_flag=obj_info.mod_flag, keywords=keywords)
                 file_ast.add_scope(new_sub, END_SUB_WORD)
                 if(debug):
                     print('{1} !!! SUBROUTINE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'fun':
-                keywords, _ = map_keywords(obj[4])
-                new_fun = fortran_function(file_ast, line_number, obj[0], args=obj[1],
-                                           mod_fun=obj[3], keywords=keywords,
-                                           return_type=obj[2][0], result_var=obj[2][1])
+                keywords, _ = map_keywords(obj_info.keywords)
+                new_fun = fortran_function(file_ast, line_number, obj_info.name, args=obj_info.args,
+                                           mod_flag=obj_info.mod_flag, keywords=keywords,
+                                           return_type=obj_info.return_type, result_var=obj_info.return_var)
                 file_ast.add_scope(new_fun, END_FUN_WORD)
-                if obj[2][0] is not None:
-                    new_obj = fortran_var(file_ast, line_number, obj[0], obj[2][0][0], obj[2][0][1])
+                if obj_info.return_type is not None:
+                    new_obj = fortran_var(file_ast, line_number, obj_info.name,
+                                          obj_info.return_type[0], obj_info.return_type[1])
                     file_ast.add_variable(new_obj)
                 if(debug):
                     print('{1} !!! FUNCTION statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'block':
-                name = obj[0]
+                name = obj_info
                 if name is None:
                     block_counter += 1
                     name = '#BLOCK{0}'.format(block_counter)
@@ -1546,15 +1556,15 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
             elif obj_type == 'do':
                 do_counter += 1
                 name = '#DO{0}'.format(do_counter)
-                if obj[0] != '':
-                    block_id_stack.append(obj[0])
+                if obj_info != '':
+                    block_id_stack.append(obj_info)
                 new_do = fortran_do(file_ast, line_number, name)
                 file_ast.add_scope(new_do, END_DO_WORD, req_container=True)
                 if(debug):
                     print('{1} !!! DO statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'where':
                 # Add block if WHERE is not single line
-                if not obj:
+                if not obj_info:
                     do_counter += 1
                     name = '#WHERE{0}'.format(do_counter)
                     new_do = fortran_where(file_ast, line_number, name)
@@ -1566,7 +1576,7 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
                 name = '#ASSOC{0}'.format(block_counter)
                 new_assoc = fortran_associate(file_ast, line_number, name)
                 file_ast.add_scope(new_assoc, END_ASSOCIATE_WORD, req_container=True)
-                for bound_var in obj:
+                for bound_var in obj_info:
                     binding_split = bound_var.split('=>')
                     if len(binding_split) == 2:
                         binding_name = binding_split[0].strip()
@@ -1586,20 +1596,20 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
             elif obj_type == 'select':
                 select_counter += 1
                 name = '#SELECT{0}'.format(select_counter)
-                new_select = fortran_select(file_ast, line_number, name, obj)
+                new_select = fortran_select(file_ast, line_number, name, obj_info)
                 file_ast.add_scope(new_select, END_SELECT_WORD, req_container=True)
                 new_var = new_select.create_binding_variable(
-                    file_ast, line_number, '{0}({1})'.format(obj[2], obj[1]), obj[0]
+                    file_ast, line_number, '{0}({1})'.format(obj_info.desc, obj_info.binding), obj_info.type
                 )
                 if new_var is not None:
                     file_ast.add_variable(new_var)
                 if(debug):
                     print('{1} !!! SELECT statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'typ':
-                keywords, _ = map_keywords(obj[2])
-                new_type = fortran_type(file_ast, line_number, obj[0], keywords)
-                if obj[1] is not None:
-                    new_type.set_inherit(obj[1])
+                keywords, _ = map_keywords(obj_info.keywords)
+                new_type = fortran_type(file_ast, line_number, obj_info.name, keywords)
+                if obj_info.parent is not None:
+                    new_type.set_inherit(obj_info.parent)
                 file_ast.add_scope(new_type, END_TYPED_WORD, req_container=True)
                 if(debug):
                     print('{1} !!! TYPE statement({0})'.format(line_number, line.strip()))
@@ -1611,18 +1621,18 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
                 if(debug):
                     print('{1} !!! ENUM statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'int':
-                name = obj[0]
+                name = obj_info.name
                 if name is None:
                     int_counter += 1
                     name = '#GEN_INT{0}'.format(int_counter)
-                new_int = fortran_int(file_ast, line_number, name, abstract=obj[1])
+                new_int = fortran_int(file_ast, line_number, name, abstract=obj_info.abstract)
                 file_ast.add_scope(new_int, END_INT_WORD, req_container=True)
                 if(debug):
                     print('{1} !!! INTERFACE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'gen':
-                new_int = fortran_int(file_ast, line_number, obj[0], abstract=False)
+                new_int = fortran_int(file_ast, line_number, obj_info.bound_name, abstract=False)
                 file_ast.add_scope(new_int, END_INT_WORD, req_container=True)
-                for pro_link in obj[1]:
+                for pro_link in obj_info.pro_links:
                     file_ast.add_int_member(pro_link)
                 file_ast.end_scope(line_number)
                 if(debug):
@@ -1630,20 +1640,20 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
             elif obj_type == 'int_pro':
                 if (file_ast.current_scope is None) or (file_ast.current_scope.get_type() != INTERFACE_TYPE_ID):
                     continue
-                for name in obj:
+                for name in obj_info:
                     file_ast.add_int_member(name)
                 if(debug):
                     print('{1} !!! INTERFACE-PRO statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'use':
-                file_ast.add_use(obj[0], line_number, obj[1], obj[2])
+                file_ast.add_use(obj_info.mod_name, line_number, obj_info.only_list, obj_info.rename_map)
                 if(debug):
                     print('{1} !!! USE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'import':
-                file_ast.add_use('#IMPORT', line_number, obj[0])
+                file_ast.add_use('#IMPORT', line_number, obj_info)
                 if(debug):
                     print('{1} !!! IMPORT statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'inc':
-                file_ast.add_include(obj[0], line_number)
+                file_ast.add_include(obj_info, line_number)
                 if(debug):
                     print('{1} !!! INCLUDE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'vis':
@@ -1656,14 +1666,14 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
                         "sev": 1
                     })
                 else:
-                    if (len(obj[1]) == 0) and (obj[0] == 1):
+                    if (len(obj_info.obj_names) == 0) and (obj_info.type == 1):
                         file_ast.current_scope.set_default_vis(-1)
                     else:
-                        if obj[0] == 1:
-                            for word in obj[1]:
+                        if obj_info.type == 1:
+                            for word in obj_info.obj_names:
                                 file_ast.add_private(word)
                         else:
-                            for word in obj[1]:
+                            for word in obj_info.obj_names:
                                 file_ast.add_public(word)
                 if(debug):
                     print('{1} !!! Visiblity statement({0})'.format(line_number, line.strip()))

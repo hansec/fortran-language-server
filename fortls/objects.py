@@ -773,14 +773,14 @@ class fortran_submodule(fortran_module):
 
 
 class fortran_subroutine(fortran_scope):
-    def __init__(self, file_ast, line_number, name, args="", mod_sub=False, keywords=[]):
+    def __init__(self, file_ast, line_number, name, args="", mod_flag=False, keywords=[]):
         self.base_setup(file_ast, line_number, name, keywords=keywords)
         self.args = args.replace(' ', '')
         self.args_snip = self.args
         self.arg_objs = []
         self.in_children = []
         self.missing_args = []
-        self.mod_scope = mod_sub
+        self.mod_scope = mod_flag
 
     def is_mod_scope(self):
         return self.mod_scope
@@ -966,14 +966,14 @@ class fortran_subroutine(fortran_scope):
 
 class fortran_function(fortran_subroutine):
     def __init__(self, file_ast, line_number, name, args="",
-                 mod_fun=False, keywords=[], return_type=None, result_var=None):
+                 mod_flag=False, keywords=[], return_type=None, result_var=None):
         self.base_setup(file_ast, line_number, name, keywords=keywords)
         self.args = args.replace(' ', '').lower()
         self.args_snip = self.args
         self.arg_objs = []
         self.in_children = []
         self.missing_args = []
-        self.mod_scope = mod_fun
+        self.mod_scope = mod_flag
         self.result_var = result_var
         self.result_obj = None
         if return_type is not None:
@@ -1325,19 +1325,19 @@ class fortran_enum(fortran_block):
 class fortran_select(fortran_block):
     def __init__(self, file_ast, line_number, name, select_info):
         self.base_setup(file_ast, line_number, name)
-        self.select_type = select_info[0]
+        self.select_type = select_info.type
         self.binding_name = None
         self.bound_var = None
         self.binding_type = None
         if self.select_type == 2:
-            binding_split = select_info[1].split('=>')
+            binding_split = select_info.binding.split('=>')
             if len(binding_split) == 1:
                 self.bound_var = binding_split[0].strip()
             elif len(binding_split) == 2:
                 self.binding_name = binding_split[0].strip()
                 self.bound_var = binding_split[1].strip()
         elif self.select_type == 3:
-            self.binding_type = select_info[1]
+            self.binding_type = select_info.binding
         # Close previous "TYPE IS" region if open
         if (file_ast.current_scope is not None) \
            and (file_ast.current_scope.get_type() == SELECT_TYPE_ID)\
