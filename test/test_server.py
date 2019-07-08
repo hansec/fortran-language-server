@@ -494,3 +494,16 @@ def test_docs():
     check_return(results[8], ())
     check_return(results[9], ())
     check_return(results[10], ((3, ' !! Doc 9'), (4, ' !! Doc 10')))
+
+if __name__ == "__main__":
+    test_init()
+    test_open()
+    test_change()
+    test_symbols()
+    test_workspace_symbols()
+    test_comp()
+    test_sig()
+    test_def()
+    test_refs()
+    test_hover()
+    test_docs()
