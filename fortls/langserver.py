@@ -47,8 +47,16 @@ def get_line_prefix(pre_lines, curr_line, iChar):
     iChar += len(prepend_string)
     line_prefix = curr_line[:iChar].lower()
     # Ignore string literals
-    if (line_prefix.count("'") % 2 == 1) or (line_prefix.count('"') % 2 == 1):
-        return None
+    if (line_prefix.find("'") > -1) or (line_prefix.find('"') > -1):
+        sq_count = 0
+        dq_count = 0
+        for char in line_prefix:
+            if (char == "'") and (dq_count % 2 == 0):
+                sq_count += 1
+            elif (char == '"') and (sq_count % 2 == 0):
+                dq_count += 1
+        if (dq_count % 2 == 1) or (sq_count % 2 == 1):
+            return None
     return line_prefix
 
 
