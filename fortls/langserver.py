@@ -1165,24 +1165,27 @@ class LangServer:
         path = path_from_uri(uri)
         file_obj = self.workspace.get(path)
         if file_obj is None:
-            self.post_message('Change request failed for unknown file "{0}"'.format(path))
-            log.error('Change request failed for unknown file "%s"', path)
-            return
-        else:
-            # Update file contents with changes
-            reparse_req = True
             if self.sync_type == 1:
-                file_obj.apply_change(params["contentChanges"][0])
+                file_obj = fortran_file(path, self.pp_suffixes)
+                self.workspace[path] = file_obj
             else:
-                try:
-                    reparse_req = False
-                    for change in params["contentChanges"]:
-                        reparse_flag = file_obj.apply_change(change)
-                        reparse_req = (reparse_req or reparse_flag)
-                except:
-                    self.post_message('Change request failed for file "{0}": Could not apply change'.format(path))
-                    log.error('Change request failed for file "%s": Could not apply change', path, exc_info=True)
-                    return
+                self.post_message('Change request failed for unknown file "{0}"'.format(path))
+                log.error('Change request failed for unknown file "%s"', path)
+                return
+        # Update file contents with changes
+        reparse_req = True
+        if self.sync_type == 1:
+            file_obj.apply_change(params["contentChanges"][0])
+        else:
+            try:
+                reparse_req = False
+                for change in params["contentChanges"]:
+                    reparse_flag = file_obj.apply_change(change)
+                    reparse_req = (reparse_req or reparse_flag)
+            except:
+                self.post_message('Change request failed for file "{0}": Could not apply change'.format(path))
+                log.error('Change request failed for file "%s": Could not apply change', path, exc_info=True)
+                return
         # Parse newly updated file
         if reparse_req:
             _, err_str = self.update_workspace_file(path, update_links=True)
