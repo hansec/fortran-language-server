@@ -1,3 +1,22 @@
+## 1.10.0
+
+### Improvements
+* Initial implementation of preprocessor include file handling, ref [#115](https://github.com/hansec/fortran-language-server/issues/115)
+* Add support for specifying file suffixes for preprocessing, ref [#115](https://github.com/hansec/fortran-language-server/issues/115)
+* Add support for completion in visibility statements, fixes [#120](https://github.com/hansec/fortran-language-server/issues/120)
+* Support "onOpen" requests before a file is written to disk, fixes [#123](https://github.com/hansec/fortran-language-server/issues/123)
+* Add support for IMPURE keyword (contributed by @mcocdawc)
+* Improve readability by replacing various result arrays with namedtuples
+
+### Fixes
+* Fix bug in open string literal detection, fixes [#124](https://github.com/hansec/fortran-language-server/issues/124)
+* Fix bug with multiline docstrings that start with a trailing comment, fixes [#118](https://github.com/hansec/fortran-language-server/issues/118)
+* Fix symbols types for subroutines and methods in "documentSymbol" and "completion" requests, fixes [#117](https://github.com/hansec/fortran-language-server/issues/117)
+* Fix bug where ONLY renaming was not fully tracked in some circumstances
+* Fix bug with inline dimension specifications for variables
+* Fix accidental message swap in "object not found" and "object not imported" diagnostics
+* Fix bug where errors were reported with "module subroutine" and "module function" definitions (no import required)
+
 ## 1.9.1
 
 ### Fixes
