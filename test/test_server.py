@@ -74,6 +74,23 @@ def test_open():
 
 def test_change():
     string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
+    file_path = os.path.join(test_dir, "subdir", "test_unknown.f90")
+    string += write_rpc_notification("textDocument/didOpen", {
+        "textDocument": {"uri": file_path}
+    })
+    string += write_rpc_notification("textDocument/didChange", {
+        "textDocument": {"uri": file_path},
+        "contentChanges": [{
+            "text": "module test_unkown\nend module test_unknown\n",
+            "range": {
+                "start": {"line": 0, "character": 0},
+                "end": {"line": 0, "character": 0}
+            }
+        }]
+    })
+    string += write_rpc_request(2, "textDocument/documentSymbol", {
+        "textDocument": {"uri": file_path}
+    })
     file_path = os.path.join(test_dir, "subdir", "test_free.f90")
     string += write_rpc_notification("textDocument/didChange", {
         "textDocument": {"uri": file_path},
@@ -99,14 +116,15 @@ def test_change():
             }
         }]
     })
-    string += write_rpc_request(2, "textDocument/documentSymbol", {
+    string += write_rpc_request(3, "textDocument/documentSymbol", {
         "textDocument": {"uri": file_path}
     })
     errcode, results = run_request(string)
     #
     assert errcode == 0
-    assert len(results) == 2
-    assert len(results[1]) == 5
+    assert len(results) == 3
+    assert len(results[1]) == 1
+    assert len(results[2]) == 5
 
 
 def test_symbols():

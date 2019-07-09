@@ -4,8 +4,8 @@ import traceback
 import re
 # Local modules
 from fortls.jsonrpc import path_to_uri, path_from_uri
-from fortls.parse_fortran import fortran_file, process_file, get_paren_level, \
-    expand_name, get_line_context
+from fortls.parse_fortran import fortran_file, fortran_ast, process_file, \
+    get_paren_level, expand_name, get_line_context
 from fortls.objects import find_in_scope, find_in_workspace, get_use_tree, \
     get_var_stack, climb_type_tree, set_keyword_ordering, MODULE_TYPE_ID, \
     SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID, CLASS_TYPE_ID, INTERFACE_TYPE_ID, \
@@ -137,7 +137,7 @@ class LangServer:
             "textDocument/hover": self.serve_hover,
             "textDocument/implementation": self.serve_implementation,
             "textDocument/rename": self.serve_rename,
-            "textDocument/didOpen": self.serve_onSave,
+            "textDocument/didOpen": self.serve_onOpen,
             "textDocument/didSave": self.serve_onSave,
             "textDocument/didClose": self.serve_onClose,
             "textDocument/didChange": self.serve_onChange,
@@ -1198,10 +1198,13 @@ class LangServer:
         elif file_obj.preproc:
             file_obj.preprocess(pp_defs=self.pp_defs)
 
+    def serve_onOpen(self, request):
+        self.serve_onSave(request, did_open=True)
+
     def serve_onClose(self, request):
         self.serve_onSave(request, did_close=True)
 
-    def serve_onSave(self, request, did_close=False):
+    def serve_onSave(self, request, did_open=False, did_close=False):
         # Update workspace from file on disk
         params = request["params"]
         uri = params["textDocument"]["uri"]
@@ -1216,7 +1219,7 @@ class LangServer:
                     for key in ast_old.global_dict:
                         self.obj_tree.pop(key, None)
             return
-        did_change, err_str = self.add_file(filepath)
+        did_change, err_str = self.update_workspace_file(filepath, read_file=True, allow_empty=did_open)
         if err_str is not None:
             self.post_message('Save request failed for file "{0}": {1}'.format(filepath, err_str))
             return
@@ -1232,18 +1235,26 @@ class LangServer:
                 file_obj.ast.resolve_links(self.obj_tree, self.link_version)
         self.send_diagnostics(uri)
 
-    def add_file(self, filepath):
-        return self.update_workspace_file(filepath, read_file=True)
-
-    def update_workspace_file(self, filepath, read_file=False, update_links=False):
+    def update_workspace_file(self, filepath, read_file=False, allow_empty=False, update_links=False):
         # Update workspace from file contents and path
         try:
             file_obj = self.workspace.get(filepath)
             if read_file:
                 if file_obj is None:
                     file_obj = fortran_file(filepath, self.pp_suffixes)
+                    # Create empty file if not yet saved to disk
+                    if not os.path.isfile(filepath):
+                        if allow_empty:
+                            file_obj.ast = fortran_ast(file_obj)
+                            self.workspace[filepath] = file_obj
+                            return False, None
+                        else:
+                            return False, 'File does not exist'  # Error during load
                 hash_old = file_obj.hash
-                file_obj.load_from_disk()
+                err_string = file_obj.load_from_disk()
+                if err_string is not None:
+                    log.error(err_string + ": %s", filepath)
+                    return False, err_string  # Error during file read
                 if hash_old == file_obj.hash:
                     return False, None
             ast_new = process_file(file_obj, True, pp_defs=self.pp_defs, include_dirs=self.include_dirs)
