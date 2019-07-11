@@ -1376,6 +1376,8 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
                 line = semi_split[0]
                 semi_split = semi_split[1:]
                 line_stripped = strip_strings(line, maintain_len=True)
+                line_no_comment = line
+                line_post_comment = None
         # Test for scope end
         if file_ast.END_SCOPE_WORD is not None:
             match = END_WORD_REGEX.match(line_no_comment)
