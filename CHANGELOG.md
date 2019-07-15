@@ -1,3 +1,8 @@
+## 1.10.1
+
+### Fixes
+* Fix bug in semicolon parsing, fixes [#127](https://github.com/hansec/fortran-language-server/issues/127)
+
 ## 1.10.0
 
 ### Improvements
