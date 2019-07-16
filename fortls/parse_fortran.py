@@ -439,12 +439,13 @@ def read_block_def(line):
             name = name.replace(':', ' ').strip()
         return 'block', name
     #
-    line_no_comment = line.split('!')[0].rstrip()
+    line_stripped = strip_strings(line, maintain_len=True)
+    line_no_comment = line_stripped.split('!')[0].rstrip()
     do_match = DO_REGEX.match(line_no_comment)
     if do_match is not None:
         return 'do', do_match.group(1).strip()
     #
-    where_match = WHERE_REGEX.match(line)
+    where_match = WHERE_REGEX.match(line_no_comment)
     if where_match is not None:
         trailing_line = line[where_match.end(0):]
         close_paren = find_paren_match(trailing_line)
@@ -455,7 +456,7 @@ def read_block_def(line):
         else:
             return 'where', False
     #
-    if_match = IF_REGEX.match(line)
+    if_match = IF_REGEX.match(line_no_comment)
     if if_match is not None:
         then_match = THEN_REGEX.search(line_no_comment)
         if then_match is not None:
