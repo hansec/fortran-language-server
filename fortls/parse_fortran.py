@@ -900,7 +900,7 @@ class fortran_file:
             else:  # Free format file
                 opt_cont_match = FREE_CONT_REGEX.match(curr_line)
                 if opt_cont_match is not None:
-                    curr_line = curr_line[opt_cont_match.end(0):]
+                    curr_line = ' '*opt_cont_match.end(0) + curr_line[opt_cont_match.end(0):]
                 while(line_ind > 0):
                     tmp_line = strip_strings(self.get_line(line_ind, pp_content), maintain_len=True)
                     tmp_no_comm = tmp_line.split('!')[0]
@@ -909,7 +909,7 @@ class fortran_file:
                     if opt_cont_match is not None:
                         if cont_ind == opt_cont_match.end(0)-1:
                             break
-                        tmp_no_comm = tmp_no_comm[opt_cont_match.end(0):]
+                        tmp_no_comm = ' '*opt_cont_match.end(0) + tmp_no_comm[opt_cont_match.end(0):]
                     if cont_ind >= 0:
                         pre_lines.append(tmp_no_comm[:cont_ind])
                     else:
@@ -949,9 +949,9 @@ class fortran_file:
                         next_line = ''
                         post_lines.append('')
                         continue
-                    cont_match = FREE_CONT_REGEX.match(next_line)
-                    if cont_match is not None:
-                        next_line = ' '*cont_match.end(0) + next_line[cont_match.end(0):]
+                    opt_cont_match = FREE_CONT_REGEX.match(next_line)
+                    if opt_cont_match is not None:
+                        next_line = ' '*opt_cont_match.end(0) + next_line[opt_cont_match.end(0):]
                     post_lines.append(next_line)
                     line_stripped = strip_strings(next_line, maintain_len=True)
                     iAmper = line_stripped.find('&')
