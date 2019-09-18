@@ -31,7 +31,10 @@ setup(
     # your project is installed. For an analysis of "install_requires" vs pip's
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    install_requires=['future','argparse'],
+    install_requires=[
+        'future; python_version < "3"',
+        'argparse; python_version < "2.7" or python_version in "3.0, 3.1"'
+    ],
 
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow
