@@ -15,7 +15,7 @@ install:
   # Get python version
   - "%PYTHON%\\python.exe --version"
   # Install test dependencies
-  - "%PYTHON%\\python.exe -m pip install pytest"
+  - "%PYTHON%\\python.exe -m pip install -r test_requirements.txt"
 
 test_script:
   # Run test script
