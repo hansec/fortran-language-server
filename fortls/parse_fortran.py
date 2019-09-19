@@ -1100,6 +1100,7 @@ def preprocess_file(contents_split, file_path=None, pp_defs={}, include_dirs=[],
     pp_defines = []
     pp_stack = []
     defs_tmp = pp_defs.copy()
+    def_regexes = {}
     output_file = []
     def_cont_name = None
     for (i, line) in enumerate(contents_split):
@@ -1233,12 +1234,17 @@ def preprocess_file(contents_split, file_path=None, pp_defs={}, include_dirs=[],
                     print('{1} !!! Could not locate include file ({0})'.format(i+1, line.strip()))
         #
         for def_tmp, value in defs_tmp.items():
-            if line.find(def_tmp) >= 0:
+            def_regex = def_regexes.get(def_tmp)
+            if def_regex is None:
+                def_regex = re.compile(r'\b{0}\b'.format(def_tmp))
+                def_regexes[def_tmp] = def_regex
+            line_new, nsubs = def_regex.subn(value, line)
+            if nsubs > 0:
                 if debug:
                     print('{1} !!! Macro sub({0}) "{2}" -> "{3}"'.format(
                         i+1, line.strip(), def_tmp, value
                     ))
-                line = line.replace(def_tmp, value)
+                line = line_new
         output_file.append(line)
     return output_file, pp_skips, pp_defines, defs_tmp
 
