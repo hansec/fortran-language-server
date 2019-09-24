@@ -1,3 +1,9 @@
+## 1.10.3
+
+### Fixes
+* Fix parsing bug with spaces in "old-style" kind specifications, fixes [#142](https://github.com/hansec/fortran-language-server/issues/142)
+* Fix issue with erroneous sub-word matching in preprocessor macro substitutions, fixes [#141](https://github.com/hansec/fortran-language-server/issues/141)
+
 ## 1.10.2
 
 ### Improvements
