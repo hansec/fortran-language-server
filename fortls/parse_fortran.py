@@ -63,7 +63,7 @@ END_ENUMD_WORD = r'ENUM'
 NAT_VAR_REGEX = re.compile(r'[ ]*(INTEGER|REAL|DOUBLE[ ]*PRECISION|COMPLEX'
                            r'|DOUBLE[ ]*COMPLEX|CHARACTER|LOGICAL|PROCEDURE'
                            r'|EXTERNAL|CLASS|TYPE)', re.I)
-KIND_SPEC_REGEX = re.compile(r'[ ]*([*]?\([ ]*[a-z0-9_*:]|\*[0-9:]*)', re.I)
+KIND_SPEC_REGEX = re.compile(r'[ ]*([*]?\([ ]*[a-z0-9_*:]|\*[ ]*[0-9:]*)', re.I)
 KEYWORD_LIST_REGEX = re.compile(r'[ ]*,[ ]*(PUBLIC|PRIVATE|ALLOCATABLE|'
                                 r'POINTER|TARGET|DIMENSION\(|'
                                 r'OPTIONAL|INTENT\([inout]*\)|DEFERRED|NOPASS|'
@@ -322,10 +322,10 @@ def read_var_def(line, type_word=None, fun_only=False):
     #
     kind_match = KIND_SPEC_REGEX.match(trailing_line)
     if kind_match is not None:
-        kind_str = kind_match.group(1).strip()
+        kind_str = kind_match.group(1).replace(' ', '')
         type_word += kind_str
         trailing_line = trailing_line[kind_match.end(0):]
-        if (kind_str[0] == '(') or (kind_str[1] == '('):
+        if kind_str.find('(') >= 0:
             match_char = find_paren_match(trailing_line)
             if match_char < 0:
                 return None  # Incomplete type spec
