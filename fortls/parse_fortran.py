@@ -63,7 +63,7 @@ END_ENUMD_WORD = r'ENUM'
 NAT_VAR_REGEX = re.compile(r'[ ]*(INTEGER|REAL|DOUBLE[ ]*PRECISION|COMPLEX'
                            r'|DOUBLE[ ]*COMPLEX|CHARACTER|LOGICAL|PROCEDURE'
                            r'|EXTERNAL|CLASS|TYPE)', re.I)
-KIND_SPEC_REGEX = re.compile(r'[ ]*([*]?\([ ]*[a-z0-9_*:]|\*[0-9:]*)', re.I)
+KIND_SPEC_REGEX = re.compile(r'[ ]*([*]?\([ ]*[a-z0-9_*:]|\*[ ]*[0-9:]*)', re.I)
 KEYWORD_LIST_REGEX = re.compile(r'[ ]*,[ ]*(PUBLIC|PRIVATE|ALLOCATABLE|'
                                 r'POINTER|TARGET|DIMENSION\(|'
                                 r'OPTIONAL|INTENT\([inout]*\)|DEFERRED|NOPASS|'
@@ -322,10 +322,10 @@ def read_var_def(line, type_word=None, fun_only=False):
     #
     kind_match = KIND_SPEC_REGEX.match(trailing_line)
     if kind_match is not None:
-        kind_str = kind_match.group(1).strip()
+        kind_str = kind_match.group(1).replace(' ', '')
         type_word += kind_str
         trailing_line = trailing_line[kind_match.end(0):]
-        if (kind_str[0] == '(') or (kind_str[1] == '('):
+        if kind_str.find('(') >= 0:
             match_char = find_paren_match(trailing_line)
             if match_char < 0:
                 return None  # Incomplete type spec
@@ -1100,6 +1100,7 @@ def preprocess_file(contents_split, file_path=None, pp_defs={}, include_dirs=[],
     pp_defines = []
     pp_stack = []
     defs_tmp = pp_defs.copy()
+    def_regexes = {}
     output_file = []
     def_cont_name = None
     for (i, line) in enumerate(contents_split):
@@ -1233,12 +1234,17 @@ def preprocess_file(contents_split, file_path=None, pp_defs={}, include_dirs=[],
                     print('{1} !!! Could not locate include file ({0})'.format(i+1, line.strip()))
         #
         for def_tmp, value in defs_tmp.items():
-            if line.find(def_tmp) >= 0:
+            def_regex = def_regexes.get(def_tmp)
+            if def_regex is None:
+                def_regex = re.compile(r'\b{0}\b'.format(def_tmp))
+                def_regexes[def_tmp] = def_regex
+            line_new, nsubs = def_regex.subn(value, line)
+            if nsubs > 0:
                 if debug:
                     print('{1} !!! Macro sub({0}) "{2}" -> "{3}"'.format(
                         i+1, line.strip(), def_tmp, value
                     ))
-                line = line.replace(def_tmp, value)
+                line = line_new
         output_file.append(line)
     return output_file, pp_skips, pp_defines, defs_tmp
 
