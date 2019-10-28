@@ -60,6 +60,17 @@ Installation
 
 ``pip install fortran-language-server``
 
+If you get the following error:
+
+   ``'install_requires' must be a string or list of strings containing valid project/version requirement specifiers``
+
+try updating setuptools:
+
+::
+
+    pip install -U setuptools
+    pip install fortran-language-server
+
 Language server settings
 ------------------------
 
