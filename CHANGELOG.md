@@ -1,3 +1,19 @@
+## 1.10.3
+
+### Fixes
+* Fix parsing bug with spaces in "old-style" kind specifications, fixes [#142](https://github.com/hansec/fortran-language-server/issues/142)
+* Fix issue with erroneous sub-word matching in preprocessor macro substitutions, fixes [#141](https://github.com/hansec/fortran-language-server/issues/141)
+
+## 1.10.2
+
+### Improvements
+* Add support for "old-style" character length specification, fixes [#130](https://github.com/hansec/fortran-language-server/issues/130) and [#134](https://github.com/hansec/fortran-language-server/issues/134)
+
+### Fixes
+* Fix "can't set attribute" error in USE traversal, fixes [#132](https://github.com/hansec/fortran-language-server/issues/132)
+* Fix bugs related to optional leading ampersands on continuation lines, fixes [#131](https://github.com/hansec/fortran-language-server/issues/131)
+* Fix bug in block parsing with string literals, fixes [#128](https://github.com/hansec/fortran-language-server/issues/128)
+
 ## 1.10.1
 
 ### Fixes

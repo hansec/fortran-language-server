@@ -4,6 +4,8 @@ c     **********
       double precision xval
       integer ieq1(2), ieq2(2)
       double precision req(2)
+      character*(LEN=200) bob
+      character dave*(20)
       equivalence (req(1),ieq1(1))
       equivalence (req(2),ieq2(1))
 c
@@ -11,6 +13,7 @@ c
       data req(2) /1.0000000d-308/
 c
       myfun = xval
+      bob(1:20) = dave
       do 10 i = 1, n
    10    myfun = myfun + xval
       return

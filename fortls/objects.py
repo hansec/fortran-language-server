@@ -584,6 +584,9 @@ class fortran_scope(fortran_obj):
         """Check for definition errors in scope"""
         FQSN_dict = {}
         for child in self.children:
+            # Skip masking/double checks for interfaces
+            if child.get_type() == INTERFACE_TYPE_ID:
+                continue
             # Check other variables in current scope
             if child.FQSN in FQSN_dict:
                 if child.sline < FQSN_dict[child.FQSN]:
@@ -598,7 +601,7 @@ class fortran_scope(fortran_obj):
                 contains_line = self.eline
             else:
                 contains_line = self.contains_start
-        # Get list of imported objects for interfaces
+        # Detect interface defintions
         is_interface = False
         if (self.parent is not None) and (self.parent.get_type() == INTERFACE_TYPE_ID) and \
            (not self.is_mod_scope()):
@@ -622,8 +625,8 @@ class fortran_scope(fortran_obj):
                     severity=1
                 )
                 errors.append(new_diag)
-            # Skip masking/double checks for interface members
-            if (self.parent is not None) and (self.parent.get_type() == INTERFACE_TYPE_ID):
+            # Skip masking/double checks for interfaces and members
+            if (self.get_type() == INTERFACE_TYPE_ID) or (child.get_type() == INTERFACE_TYPE_ID):
                 continue
             # Check other variables in current scope
             if child.FQSN in FQSN_dict:

@@ -247,6 +247,9 @@ def test_comp():
     file_path = os.path.join(test_dir, "subdir", "test_free.f90")
     string += comp_request(file_path, 10, 22)
     string += comp_request(file_path, 28, 14)
+    file_path = os.path.join(test_dir, "subdir", "test_fixed.f")
+    string += comp_request(file_path, 15, 8)
+    string += comp_request(file_path, 15, 21)
     file_path = os.path.join(test_dir, "subdir", "test_select.f90")
     string += comp_request(file_path, 21, 7)
     string += comp_request(file_path, 23, 7)
@@ -293,6 +296,9 @@ def test_comp():
         # subdir/test_free.f90
         [1, "DIMENSION(:)", "KEYWORD"],
         [3, "INTENT(IN)", "KEYWORD"],
+        # subdir/test_fixed.f90
+        [1, "bob", "CHARACTER*(LEN=200)"],
+        [1, "dave", "CHARACTER*(20)"],
         # subdir/test_select.f90
         [2, "a", "REAL(8)"],
         [2, "a", "COMPLEX(8)"],
@@ -391,7 +397,7 @@ def test_def():
     exp_results = (
         # test_prog.f08
         [0, 0, fixed_path],
-        [19, 19, fixed_path],
+        [22, 22, fixed_path],
         [10, 10, os.path.join(test_dir, "test_prog.f08")],
         [21, 21, free_path],
         [14, 14, free_path],

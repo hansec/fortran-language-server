@@ -9,7 +9,7 @@ setup(
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='1.10.1',
+    version='1.10.3',
 
     description='FORTRAN Language Server for the Language Server Protocol',
 
@@ -17,7 +17,7 @@ setup(
 
     # The project's main homepage.
     url='https://github.com/hansec/fortran-language-server',
-    download_url = 'https://github.com/hansec/fortran-language-server/archive/v1.10.1.tar.gz',
+    download_url = 'https://github.com/hansec/fortran-language-server/archive/v1.10.3.tar.gz',
 
     author='Chris Hansen',
     author_email = 'hansec@uw.edu',
@@ -31,7 +31,11 @@ setup(
     # your project is installed. For an analysis of "install_requires" vs pip's
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    install_requires=['future','argparse','compdb'],
+    install_requires=[
+        'future; python_version < "3"',
+        'argparse; python_version < "2.7" or python_version in "3.0, 3.1"',
+        'compdb'
+    ],
 
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow
