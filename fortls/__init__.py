@@ -69,6 +69,10 @@ def main():
         help="Show signature information in hover for argument (also enables '--variable_hover')"
     )
     parser.add_argument(
+        '--hover_language', type=str, default=None,
+        help="Language used for responses to hover requests (for editor syntax highlighting)"
+    )
+    parser.add_argument(
         '--preserve_keyword_order', action="store_true",
         help="Display variable keywords information in original order (default: sort to consistent ordering)"
     )
@@ -181,6 +185,7 @@ def main():
         "use_signature_help": args.use_signature_help,
         "variable_hover": (args.variable_hover or args.hover_signature),
         "hover_signature": args.hover_signature,
+        "hover_language": args.hover_language,
         "sort_keywords": (not args.preserve_keyword_order),
         "enable_code_actions": (args.enable_code_actions or args.debug_actions),
         "max_line_length": args.max_line_length,
