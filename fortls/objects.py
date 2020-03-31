@@ -169,6 +169,8 @@ def find_in_scope(scope, var_name, obj_tree, interface=False, local_only=False):
     #
     var_name_lower = var_name.lower()
     # Check local scope
+    if scope is None:
+        return None
     tmp_var = check_scope(scope, var_name_lower)
     if local_only or (tmp_var is not None):
         return tmp_var
