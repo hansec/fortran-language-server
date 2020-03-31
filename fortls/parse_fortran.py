@@ -1558,8 +1558,9 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
                                            return_type=obj_info.return_type, result_var=obj_info.return_var)
                 file_ast.add_scope(new_fun, END_FUN_WORD)
                 if obj_info.return_type is not None:
+                    keywords, keyword_info = map_keywords(obj_info.return_type[1])
                     new_obj = fortran_var(file_ast, line_number, obj_info.name,
-                                          obj_info.return_type[0], obj_info.return_type[1])
+                                          obj_info.return_type[0], keywords, keyword_info)
                     file_ast.add_variable(new_obj)
                 if(debug):
                     print('{1} !!! FUNCTION statement({0})'.format(line_number, line.strip()))
