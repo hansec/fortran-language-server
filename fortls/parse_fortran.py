@@ -5,11 +5,11 @@ import re
 import hashlib
 from collections import namedtuple
 from fortls.objects import get_paren_substring, map_keywords, get_paren_level, \
-    fortran_ast, fortran_module, fortran_program, fortran_submodule, \
+    fortran_ast, fortran_scope, fortran_module, fortran_program, fortran_submodule, \
     fortran_subroutine, fortran_function, fortran_block, fortran_select, \
     fortran_type, fortran_enum, fortran_int, fortran_var, fortran_meth, \
     fortran_associate, fortran_do, fortran_where, fortran_if, \
-    INTERFACE_TYPE_ID, SELECT_TYPE_ID
+    INTERFACE_TYPE_ID, SELECT_TYPE_ID, SUBMODULE_TYPE_ID
 PY3K = sys.version_info >= (3, 0)
 if not PY3K:
     import io
@@ -29,6 +29,7 @@ MOD_REGEX = re.compile(r'[ ]*MODULE[ ]+([a-z0-9_]+)', re.I)
 END_MOD_WORD = r'MODULE'
 SUBMOD_REGEX = re.compile(r'[ ]*SUBMODULE[ ]*\(', re.I)
 END_SMOD_WORD = r'SUBMODULE'
+END_PRO_WORD = r'PROCEDURE'
 BLOCK_REGEX = re.compile(r'[ ]*([a-z_][a-z0-9_]*[ ]*:[ ]*)?BLOCK(?![a-z0-9_])', re.I)
 END_BLOCK_WORD = r'BLOCK'
 DO_REGEX = re.compile(r'[ ]*(?:[a-z_][a-z0-9_]*[ ]*:[ ]*)?DO([ ]+[0-9]*|$)', re.I)
@@ -52,7 +53,7 @@ INT_REGEX = re.compile(r'[ ]*(ABSTRACT)?[ ]*INTERFACE[ ]*([a-z0-9_]*)', re.I)
 END_INT_WORD = r'INTERFACE'
 END_WORD_REGEX = re.compile(r'[ ]*END[ ]*(DO|WHERE|IF|BLOCK|ASSOCIATE|SELECT'
                             r'|TYPE|ENUM|MODULE|SUBMODULE|PROGRAM|INTERFACE'
-                            r'|SUBROUTINE|FUNCTION)?([ ]+|$)', re.I)
+                            r'|SUBROUTINE|FUNCTION|PROCEDURE)?([ ]+|$)', re.I)
 TYPE_DEF_REGEX = re.compile(r'[ ]*(TYPE)[, :]+', re.I)
 EXTENDS_REGEX = re.compile(r'EXTENDS[ ]*\(([a-z0-9_]*)\)', re.I)
 GENERIC_PRO_REGEX = re.compile(r'[ ]*(GENERIC)[ ]*::[ ]*[a-z]', re.I)
@@ -101,7 +102,7 @@ TYPE_STMNT_REGEX = re.compile(r'[ ]*(TYPE|CLASS)[ ]*(IS)?[ ]*$', re.I)
 PROCEDURE_STMNT_REGEX = re.compile(r'[ ]*(PROCEDURE)[ ]*$', re.I)
 PRO_LINK_REGEX = re.compile(r'[ ]*(MODULE[ ]*PROCEDURE )', re.I)
 SCOPE_DEF_REGEX = re.compile(r'[ ]*(MODULE|PROGRAM|SUBROUTINE|FUNCTION|INTERFACE)[ ]+', re.I)
-END_REGEX = re.compile(r'[ ]*(END)( |MODULE|PROGRAM|SUBROUTINE|FUNCTION|TYPE|DO|IF|SELECT)?', re.I)
+END_REGEX = re.compile(r'[ ]*(END)( |MODULE|PROGRAM|SUBROUTINE|FUNCTION|PROCEDURE|TYPE|DO|IF|SELECT)?', re.I)
 # Helper types
 VAR_info = namedtuple('VAR_info', ['type_word', 'keywords', 'var_names'])
 SUB_info = namedtuple('SUB_info', ['name', 'args', 'mod_flag', 'keywords'])
@@ -1656,12 +1657,17 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
                 if(debug):
                     print('{1} !!! GENERIC statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'int_pro':
-                if (file_ast.current_scope is None) or (file_ast.current_scope.get_type() != INTERFACE_TYPE_ID):
-                    continue
-                for name in obj_info:
-                    file_ast.add_int_member(name)
-                if(debug):
-                    print('{1} !!! INTERFACE-PRO statement({0})'.format(line_number, line.strip()))
+                if file_ast.current_scope is not None:
+                    if file_ast.current_scope.get_type() == INTERFACE_TYPE_ID:
+                        for name in obj_info:
+                            file_ast.add_int_member(name)
+                        if(debug):
+                            print('{1} !!! INTERFACE-PRO statement({0})'.format(line_number, line.strip()))
+                    elif file_ast.current_scope.get_type() == SUBMODULE_TYPE_ID:
+                        new_impl = fortran_scope(file_ast, line_number, obj_info[0])
+                        file_ast.add_scope(new_impl, END_PRO_WORD)
+                        if(debug):
+                            print('{1} !!! PROCEDURE-IMPL statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'use':
                 file_ast.add_use(obj_info.mod_name, line_number, obj_info.only_list, obj_info.rename_map)
                 if(debug):
