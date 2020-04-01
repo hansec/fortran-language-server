@@ -185,12 +185,13 @@ def main():
         "use_signature_help": args.use_signature_help,
         "variable_hover": (args.variable_hover or args.hover_signature),
         "hover_signature": args.hover_signature,
-        "hover_language": args.hover_language,
         "sort_keywords": (not args.preserve_keyword_order),
         "enable_code_actions": (args.enable_code_actions or args.debug_actions),
         "max_line_length": args.max_line_length,
         "max_comment_line_length": args.max_comment_line_length
     }
+    if args.hover_language is not None:
+        settings["hover_language"] = args.hover_language
     #
     if args.debug_parser:
         if args.debug_filepath is None:
