@@ -1,3 +1,8 @@
+## 1.11.1
+
+### Fixes
+* Fix bug with hover requests introduced in v1.11.0, fixes [#159](https://github.com/hansec/fortran-language-server/issues/159)
+
 ## 1.11.0
 
 ### Improvements
