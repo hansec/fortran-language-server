@@ -7,7 +7,7 @@ from multiprocessing import freeze_support
 from .langserver import LangServer
 from .jsonrpc import JSONRPC2Connection, ReadWriter, path_from_uri
 from .parse_fortran import fortran_file, process_file
-__version__ = '1.10.3'
+__version__ = '1.11.1'
 
 
 def error_exit(error_str):
@@ -67,6 +67,10 @@ def main():
     parser.add_argument(
         '--hover_signature', action="store_true",
         help="Show signature information in hover for argument (also enables '--variable_hover')"
+    )
+    parser.add_argument(
+        '--hover_language', type=str, default=None,
+        help="Language used for responses to hover requests (for editor syntax highlighting)"
     )
     parser.add_argument(
         '--preserve_keyword_order', action="store_true",
@@ -186,6 +190,8 @@ def main():
         "max_line_length": args.max_line_length,
         "max_comment_line_length": args.max_comment_line_length
     }
+    if args.hover_language is not None:
+        settings["hover_language"] = args.hover_language
     #
     if args.debug_parser:
         if args.debug_filepath is None:

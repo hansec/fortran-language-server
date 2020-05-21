@@ -95,6 +95,7 @@ class LangServer:
         self.use_signature_help = settings.get("use_signature_help", False)
         self.variable_hover = settings.get("variable_hover", False)
         self.hover_signature = settings.get("hover_signature", False)
+        self.hover_language = settings.get("hover_language", "fortran90")
         self.sort_keywords = settings.get("sort_keywords", True)
         self.enable_code_actions = settings.get("enable_code_actions", False)
         self.max_line_length = settings.get("max_line_length", -1)
@@ -965,7 +966,7 @@ class LangServer:
         def create_hover(string, highlight):
             if highlight:
                 return {
-                    "language": "fortran90",
+                    "language": self.hover_language,
                     "value": string
                 }
             else:

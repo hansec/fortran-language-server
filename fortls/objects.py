@@ -35,6 +35,7 @@ KEYWORD_LIST = [
 ]
 KEYWORD_ID_DICT = {keyword: ind for (ind, keyword) in enumerate(KEYWORD_LIST)}
 # Type identifiers
+BASE_TYPE_ID = -1
 MODULE_TYPE_ID = 1
 SUBROUTINE_TYPE_ID = 2
 FUNCTION_TYPE_ID = 3
@@ -42,13 +43,14 @@ CLASS_TYPE_ID = 4
 INTERFACE_TYPE_ID = 5
 VAR_TYPE_ID = 6
 METH_TYPE_ID = 7
-BLOCK_TYPE_ID = 8
-SELECT_TYPE_ID = 9
-DO_TYPE_ID = 10
-WHERE_TYPE_ID = 11
-IF_TYPE_ID = 12
-ASSOC_TYPE_ID = 13
-ENUM_TYPE_ID = 14
+SUBMODULE_TYPE_ID = 8
+BLOCK_TYPE_ID = 9
+SELECT_TYPE_ID = 10
+DO_TYPE_ID = 11
+WHERE_TYPE_ID = 12
+IF_TYPE_ID = 13
+ASSOC_TYPE_ID = 14
+ENUM_TYPE_ID = 15
 
 
 def set_keyword_ordering(sorted):
@@ -169,6 +171,8 @@ def find_in_scope(scope, var_name, obj_tree, interface=False, local_only=False):
     #
     var_name_lower = var_name.lower()
     # Check local scope
+    if scope is None:
+        return None
     tmp_var = check_scope(scope, var_name_lower)
     if local_only or (tmp_var is not None):
         return tmp_var
@@ -438,7 +442,7 @@ class fortran_obj:
         return False
 
     def get_type(self, no_link=False):
-        return -1
+        return BASE_TYPE_ID
 
     def get_type_obj(self, obj_tree):
         return None
@@ -533,6 +537,25 @@ class fortran_scope(fortran_obj):
         else:
             self.FQSN = self.name.lower()
 
+    def copy_from(self, copy_source):
+        self.file_ast = copy_source.file_ast
+        self.name = copy_source.name
+        self.FQSN = copy_source.FQSN
+        self.sline = copy_source.sline
+        self.eline = copy_source.eline
+        self.keywords = copy_source.keywords
+        self.children = copy_source.children
+        self.members = copy_source.members
+        self.use = copy_source.use
+        self.inherit = copy_source.inherit
+        self.parent = copy_source.parent
+        self.vis = copy_source.vis
+        self.def_vis = copy_source.def_vis
+        self.contains_start = copy_source.contains_start
+        self.doc_str = copy_source.doc_str
+        self.implicit_vars = copy_source.implicit_vars
+        self.implicit_line = copy_source.implicit_line
+
     def add_use(self, use_mod, line_number, only_list=[], rename_map={}):
         self.use.append(USE_line(use_mod, line_number, only_list, rename_map))
 
@@ -596,7 +619,7 @@ class fortran_scope(fortran_obj):
         #
         contains_line = -1
         after_contains_list = (SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID)
-        if self.get_type() in (MODULE_TYPE_ID, SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID):
+        if self.get_type() in (MODULE_TYPE_ID, SUBMODULE_TYPE_ID, SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID):
             if self.contains_start is None:
                 contains_line = self.eline
             else:
@@ -731,6 +754,9 @@ class fortran_submodule(fortran_module):
         self.ancestor_name = ancestor_name
         self.ancestor_obj = None
 
+    def get_type(self, no_link=False):
+        return SUBMODULE_TYPE_ID
+
     def get_desc(self):
         return 'SUBMODULE'
 
@@ -761,16 +787,30 @@ class fortran_submodule(fortran_module):
             if child.get_type() == INTERFACE_TYPE_ID:
                 for prototype in child.children:
                     prototype_type = prototype.get_type()
-                    if (prototype_type == SUBROUTINE_TYPE_ID or prototype_type == FUNCTION_TYPE_ID) \
+                    if (prototype_type in (SUBROUTINE_TYPE_ID, FUNCTION_TYPE_ID, BASE_TYPE_ID)) \
                        and prototype.is_mod_scope():
                         ancestor_interfaces.append(prototype)
         # Match interface definitions to implementations
         for prototype in ancestor_interfaces:
-            for child in self.children:
-                if (child.name.lower() == prototype.name.lower()) and (child.get_type() == prototype.get_type()):
-                    prototype.resolve_link(obj_tree)
-                    child.copy_interface(prototype)
-                    break
+            for (i, child) in enumerate(self.children):
+                if child.name.lower() == prototype.name.lower():
+                    # Create correct object for interface
+                    if child.get_type() == BASE_TYPE_ID:
+                        child_old = child
+                        if prototype.get_type() == SUBROUTINE_TYPE_ID:
+                            child = fortran_subroutine(child_old.file_ast, child_old.sline, child_old.name)
+                        elif prototype.get_type() == FUNCTION_TYPE_ID:
+                            child = fortran_function(child_old.file_ast, child_old.sline, child_old.name)
+                        child.copy_from(child_old)
+                        # Replace in child and scope lists
+                        self.children[i] = child
+                        for (j, file_scope) in enumerate(child.file_ast.scope_list):
+                            if file_scope is child_old:
+                                child.file_ast.scope_list[j] = child
+                    if child.get_type() == prototype.get_type():
+                        prototype.resolve_link(obj_tree)
+                        child.copy_interface(prototype)
+                        break
 
     def require_link(self):
         return True

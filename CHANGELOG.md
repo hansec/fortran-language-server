@@ -1,3 +1,20 @@
+## 1.11.1
+
+### Fixes
+* Fix bug with hover requests introduced in v1.11.0, fixes [#159](https://github.com/hansec/fortran-language-server/issues/159)
+
+## 1.11.0
+
+### Improvements
+* Add support for specifying the language name returned for hover requests, ref [Fortran IntelliSense #17](https://github.com/hansec/vscode-fortran-ls/issues/17)
+* Add support for submodule implementations using the "PROCEDURE" keyword, fixes [#152](https://github.com/hansec/fortran-language-server/issues/152)
+
+### Fixes
+* Fix bug with keywords in old style function declarations, fixes [#154](https://github.com/hansec/fortran-language-server/issues/154)
+* Fix bug when searching an empty scope, fixes [#151](https://github.com/hansec/fortran-language-server/issues/151)
+* Remove erroneous double definition/masking checks for interfaces, fixes [#18](https://github.com/hansec/fortran-language-server/issues/18) and [#138](https://github.com/hansec/fortran-language-server/issues/138)
+* README: Add fix for possible installation error
+
 ## 1.10.3
 
 ### Fixes
