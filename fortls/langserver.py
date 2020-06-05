@@ -96,6 +96,7 @@ class LangServer:
         self.hover_language = settings.get("hover_language", "fortran90")
         self.sort_keywords = settings.get("sort_keywords", True)
         self.enable_code_actions = settings.get("enable_code_actions", False)
+        self.disable_diagnostics = settings.get("disable_diagnostics", False)
         self.max_line_length = settings.get("max_line_length", -1)
         self.max_comment_line_length = settings.get("max_comment_line_length", -1)
         # Set object settings
@@ -1234,7 +1235,8 @@ class LangServer:
             self.link_version = (self.link_version + 1) % 1000
             for _, file_obj in self.workspace.items():
                 file_obj.ast.resolve_links(self.obj_tree, self.link_version)
-        self.send_diagnostics(uri)
+        if not self.disable_diagnostics:
+            self.send_diagnostics(uri)
 
     def update_workspace_file(self, filepath, read_file=False, allow_empty=False, update_links=False):
         # Update workspace from file contents and path

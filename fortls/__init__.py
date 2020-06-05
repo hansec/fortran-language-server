@@ -89,6 +89,10 @@ def main():
         help="Maximum comment line length (default: disabled)"
     )
     parser.add_argument(
+        '--disable_diagnostics', action="store_true",
+        help="Disable diagnostics"
+    )
+    parser.add_argument(
         '--debug_log', action="store_true",
         help="Generate debug log in project root folder"
     )
@@ -188,7 +192,8 @@ def main():
         "sort_keywords": (not args.preserve_keyword_order),
         "enable_code_actions": (args.enable_code_actions or args.debug_actions),
         "max_line_length": args.max_line_length,
-        "max_comment_line_length": args.max_comment_line_length
+        "max_comment_line_length": args.max_comment_line_length,
+        "disable_diagnostics": args.disable_diagnostics,
     }
     if args.hover_language is not None:
         settings["hover_language"] = args.hover_language
