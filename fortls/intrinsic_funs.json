@@ -403,14 +403,14 @@
     "doc": "IPARITY(ARRAY,DIM=dim,MASK=mask) reduces with bitwise XOR (exclusive or) the elements of ARRAY along dimension DIM if the corresponding element in MASK is TRUE.",
     "type": 3
   },
-  "ISHIFT": {
+  "ISHFT": {
     "args": "I,SHIFT",
-    "doc": "ISHIFT(I,SHIFT) returns a value corresponding to I with all of the bits shifted SHIFT places",
+    "doc": "ISHFT(I,SHIFT) returns a value corresponding to I with all of the bits shifted SHIFT places",
     "type": 3
   },
-  "ISHIFTC": {
+  "ISHFTC": {
     "args": "I,SHIFT,SIZE=size",
-    "doc": "ISHIFTC(I,SHIFT,SIZE=size) returns a value corresponding to I with the rightmost SIZE bits shifted circularly SHIFT places; that is, bits shifted out one end are shifted into the opposite end.",
+    "doc": "ISHFTC(I,SHIFT,SIZE=size) returns a value corresponding to I with the rightmost SIZE bits shifted circularly SHIFT places; that is, bits shifted out one end are shifted into the opposite end.",
     "type": 3
   },
   "IS_IOSTAT_END": {
