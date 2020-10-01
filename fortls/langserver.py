@@ -222,6 +222,7 @@ class LangServer:
                     self.excl_suffixes = config_dict.get("excl_suffixes", [])
                     self.lowercase_intrinsics = config_dict.get("lowercase_intrinsics", self.lowercase_intrinsics)
                     self.debug_log = config_dict.get("debug_log", self.debug_log)
+                    self.disable_diagnostics = config_dict.get("disable_diagnostics", self.disable_diagnostics)
                     self.pp_suffixes = config_dict.get("pp_suffixes", None)
                     self.pp_defs = config_dict.get("pp_defs", {})
                     self.include_dirs = config_dict.get("include_dirs", [])
