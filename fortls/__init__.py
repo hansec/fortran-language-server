@@ -82,11 +82,11 @@ def main():
     )
     parser.add_argument(
         '--max_line_length', type=int, default=-1,
-        help="Maximum line length (default: disabled)"
+        help="Maximum line length (default: none)"
     )
     parser.add_argument(
         '--max_comment_line_length', type=int, default=-1,
-        help="Maximum comment line length (default: disabled)"
+        help="Maximum comment line length (default: none)"
     )
     parser.add_argument(
         '--disable_diagnostics', action="store_true",

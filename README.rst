@@ -89,8 +89,9 @@ The following global settings can be used when launching the language server.
 * ``--hover_signature`` Show signature information in hover for argument (also enables '--variable_hover')
 * ``--preserve_keyword_order`` Display variable keywords information in original order (default: sort to consistent ordering)
 * ``--enable_code_actions`` Enable experimental code actions (default: false)
-* ``--max_line_length`` Maximum line length (default: disabled)
-* ``--max_comment_line_length`` Maximum comment line length (default: disabled)
+* ``--disable_diagnostics`` Disable code diagnostics (default: false)
+* ``--max_line_length`` Maximum line length (default: none)
+* ``--max_comment_line_length`` Maximum comment line length (default: none)
 * ``--debug_log`` Write debug information to ``root_dir/fortls_debug.log`` (requires a specified ``root_dir`` during initialization)
 
 Debug settings:
@@ -124,6 +125,9 @@ in the ``root_dir`` directory.
 
 * ``lowercase_intrinsics`` Use lowercase for intrinsics and keywords in autocomplete requests (default: false)
 * ``debug_log`` Write debug information to ``root_dir/fortls_debug.log`` (default: false)
+* ``disable_diagnostics`` Disable diagnostics for this project only (default: false)
+* ``max_line_length`` Maximum line length (default: none)
+* ``max_comment_line_length`` Maximum comment line length (default: none)
 
 Setup source file search paths:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
