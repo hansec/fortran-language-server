@@ -1,3 +1,12 @@
+## 1.12.0
+
+### Improvements
+* Add support for disabling diagnostics globally or on a per-project basis, ref [PR 163](https://github.com/hansec/fortran-language-server/pull/163)
+
+### Fixes
+* Fix bug with enum declarations, fixes [#167](https://github.com/hansec/fortran-language-server/issues/167)
+* Fix typo in "ISHIFT" and "ISHIFTC" intrinsic functions, ref [PR 165](https://github.com/hansec/fortran-language-server/pull/165)
+
 ## 1.11.1
 
 ### Fixes
