@@ -309,7 +309,7 @@ def test_comp():
         [8, "READ", "STATEMENT"],
         [9, "READ", "STATEMENT"],
         # subdir/test_generic.f90
-        [2, "my_gen", "SUBROUTINE my_gen(self, a, b)"],
+        [4, "my_gen", "SUBROUTINE my_gen(self, a, b)"],
         # subdir/test_inherit.f90
         [1, "val", "REAL(8)"],
         # subdir/test_rename.F90

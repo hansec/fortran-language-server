@@ -56,7 +56,7 @@ END_WORD_REGEX = re.compile(r'[ ]*END[ ]*(DO|WHERE|IF|BLOCK|ASSOCIATE|SELECT'
                             r'|SUBROUTINE|FUNCTION|PROCEDURE)?([ ]+|$)', re.I)
 TYPE_DEF_REGEX = re.compile(r'[ ]*(TYPE)[, :]+', re.I)
 EXTENDS_REGEX = re.compile(r'EXTENDS[ ]*\(([a-z0-9_]*)\)', re.I)
-GENERIC_PRO_REGEX = re.compile(r'[ ]*(GENERIC)[ ]*::[ ]*[a-z]', re.I)
+GENERIC_PRO_REGEX = re.compile(r'[ ]*(GENERIC)[, ]*(PRIVATE|PUBLIC)?[ ]*::[ ]*[a-z]', re.I)
 GEN_ASSIGN_REGEX = re.compile(r'(ASSIGNMENT|OPERATOR)\(', re.I)
 END_TYPED_REGEX = re.compile(r'TYPE', re.I)
 ENUM_DEF_REGEX = re.compile(r'[ ]*ENUM[, ]+', re.I)
@@ -110,7 +110,7 @@ FUN_info = namedtuple('FUN_info', ['name', 'args', 'return_type', 'return_var', 
 SELECT_info = namedtuple('SELECT_info', ['type', 'binding', 'desc'])
 CLASS_info = namedtuple('CLASS_info', ['name', 'parent', 'keywords'])
 USE_info = namedtuple('USE_info', ['mod_name', 'only_list', 'rename_map'])
-GEN_info = namedtuple('GEN_info', ['bound_name', 'pro_links'])
+GEN_info = namedtuple('GEN_info', ['bound_name', 'pro_links', 'vis_flag'])
 SMOD_info = namedtuple('SMOD_info', ['name', 'parent'])
 INT_info = namedtuple('INT_info', ['name', 'abstract'])
 VIS_info = namedtuple('VIS_info', ['type', 'obj_names'])
@@ -562,6 +562,14 @@ def read_generic_def(line):
     trailing_line = line[generic_match.end(0)-1:].split('!')[0].strip()
     if len(trailing_line) == 0:
         return None
+    # Set visibility
+    if generic_match.group(2) is None:
+        vis_flag = 0
+    else:
+        if generic_match.group(2).lower() == 'private':
+            vis_flag = -1
+        else:
+            vis_flag = 1
     #
     i1 = trailing_line.find('=>')
     if i1 < 0:
@@ -578,7 +586,7 @@ def read_generic_def(line):
     if len(pro_out) == 0:
         return None
     #
-    return 'gen', GEN_info(bound_name, pro_out)
+    return 'gen', GEN_info(bound_name, pro_out, vis_flag)
 
 
 def read_mod_def(line):
@@ -1654,6 +1662,7 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
                     print('{1} !!! INTERFACE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'gen':
                 new_int = fortran_int(file_ast, line_number, obj_info.bound_name, abstract=False)
+                new_int.set_visibility(obj_info.vis_flag)
                 file_ast.add_scope(new_int, END_INT_REGEX, req_container=True)
                 for pro_link in obj_info.pro_links:
                     file_ast.add_int_member(pro_link)
