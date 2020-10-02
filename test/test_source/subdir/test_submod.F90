@@ -12,6 +12,11 @@ module points
      module logical function is_point_equal_a(a, b)
       type(point), intent(in) :: a, b
     end function is_point_equal_a
+
+    module subroutine is_point_equal_sub(a, b, test)
+      type(point), intent(in) :: a, b
+      logical, intent(out) :: test
+    end subroutine is_point_equal_sub
   end interface
 contains
   logical function is_point_equal(a, b)
@@ -29,6 +34,11 @@ contains
 
   module procedure is_point_equal_a
     type(point) :: c
-    is_point_equal = merge(.true., .false., a%x == b%x .and. a%y == b%y)
+    is_point_equal_a = merge(.true., .false., a%x == b%x .and. a%y == b%y)
   end procedure is_point_equal_a
+
+  module procedure is_point_equal_sub
+    type(point) :: c
+    test = is_point_equal(a,b)
+  end module procedure is_point_equal_sub
 end submodule points_a

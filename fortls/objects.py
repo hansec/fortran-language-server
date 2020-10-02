@@ -1743,7 +1743,7 @@ class fortran_ast:
         self.none_scope = None
         self.inc_scope = None
         self.current_scope = None
-        self.END_SCOPE_WORD = None
+        self.END_SCOPE_REGEX = None
         self.enc_scope_name = None
         self.last_obj = None
         self.pending_doc = None
@@ -1761,7 +1761,7 @@ class fortran_ast:
             return None
         return self.current_scope.FQSN
 
-    def add_scope(self, new_scope, END_SCOPE_WORD, exportable=True, req_container=False):
+    def add_scope(self, new_scope, END_SCOPE_REGEX, exportable=True, req_container=False):
         self.scope_list.append(new_scope)
         if new_scope.require_inherit():
             self.inherit_objs.append(new_scope)
@@ -1779,10 +1779,10 @@ class fortran_ast:
         else:
             self.current_scope.add_child(new_scope)
             self.scope_stack.append(self.current_scope)
-        if self.END_SCOPE_WORD is not None:
-            self.end_stack.append(self.END_SCOPE_WORD)
+        if self.END_SCOPE_REGEX is not None:
+            self.end_stack.append(self.END_SCOPE_REGEX)
         self.current_scope = new_scope
-        self.END_SCOPE_WORD = END_SCOPE_WORD
+        self.END_SCOPE_REGEX = END_SCOPE_REGEX
         self.enc_scope_name = self.get_enc_scope_name()
         self.last_obj = new_scope
         if self.pending_doc is not None:
@@ -1799,9 +1799,9 @@ class fortran_ast:
         else:
             self.current_scope = None
         if len(self.end_stack) > 0:
-            self.END_SCOPE_WORD = self.end_stack.pop()
+            self.END_SCOPE_REGEX = self.end_stack.pop()
         else:
-            self.END_SCOPE_WORD = None
+            self.END_SCOPE_REGEX = None
         self.enc_scope_name = self.get_enc_scope_name()
 
     def add_variable(self, new_var):

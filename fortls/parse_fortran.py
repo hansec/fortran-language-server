@@ -9,7 +9,7 @@ from fortls.objects import get_paren_substring, map_keywords, get_paren_level, \
     fortran_subroutine, fortran_function, fortran_block, fortran_select, \
     fortran_type, fortran_enum, fortran_int, fortran_var, fortran_meth, \
     fortran_associate, fortran_do, fortran_where, fortran_if, \
-    INTERFACE_TYPE_ID, SELECT_TYPE_ID, SUBMODULE_TYPE_ID
+    INTERFACE_TYPE_ID, SELECT_TYPE_ID, SUBMODULE_TYPE_ID, DO_TYPE_ID
 PY3K = sys.version_info >= (3, 0)
 if not PY3K:
     import io
@@ -21,36 +21,36 @@ CONTAINS_REGEX = re.compile(r'[ ]*(CONTAINS)[ ]*$', re.I)
 IMPLICIT_REGEX = re.compile(r'[ ]*IMPLICIT[ ]+([a-z]*)', re.I)
 SUB_MOD_REGEX = re.compile(r'[ ]*(PURE|IMPURE|ELEMENTAL|RECURSIVE)+', re.I)
 SUB_REGEX = re.compile(r'[ ]*SUBROUTINE[ ]+([a-z0-9_]+)', re.I)
-END_SUB_WORD = r'SUBROUTINE'
+END_SUB_REGEX = re.compile(r'SUBROUTINE', re.I)
 FUN_REGEX = re.compile(r'[ ]*FUNCTION[ ]+([a-z0-9_]+)', re.I)
 RESULT_REGEX = re.compile(r'RESULT[ ]*\(([a-z0-9_]*)\)', re.I)
-END_FUN_WORD = r'FUNCTION'
+END_FUN_REGEX = re.compile(r'FUNCTION', re.I)
 MOD_REGEX = re.compile(r'[ ]*MODULE[ ]+([a-z0-9_]+)', re.I)
-END_MOD_WORD = r'MODULE'
+END_MOD_REGEX = re.compile(r'MODULE', re.I)
 SUBMOD_REGEX = re.compile(r'[ ]*SUBMODULE[ ]*\(', re.I)
-END_SMOD_WORD = r'SUBMODULE'
-END_PRO_WORD = r'PROCEDURE'
+END_SMOD_REGEX = re.compile(r'SUBMODULE', re.I)
+END_PRO_REGEX = re.compile(r'(MODULE)?[ ]*PROCEDURE', re.I)
 BLOCK_REGEX = re.compile(r'[ ]*([a-z_][a-z0-9_]*[ ]*:[ ]*)?BLOCK(?![a-z0-9_])', re.I)
-END_BLOCK_WORD = r'BLOCK'
+END_BLOCK_REGEX = re.compile(r'BLOCK', re.I)
 DO_REGEX = re.compile(r'[ ]*(?:[a-z_][a-z0-9_]*[ ]*:[ ]*)?DO([ ]+[0-9]*|$)', re.I)
-END_DO_WORD = r'DO'
+END_DO_REGEX = re.compile(r'DO', re.I)
 WHERE_REGEX = re.compile(r'[ ]*WHERE[ ]*\(', re.I)
-END_WHERE_WORD = r'WHERE'
+END_WHERE_REGEX = re.compile(r'WHERE', re.I)
 IF_REGEX = re.compile(r'[ ]*(?:[a-z_][a-z0-9_]*[ ]*:[ ]*)?IF[ ]*\(', re.I)
 THEN_REGEX = re.compile(r'\)[ ]*THEN$', re.I)
-END_IF_WORD = r'IF'
+END_IF_REGEX = re.compile(r'IF', re.I)
 ASSOCIATE_REGEX = re.compile(r'[ ]*ASSOCIATE[ ]*\(', re.I)
-END_ASSOCIATE_WORD = r'ASSOCIATE'
+END_ASSOCIATE_REGEX = re.compile(r'ASSOCIATE', re.I)
 END_FIXED_REGEX = re.compile(r'[ ]*([0-9]*)[ ]*CONTINUE', re.I)
 SELECT_REGEX = re.compile(r'[ ]*(?:[a-z_][a-z0-9_]*[ ]*:[ ]*)?SELECT[ ]*'
                           r'(CASE|TYPE)[ ]*\(([a-z0-9_=> ]*)', re.I)
 SELECT_TYPE_REGEX = re.compile(r'[ ]*(TYPE|CLASS)[ ]+IS[ ]*\(([a-z0-9_ ]*)', re.I)
 SELECT_DEFAULT_REGEX = re.compile(r'[ ]*CLASS[ ]+DEFAULT', re.I)
-END_SELECT_WORD = r'SELECT'
+END_SELECT_REGEX = re.compile(r'SELECT', re.I)
 PROG_REGEX = re.compile(r'[ ]*PROGRAM[ ]+([a-z0-9_]+)', re.I)
-END_PROG_WORD = r'PROGRAM'
+END_PROG_REGEX = re.compile(r'PROGRAM', re.I)
 INT_REGEX = re.compile(r'[ ]*(ABSTRACT)?[ ]*INTERFACE[ ]*([a-z0-9_]*)', re.I)
-END_INT_WORD = r'INTERFACE'
+END_INT_REGEX = re.compile(r'INTERFACE', re.I)
 END_WORD_REGEX = re.compile(r'[ ]*END[ ]*(DO|WHERE|IF|BLOCK|ASSOCIATE|SELECT'
                             r'|TYPE|ENUM|MODULE|SUBMODULE|PROGRAM|INTERFACE'
                             r'|SUBROUTINE|FUNCTION|PROCEDURE)?([ ]+|$)', re.I)
@@ -58,9 +58,9 @@ TYPE_DEF_REGEX = re.compile(r'[ ]*(TYPE)[, :]+', re.I)
 EXTENDS_REGEX = re.compile(r'EXTENDS[ ]*\(([a-z0-9_]*)\)', re.I)
 GENERIC_PRO_REGEX = re.compile(r'[ ]*(GENERIC)[ ]*::[ ]*[a-z]', re.I)
 GEN_ASSIGN_REGEX = re.compile(r'(ASSIGNMENT|OPERATOR)\(', re.I)
-END_TYPED_WORD = r'TYPE'
+END_TYPED_REGEX = re.compile(r'TYPE', re.I)
 ENUM_DEF_REGEX = re.compile(r'[ ]*ENUM[, ]+', re.I)
-END_ENUMD_WORD = r'ENUM'
+END_ENUMD_REGEX = re.compile(r'ENUM', re.I)
 NAT_VAR_REGEX = re.compile(r'[ ]*(INTEGER|REAL|DOUBLE[ ]*PRECISION|COMPLEX'
                            r'|DOUBLE[ ]*COMPLEX|CHARACTER|LOGICAL|PROCEDURE'
                            r'|EXTERNAL|CLASS|TYPE)', re.I)
@@ -1387,18 +1387,21 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
                 line_no_comment = line
                 line_post_comment = None
         # Test for scope end
-        if file_ast.END_SCOPE_WORD is not None:
+        if file_ast.END_SCOPE_REGEX is not None:
             match = END_WORD_REGEX.match(line_no_comment)
             # Handle end statement
             if match is not None:
-                end_scope_word = match.group(1)
-                if (end_scope_word is not None) or (match.group(2) == ""):
-                    if end_scope_word is not None:
-                        end_scope_word = end_scope_word.strip().upper()
-                    if ((end_scope_word != file_ast.END_SCOPE_WORD)
-                       and (file_ast.current_scope.req_named_end() or (end_scope_word is not None))
+                end_scope_word = None
+                if match.group(1) is None:
+                    end_scope_word = ""
+                    if (file_ast.current_scope.req_named_end()
                        and (file_ast.current_scope is not file_ast.none_scope)):
                         file_ast.end_errors.append([line_number, file_ast.current_scope.sline])
+                else:
+                    scope_match = file_ast.END_SCOPE_REGEX.match(line_no_comment[match.start(1):])
+                    if (scope_match is not None):
+                        end_scope_word = scope_match.group(0)
+                if end_scope_word is not None:
                     if (file_ast.current_scope.get_type() == SELECT_TYPE_ID) \
                        and (file_ast.current_scope.is_type_region()):
                         file_ast.end_scope(line_number)
@@ -1407,7 +1410,7 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
                         print('{1} !!! END "{2}" scope({0})'.format(line_number, line.strip(), end_scope_word))
                     continue
             # Look for old-style end of DO loops with line labels
-            if (file_ast.END_SCOPE_WORD == 'DO') and (line_label is not None):
+            if (file_ast.current_scope.get_type() == DO_TYPE_ID) and (line_label is not None):
                 did_close = False
                 while (len(block_id_stack) > 0) and (line_label == block_id_stack[-1]):
                     file_ast.end_scope(line_number)
@@ -1531,24 +1534,24 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
                     print('{1} !!! VARIABLE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'mod':
                 new_mod = fortran_module(file_ast, line_number, obj_info)
-                file_ast.add_scope(new_mod, END_MOD_WORD)
+                file_ast.add_scope(new_mod, END_MOD_REGEX)
                 if(debug):
                     print('{1} !!! MODULE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'smod':
                 new_smod = fortran_submodule(file_ast, line_number, obj_info.name, ancestor_name=obj_info.parent)
-                file_ast.add_scope(new_smod, END_SMOD_WORD)
+                file_ast.add_scope(new_smod, END_SMOD_REGEX)
                 if(debug):
                     print('{1} !!! SUBMODULE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'prog':
                 new_prog = fortran_program(file_ast, line_number, obj_info)
-                file_ast.add_scope(new_prog, END_PROG_WORD)
+                file_ast.add_scope(new_prog, END_PROG_REGEX)
                 if(debug):
                     print('{1} !!! PROGRAM statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'sub':
                 keywords, _ = map_keywords(obj_info.keywords)
                 new_sub = fortran_subroutine(file_ast, line_number, obj_info.name, args=obj_info.args,
                                              mod_flag=obj_info.mod_flag, keywords=keywords)
-                file_ast.add_scope(new_sub, END_SUB_WORD)
+                file_ast.add_scope(new_sub, END_SUB_REGEX)
                 if(debug):
                     print('{1} !!! SUBROUTINE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'fun':
@@ -1556,7 +1559,7 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
                 new_fun = fortran_function(file_ast, line_number, obj_info.name, args=obj_info.args,
                                            mod_flag=obj_info.mod_flag, keywords=keywords,
                                            return_type=obj_info.return_type, result_var=obj_info.return_var)
-                file_ast.add_scope(new_fun, END_FUN_WORD)
+                file_ast.add_scope(new_fun, END_FUN_REGEX)
                 if obj_info.return_type is not None:
                     keywords, keyword_info = map_keywords(obj_info.return_type[1])
                     new_obj = fortran_var(file_ast, line_number, obj_info.name,
@@ -1570,7 +1573,7 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
                     block_counter += 1
                     name = '#BLOCK{0}'.format(block_counter)
                 new_block = fortran_block(file_ast, line_number, name)
-                file_ast.add_scope(new_block, END_BLOCK_WORD, req_container=True)
+                file_ast.add_scope(new_block, END_BLOCK_REGEX, req_container=True)
                 if(debug):
                     print('{1} !!! BLOCK statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'do':
@@ -1579,7 +1582,7 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
                 if obj_info != '':
                     block_id_stack.append(obj_info)
                 new_do = fortran_do(file_ast, line_number, name)
-                file_ast.add_scope(new_do, END_DO_WORD, req_container=True)
+                file_ast.add_scope(new_do, END_DO_REGEX, req_container=True)
                 if(debug):
                     print('{1} !!! DO statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'where':
@@ -1588,14 +1591,14 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
                     do_counter += 1
                     name = '#WHERE{0}'.format(do_counter)
                     new_do = fortran_where(file_ast, line_number, name)
-                    file_ast.add_scope(new_do, END_WHERE_WORD, req_container=True)
+                    file_ast.add_scope(new_do, END_WHERE_REGEX, req_container=True)
                 if(debug):
                     print('{1} !!! WHERE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'assoc':
                 block_counter += 1
                 name = '#ASSOC{0}'.format(block_counter)
                 new_assoc = fortran_associate(file_ast, line_number, name)
-                file_ast.add_scope(new_assoc, END_ASSOCIATE_WORD, req_container=True)
+                file_ast.add_scope(new_assoc, END_ASSOCIATE_REGEX, req_container=True)
                 for bound_var in obj_info:
                     binding_split = bound_var.split('=>')
                     if len(binding_split) == 2:
@@ -1610,14 +1613,14 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
                 if_counter += 1
                 name = '#IF{0}'.format(if_counter)
                 new_if = fortran_if(file_ast, line_number, name)
-                file_ast.add_scope(new_if, END_IF_WORD, req_container=True)
+                file_ast.add_scope(new_if, END_IF_REGEX, req_container=True)
                 if(debug):
                     print('{1} !!! IF statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'select':
                 select_counter += 1
                 name = '#SELECT{0}'.format(select_counter)
                 new_select = fortran_select(file_ast, line_number, name, obj_info)
-                file_ast.add_scope(new_select, END_SELECT_WORD, req_container=True)
+                file_ast.add_scope(new_select, END_SELECT_REGEX, req_container=True)
                 new_var = new_select.create_binding_variable(
                     file_ast, line_number, '{0}({1})'.format(obj_info.desc, obj_info.binding), obj_info.type
                 )
@@ -1630,14 +1633,14 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
                 new_type = fortran_type(file_ast, line_number, obj_info.name, keywords)
                 if obj_info.parent is not None:
                     new_type.set_inherit(obj_info.parent)
-                file_ast.add_scope(new_type, END_TYPED_WORD, req_container=True)
+                file_ast.add_scope(new_type, END_TYPED_REGEX, req_container=True)
                 if(debug):
                     print('{1} !!! TYPE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'enum':
                 block_counter += 1
                 name = '#ENUM{0}'.format(block_counter)
                 new_enum = fortran_enum(file_ast, line_number, name)
-                file_ast.add_scope(new_enum, END_ENUMD_WORD, req_container=True)
+                file_ast.add_scope(new_enum, END_ENUMD_REGEX, req_container=True)
                 if(debug):
                     print('{1} !!! ENUM statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'int':
@@ -1646,12 +1649,12 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
                     int_counter += 1
                     name = '#GEN_INT{0}'.format(int_counter)
                 new_int = fortran_int(file_ast, line_number, name, abstract=obj_info.abstract)
-                file_ast.add_scope(new_int, END_INT_WORD, req_container=True)
+                file_ast.add_scope(new_int, END_INT_REGEX, req_container=True)
                 if(debug):
                     print('{1} !!! INTERFACE statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'gen':
                 new_int = fortran_int(file_ast, line_number, obj_info.bound_name, abstract=False)
-                file_ast.add_scope(new_int, END_INT_WORD, req_container=True)
+                file_ast.add_scope(new_int, END_INT_REGEX, req_container=True)
                 for pro_link in obj_info.pro_links:
                     file_ast.add_int_member(pro_link)
                 file_ast.end_scope(line_number)
@@ -1666,7 +1669,7 @@ def process_file(file_obj, close_open_scopes, debug=False, pp_defs={}, include_d
                             print('{1} !!! INTERFACE-PRO statement({0})'.format(line_number, line.strip()))
                     elif file_ast.current_scope.get_type() == SUBMODULE_TYPE_ID:
                         new_impl = fortran_scope(file_ast, line_number, obj_info[0])
-                        file_ast.add_scope(new_impl, END_PRO_WORD)
+                        file_ast.add_scope(new_impl, END_PRO_REGEX)
                         if(debug):
                             print('{1} !!! PROCEDURE-IMPL statement({0})'.format(line_number, line.strip()))
             elif obj_type == 'use':
