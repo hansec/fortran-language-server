@@ -703,6 +703,8 @@ class LangServer:
         curr_scope = def_file.ast.get_inner_scope(def_line+1)
         # Traverse type tree if necessary
         if is_member:
+            if curr_scope is None:
+                return None
             type_scope = climb_type_tree(var_stack, curr_scope, self.obj_tree)
             # Set enclosing type as scope
             if type_scope is None:
