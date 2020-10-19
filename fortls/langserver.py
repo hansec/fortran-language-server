@@ -12,6 +12,8 @@ from fortls.objects import find_in_scope, find_in_workspace, get_use_tree, \
     SELECT_TYPE_ID, VAR_TYPE_ID, METH_TYPE_ID
 from fortls.intrinsics import get_intrinsic_keywords, load_intrinsics, \
     set_lowercase_intrinsics
+# External modules
+from compdb.backend.json import JSONCompilationDatabase as jcb
 
 log = logging.getLogger(__name__)
 # Global regexes
@@ -261,13 +263,24 @@ class LangServer:
                         del subdirList[0]
                     continue
                 contains_source = False
+                compile_db = ""
                 for filename in fileList:
-                    _, ext = os.path.splitext(os.path.basename(filename))
+                    base_name, ext = os.path.splitext(os.path.basename(filename))
                     if FORTRAN_EXT_REGEX.match(ext):
                         contains_source = True
                         break
+                    elif base_name == 'compile_commands' and ext == '.json':
+                        compile_db = filename
+                        break
                 if contains_source:
                     self.source_dirs.append(dirName)
+                if compile_db:
+                    # parse the compile db and add paths to source_dirs
+                    json_db = jcb(os.path.join(dirName, compile_db))
+                    for db_file in json_db.get_all_files():
+                        db_file_path = os.path.dirname(db_file)
+                        if db_file_path not in self.source_dirs:
+                            self.source_dirs.append(db_file_path)
         # Initialize workspace
         self.workspace_init()
         #

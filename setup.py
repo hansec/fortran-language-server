@@ -33,7 +33,8 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
         'future; python_version < "3"',
-        'argparse; python_version < "2.7" or python_version in "3.0, 3.1"'
+        'argparse; python_version < "2.7" or python_version in "3.0, 3.1"',
+        'compdb'
     ],
 
     # To provide executable scripts, use entry points in preference to the
