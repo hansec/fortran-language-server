@@ -41,11 +41,17 @@ def test_init():
         #     "documentSymbolProvider": true,
         #     "referencesProvider": True,
         #     "hoverProvider": true,
-        #     "textDocumentSync": 2
+        #     "textDocumentSync": {
+        #          "openClose": True,
+        #          "change": 2,
+        #          "save": True,
+        #     },
         # }
         #
         assert "capabilities" in result_dict
-        assert result_dict["capabilities"]["textDocumentSync"] == 2
+        assert result_dict["capabilities"]["textDocumentSync"]["openClose"] == True
+        assert result_dict["capabilities"]["textDocumentSync"]["change"] == 2
+        assert result_dict["capabilities"]["textDocumentSync"]["save"] == True
         assert result_dict["capabilities"]["definitionProvider"] is True
         assert result_dict["capabilities"]["documentSymbolProvider"] is True
         assert result_dict["capabilities"]["hoverProvider"] is True
