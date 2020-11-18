@@ -283,7 +283,11 @@ class LangServer:
             "implementationProvider": True,
             "renameProvider": True,
             "workspaceSymbolProvider": True,
-            "textDocumentSync": self.sync_type
+            "textDocumentSync": {
+                "openClose": True,
+                "change": self.sync_type,
+                "save": True,
+            },
         }
         if self.use_signature_help:
             server_capabilities["signatureHelpProvider"] = {
