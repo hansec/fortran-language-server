@@ -1066,7 +1066,7 @@ def preprocess_file(contents_split, file_path=None, pp_defs={}, include_dirs=[],
             return expr
 
         def replace_defined(line):
-            DEFINED_REGEX = re.compile(r'defined[ ]*\([ ]*([a-z_][a-z0-9_]*)[ ]*\)', re.I)
+            DEFINED_REGEX = re.compile(r'defined[ ]*\(?[ ]*([a-z_][a-z0-9_]*)[ ]*\)?', re.I)
             i0 = 0
             out_line = ""
             for match in DEFINED_REGEX.finditer(line):
