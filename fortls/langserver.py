@@ -193,10 +193,12 @@ class LangServer:
         if config_exists:
             try:
                 import json
+                import glob
                 with open(config_path, 'r') as fhandle:
                     config_dict = json.load(fhandle)
                     for excl_path in config_dict.get("excl_paths", []):
-                        self.excl_paths.append(os.path.join(self.root_path, excl_path))
+                        for glob_excl_path in glob.glob(os.path.join(self.root_path, excl_path)):
+                            self.excl_paths.append( glob_excl_path ) 
                     source_dirs = config_dict.get("source_dirs", [])
                     ext_source_dirs = config_dict.get("ext_source_dirs", [])
                     # Legacy definition
