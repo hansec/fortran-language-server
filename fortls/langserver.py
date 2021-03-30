@@ -193,10 +193,12 @@ class LangServer:
         if config_exists:
             try:
                 import json
+                import glob
                 with open(config_path, 'r') as fhandle:
                     config_dict = json.load(fhandle)
                     for excl_path in config_dict.get("excl_paths", []):
-                        self.excl_paths.append(os.path.join(self.root_path, excl_path))
+                        for glob_excl_path in glob.glob(os.path.join(self.root_path, excl_path)):
+                            self.excl_paths.append( glob_excl_path ) 
                     source_dirs = config_dict.get("source_dirs", [])
                     ext_source_dirs = config_dict.get("ext_source_dirs", [])
                     # Legacy definition
@@ -256,7 +258,7 @@ class LangServer:
         if len(self.source_dirs) == 1:
             self.source_dirs = []
             for dirName, subdirList, fileList in os.walk(self.root_path):
-                if self.excl_paths.count(dirName) > 0:
+                if dirName in self.excl_paths:
                     while(len(subdirList) > 0):
                         del subdirList[0]
                     continue
@@ -673,7 +675,7 @@ class LangServer:
                     name_replace = candidate.name
                 for member in candidate.mems:
                     tmp_text, _ = member.get_snippet(name_replace)
-                    if tmp_list.count(tmp_text) > 0:
+                    if tmp_text in tmp_list:
                         continue
                     tmp_list.append(tmp_text)
                     item_list.append(build_comp(
@@ -1291,7 +1293,7 @@ class LangServer:
                 _, ext = os.path.splitext(os.path.basename(filename))
                 if FORTRAN_EXT_REGEX.match(ext):
                     filepath = os.path.normpath(os.path.join(source_dir, filename))
-                    if self.excl_paths.count(filepath) > 0:
+                    if filepath in self.excl_paths:
                         continue
                     inc_file = True
                     for excl_suffix in self.excl_suffixes:
