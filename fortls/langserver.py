@@ -256,7 +256,7 @@ class LangServer:
         if len(self.source_dirs) == 1:
             self.source_dirs = []
             for dirName, subdirList, fileList in os.walk(self.root_path):
-                if self.excl_paths.count(dirName) > 0:
+                if dirName in self.excl_paths:
                     while(len(subdirList) > 0):
                         del subdirList[0]
                     continue
@@ -673,7 +673,7 @@ class LangServer:
                     name_replace = candidate.name
                 for member in candidate.mems:
                     tmp_text, _ = member.get_snippet(name_replace)
-                    if tmp_list.count(tmp_text) > 0:
+                    if tmp_text in tmp_list:
                         continue
                     tmp_list.append(tmp_text)
                     item_list.append(build_comp(
@@ -1291,7 +1291,7 @@ class LangServer:
                 _, ext = os.path.splitext(os.path.basename(filename))
                 if FORTRAN_EXT_REGEX.match(ext):
                     filepath = os.path.normpath(os.path.join(source_dir, filename))
-                    if self.excl_paths.count(filepath) > 0:
+                    if filepath in self.excl_paths:
                         continue
                     inc_file = True
                     for excl_suffix in self.excl_suffixes:
