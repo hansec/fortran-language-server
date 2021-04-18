@@ -363,7 +363,7 @@ def test_def():
     def check_return(result_array, checks):
         assert result_array["uri"] == path_to_uri(checks[2])
         assert result_array["range"]["start"]["line"] == checks[0]
-        assert result_array["range"]["start"]["line"] == checks[1]
+        assert result_array["range"]["end"]["line"] == checks[1]
 
     def def_request(file_path, line, char):
         return write_rpc_request(1, "textDocument/definition", {
@@ -378,6 +378,7 @@ def test_def():
     string += def_request(file_path, 20, 7)
     string += def_request(file_path, 21, 20)
     string += def_request(file_path, 21, 42)
+    string += def_request(file_path, 23, 0)
     string += def_request(file_path, 23, 26)
     file_path = os.path.join(test_dir, "subdir", "test_submod.F90")
     string += def_request(file_path, 30, 12)
@@ -401,6 +402,7 @@ def test_def():
         [10, 10, os.path.join(test_dir, "test_prog.f08")],
         [21, 21, free_path],
         [14, 14, free_path],
+        [7, 7, os.path.join(test_dir, "test_prog.f08")],
         [5, 5, free_path],
         # subdir/test_submod.F90
         [1, 1, os.path.join(test_dir, "subdir", "test_submod.F90")],
