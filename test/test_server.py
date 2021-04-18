@@ -378,6 +378,7 @@ def test_def():
     string += def_request(file_path, 20, 7)
     string += def_request(file_path, 21, 20)
     string += def_request(file_path, 21, 42)
+    string += def_request(file_path, 23, 0)
     string += def_request(file_path, 23, 26)
     file_path = os.path.join(test_dir, "subdir", "test_submod.F90")
     string += def_request(file_path, 30, 12)
@@ -401,6 +402,7 @@ def test_def():
         [10, 10, os.path.join(test_dir, "test_prog.f08")],
         [21, 21, free_path],
         [14, 14, free_path],
+        [7, 7, os.path.join(test_dir, "test_prog.f08")],
         [5, 5, free_path],
         # subdir/test_submod.F90
         [1, 1, os.path.join(test_dir, "subdir", "test_submod.F90")],
