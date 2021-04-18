@@ -363,7 +363,7 @@ def test_def():
     def check_return(result_array, checks):
         assert result_array["uri"] == path_to_uri(checks[2])
         assert result_array["range"]["start"]["line"] == checks[0]
-        assert result_array["range"]["start"]["line"] == checks[1]
+        assert result_array["range"]["end"]["line"] == checks[1]
 
     def def_request(file_path, line, char):
         return write_rpc_request(1, "textDocument/definition", {
