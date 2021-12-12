@@ -1,30 +1,52 @@
 import subprocess
 import sys
 import os
+
 try:
     import StringIO.StringIO as StringIO
 except:
     from io import StringIO
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, root_dir)
-from fortls.jsonrpc import write_rpc_request, write_rpc_notification, \
-    read_rpc_messages, path_to_uri
+from fortls.jsonrpc import (
+    write_rpc_request,
+    write_rpc_notification,
+    read_rpc_messages,
+    path_to_uri,
+)
 
 run_command = os.path.join(root_dir, "fortls.py --incrmental_sync --use_signature_help")
 test_dir = os.path.join(root_dir, "test", "test_source")
 
 
-def run_request(request):
-    pid = subprocess.Popen(run_command, shell=True, stdin=subprocess.PIPE,
-                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+def run_request(request, fortls_args=""):
+    pid = subprocess.Popen(
+        run_command + fortls_args,
+        shell=True,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
     results = pid.communicate(input=request.encode())
     tmp_file = StringIO(results[0].decode())
     results = read_rpc_messages(tmp_file)
     parsed_results = []
     for result in results:
-        if "method" in result:
-            continue
-        parsed_results.append(result['result'])
+        try:
+            parsed_results.append(result["result"])
+        except KeyError:
+            try:
+                # Present in `method`s
+                parsed_results.append(result["params"])
+            except:
+                raise RuntimeError(
+                    "Only 'result' and 'params' keys have been implemented for testing."
+                    " Please add the new key."
+                )
+        except:
+            raise RuntimeError(
+                "Unexpected error encountered trying to extract server results"
+            )
     errcode = pid.poll()
     return errcode, parsed_results
 
@@ -50,8 +72,15 @@ def test_init():
         assert result_dict["capabilities"]["documentSymbolProvider"] is True
         assert result_dict["capabilities"]["hoverProvider"] is True
         assert result_dict["capabilities"]["referencesProvider"] is True
-        assert result_dict["capabilities"]["completionProvider"]["resolveProvider"] is False
-        assert result_dict["capabilities"]["completionProvider"]["triggerCharacters"][0] == "%"
+        assert (
+            result_dict["capabilities"]["completionProvider"]["resolveProvider"]
+            is False
+        )
+        assert (
+            result_dict["capabilities"]["completionProvider"]["triggerCharacters"][0]
+            == "%"
+        )
+
     #
     string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
     errcode, results = run_request(string)
@@ -63,10 +92,10 @@ def test_init():
 def test_open():
     string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
     file_path = os.path.join(test_dir, "subdir", "test_free.f90")
-    string += write_rpc_notification("textDocument/didOpen", {
-        "textDocument": {"uri": file_path}
-    })
-    errcode, results = run_request(string)
+    string += write_rpc_notification(
+        "textDocument/didOpen", {"textDocument": {"uri": file_path}}
+    )
+    errcode, results = run_request(string, fortls_args=" --disable_diagnostics")
     #
     assert errcode == 0
     assert len(results) == 1
@@ -75,51 +104,61 @@ def test_open():
 def test_change():
     string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
     file_path = os.path.join(test_dir, "subdir", "test_unknown.f90")
-    string += write_rpc_notification("textDocument/didOpen", {
-        "textDocument": {"uri": file_path}
-    })
-    string += write_rpc_notification("textDocument/didChange", {
-        "textDocument": {"uri": file_path},
-        "contentChanges": [{
-            "text": "module test_unkown\nend module test_unknown\n",
-            "range": {
-                "start": {"line": 0, "character": 0},
-                "end": {"line": 0, "character": 0}
-            }
-        }]
-    })
-    string += write_rpc_request(2, "textDocument/documentSymbol", {
-        "textDocument": {"uri": file_path}
-    })
+    string += write_rpc_notification(
+        "textDocument/didOpen", {"textDocument": {"uri": file_path}}
+    )
+    string += write_rpc_notification(
+        "textDocument/didChange",
+        {
+            "textDocument": {"uri": file_path},
+            "contentChanges": [
+                {
+                    "text": "module test_unkown\nend module test_unknown\n",
+                    "range": {
+                        "start": {"line": 0, "character": 0},
+                        "end": {"line": 0, "character": 0},
+                    },
+                }
+            ],
+        },
+    )
+    string += write_rpc_request(
+        2, "textDocument/documentSymbol", {"textDocument": {"uri": file_path}}
+    )
     file_path = os.path.join(test_dir, "subdir", "test_free.f90")
-    string += write_rpc_notification("textDocument/didChange", {
-        "textDocument": {"uri": file_path},
-        "contentChanges": [{
-            "text": " unicode test",
-            "range": {
-                "start": {"line": 3, "character": 3},
-                "end": {"line": 3, "character": 3}
-            }
-        },
+    string += write_rpc_notification(
+        "textDocument/didChange",
         {
-            "text": "",
-            "range": {
-                "start": {"line": 6, "character": 0},
-                "end": {"line": 31, "character": 0}
-            }
+            "textDocument": {"uri": file_path},
+            "contentChanges": [
+                {
+                    "text": " unicode test",
+                    "range": {
+                        "start": {"line": 3, "character": 3},
+                        "end": {"line": 3, "character": 3},
+                    },
+                },
+                {
+                    "text": "",
+                    "range": {
+                        "start": {"line": 6, "character": 0},
+                        "end": {"line": 31, "character": 0},
+                    },
+                },
+                {
+                    "text": "",
+                    "range": {
+                        "start": {"line": 7, "character": 0},
+                        "end": {"line": 39, "character": 0},
+                    },
+                },
+            ],
         },
-        {
-            "text": "",
-            "range": {
-                "start": {"line": 7, "character": 0},
-                "end": {"line": 39, "character": 0}
-            }
-        }]
-    })
-    string += write_rpc_request(3, "textDocument/documentSymbol", {
-        "textDocument": {"uri": file_path}
-    })
-    errcode, results = run_request(string)
+    )
+    string += write_rpc_request(
+        3, "textDocument/documentSymbol", {"textDocument": {"uri": file_path}}
+    )
+    errcode, results = run_request(string, fortls_args=" --disable_diagnostics")
     #
     assert errcode == 0
     assert len(results) == 3
@@ -152,7 +191,7 @@ def test_symbols():
             ["scaled_vector_norm", 12, 55, 59],
             ["unscaled_norm", 12, 61, 65],
             ["test_sig_Sub", 12, 67, 70],
-            ["bound_pass", 12, 72, 78]
+            ["bound_pass", 12, 72, 78],
         )
         assert len(result_array) == len(objs)
         for i, obj in enumerate(objs):
@@ -160,12 +199,13 @@ def test_symbols():
             assert result_array[i]["kind"] == obj[1]
             assert result_array[i]["location"]["range"]["start"]["line"] == obj[2]
             assert result_array[i]["location"]["range"]["end"]["line"] == obj[3]
+
     #
     string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
     file_path = os.path.join(test_dir, "subdir", "test_free.f90")
-    string += write_rpc_request(2, "textDocument/documentSymbol", {
-        "textDocument": {"uri": file_path}
-    })
+    string += write_rpc_request(
+        2, "textDocument/documentSymbol", {"textDocument": {"uri": file_path}}
+    )
     errcode, results = run_request(string)
     #
     assert errcode == 0
@@ -182,6 +222,7 @@ def test_workspace_symbols():
             ["test_gen_type", 5, 1],
             ["test_generic", 2, 0],
             ["test_inherit", 2, 0],
+            ["test_int", 2, 0],
             ["test_mod", 2, 0],
             ["test_program", 2, 0],
             ["test_rename_sub", 6, 9],
@@ -191,18 +232,17 @@ def test_workspace_symbols():
             ["test_str1", 13, 5],
             ["test_str2", 13, 5],
             ["test_sub", 6, 8],
-            ["test_vis_mod", 2, 0]
+            ["test_vis_mod", 2, 0],
         )
         assert len(result_array) == len(objs)
         for i, obj in enumerate(objs):
             assert result_array[i]["name"] == obj[0]
             assert result_array[i]["kind"] == obj[1]
             assert result_array[i]["location"]["range"]["start"]["line"] == obj[2]
+
     #
     string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
-    string += write_rpc_request(2, "workspace/symbol", {
-        "query": "test"
-    })
+    string += write_rpc_request(2, "workspace/symbol", {"query": "test"})
     errcode, results = run_request(string)
     #
     assert errcode == 0
@@ -217,10 +257,15 @@ def test_comp():
             assert result_array[0]["detail"] == checks[2]
 
     def comp_request(file_path, line, char):
-        return write_rpc_request(1, "textDocument/completion", {
-            "textDocument": {"uri": file_path},
-            "position": {"line": line, "character": char}
-        })
+        return write_rpc_request(
+            1,
+            "textDocument/completion",
+            {
+                "textDocument": {"uri": file_path},
+                "position": {"line": line, "character": char},
+            },
+        )
+
     #
     string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
     file_path = os.path.join(test_dir, "test_prog.f08")
@@ -316,25 +361,30 @@ def test_comp():
         [1, "localname", "INTEGER"],
         [1, "renamed_var2", "REAL(8)"],
         # subdir/test_vis.f90
-        [3, "some_type", "TYPE"]
+        [3, "some_type", "TYPE"],
     )
-    assert len(exp_results)+1 == len(results)
+    assert len(exp_results) + 1 == len(results)
     for i in range(len(exp_results)):
-        check_return(results[i+1], exp_results[i])
+        check_return(results[i + 1], exp_results[i])
 
 
 def test_sig():
     def check_return(results, checks):
-        assert results.get('activeParameter', -1) == checks[0]
-        signatures = results.get('signatures')
-        assert signatures[0].get('label') == checks[2]
-        assert len(signatures[0].get('parameters')) == checks[1]
+        assert results.get("activeParameter", -1) == checks[0]
+        signatures = results.get("signatures")
+        assert signatures[0].get("label") == checks[2]
+        assert len(signatures[0].get("parameters")) == checks[1]
 
     def sig_request(file_path, line, char):
-        return write_rpc_request(1, "textDocument/signatureHelp", {
-            "textDocument": {"uri": file_path},
-            "position": {"line": line, "character": char}
-        })
+        return write_rpc_request(
+            1,
+            "textDocument/signatureHelp",
+            {
+                "textDocument": {"uri": file_path},
+                "position": {"line": line, "character": char},
+            },
+        )
+
     #
     string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
     file_path = os.path.join(test_dir, "test_prog.f08")
@@ -352,11 +402,11 @@ def test_sig():
         [1, 5, sub_sig],
         [2, 5, sub_sig],
         [3, 5, sub_sig],
-        [4, 5, sub_sig]
+        [4, 5, sub_sig],
     )
-    assert len(exp_results)+1 == len(results)
+    assert len(exp_results) + 1 == len(results)
     for i in range(len(exp_results)):
-        check_return(results[i+1], exp_results[i])
+        check_return(results[i + 1], exp_results[i])
 
 
 def test_def():
@@ -366,10 +416,15 @@ def test_def():
         assert result_array["range"]["start"]["line"] == checks[1]
 
     def def_request(file_path, line, char):
-        return write_rpc_request(1, "textDocument/definition", {
-            "textDocument": {"uri": file_path},
-            "position": {"line": line, "character": char}
-        })
+        return write_rpc_request(
+            1,
+            "textDocument/definition",
+            {
+                "textDocument": {"uri": file_path},
+                "position": {"line": line, "character": char},
+            },
+        )
+
     #
     string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
     file_path = os.path.join(test_dir, "test_prog.f08")
@@ -411,76 +466,93 @@ def test_def():
         [4, 4, os.path.join(test_dir, "test_inc.f90")],
         # subdir/test_rename.F90
         [6, 6, os.path.join(test_dir, "subdir", "test_rename.F90")],
-        [1, 1, os.path.join(test_dir, "subdir", "test_rename.F90")]
+        [1, 1, os.path.join(test_dir, "subdir", "test_rename.F90")],
     )
-    assert len(exp_results)+1 == len(results)
+    assert len(exp_results) + 1 == len(results)
     for i in range(len(exp_results)):
-        check_return(results[i+1], exp_results[i])
+        check_return(results[i + 1], exp_results[i])
 
 
 def test_refs():
     def check_return(result_array, checks):
         def find_in_results(uri, sline):
             for (i, result) in enumerate(result_array):
-                if (result["uri"] == uri) and (result["range"]["start"]["line"] == sline):
+                if (result["uri"] == uri) and (
+                    result["range"]["start"]["line"] == sline
+                ):
                     del result_array[i]
                     return result
             return None
+
         assert len(result_array) == len(checks)
         for check in checks:
             result = find_in_results(path_to_uri(check[0]), check[1])
-            assert (result is not None)
+            assert result is not None
             assert result["range"]["start"]["character"] == check[2]
             assert result["range"]["end"]["character"] == check[3]
+
     #
     string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
     file_path = os.path.join(test_dir, "test_prog.f08")
-    string += write_rpc_request(2, "textDocument/references", {
-        "textDocument": {"uri": file_path},
-        "position": {"line": 9, "character": 8}
-    })
+    string += write_rpc_request(
+        2,
+        "textDocument/references",
+        {"textDocument": {"uri": file_path}, "position": {"line": 9, "character": 8}},
+    )
     errcode, results = run_request(string)
     assert errcode == 0
     #
     free_path = os.path.join(test_dir, "subdir", "test_free.f90")
-    check_return(results[1], (
-        [os.path.join(test_dir, "test_prog.f08"), 2, 21, 27],
-        [os.path.join(test_dir, "test_prog.f08"), 9, 5, 11],
-        [free_path, 8, 8, 14],
-        [free_path, 16, 9, 15],
-        [free_path, 18, 14, 20],
-        [free_path, 36, 6, 12],
-        [free_path, 44, 6, 12],
-        [free_path, 50, 6, 12],
-        [free_path, 76, 6, 12]
-    ))
+    check_return(
+        results[1],
+        (
+            [os.path.join(test_dir, "test_prog.f08"), 2, 21, 27],
+            [os.path.join(test_dir, "test_prog.f08"), 9, 5, 11],
+            [free_path, 8, 8, 14],
+            [free_path, 16, 9, 15],
+            [free_path, 18, 14, 20],
+            [free_path, 36, 6, 12],
+            [free_path, 44, 6, 12],
+            [free_path, 50, 6, 12],
+            [free_path, 76, 6, 12],
+        ),
+    )
 
 
 def test_hover():
     def check_return(result_array, checks):
         assert len(result_array) == len(checks)
         for (i, check) in enumerate(checks):
-            assert result_array[i]['contents'][0]['value'] == check
+            assert result_array[i]["contents"][0]["value"] == check
+
     #
     string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
     file_path = os.path.join(test_dir, "subdir", "test_abstract.f90")
-    string += write_rpc_request(2, "textDocument/hover", {
-        "textDocument": {"uri": file_path},
-        "position": {"line": 7, "character": 30}
-    })
+    string += write_rpc_request(
+        2,
+        "textDocument/hover",
+        {"textDocument": {"uri": file_path}, "position": {"line": 7, "character": 30}},
+    )
     errcode, results = run_request(string)
     assert errcode == 0
     #
-    check_return(results[1:], ("""SUBROUTINE test(a, b)
+    check_return(
+        results[1:],
+        (
+            """SUBROUTINE test(a, b)
  INTEGER(4), DIMENSION(3,6), INTENT(IN) :: a
- REAL(8), DIMENSION(4), INTENT(OUT) :: b""",))
+ REAL(8), DIMENSION(4), INTENT(OUT) :: b""",
+        ),
+    )
 
 
 def test_docs():
     def check_return(result_array, checks):
         comm_lines = []
-        for (i, hover_line) in enumerate(result_array['contents'][0]['value'].splitlines()):
-            if hover_line.count('!!') > 0:
+        for (i, hover_line) in enumerate(
+            result_array["contents"][0]["value"].splitlines()
+        ):
+            if hover_line.count("!!") > 0:
                 comm_lines.append((i, hover_line))
         assert len(comm_lines) == len(checks)
         for i in range(len(checks)):
@@ -488,10 +560,15 @@ def test_docs():
             assert comm_lines[i][1] == checks[i][1]
 
     def hover_request(file_path, line, char):
-        return write_rpc_request(1, "textDocument/hover", {
-            "textDocument": {"uri": file_path},
-            "position": {"line": line, "character": char}
-        })
+        return write_rpc_request(
+            1,
+            "textDocument/hover",
+            {
+                "textDocument": {"uri": file_path},
+                "position": {"line": line, "character": char},
+            },
+        )
+
     #
     string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
     file_path = os.path.join(test_dir, "subdir", "test_free.f90")
@@ -508,16 +585,50 @@ def test_docs():
     errcode, results = run_request(string)
     assert errcode == 0
     #
-    check_return(results[1], ((1, '!! Doc 1'), (3, ' !! Doc 5')))
-    check_return(results[2], ((1, '!! Doc 4'), (4, ' !! Doc 5')))
-    check_return(results[3], ((1, '!! Doc 2'), ))
-    check_return(results[4], ((1, '!! Doc 6'), ))
-    check_return(results[5], ((1, '!! Doc 7'), (3, ' !! Doc 8')))
-    check_return(results[6], ((1, '!! Doc 7'), (4, ' !! Doc 8')))
-    check_return(results[7], ((1, '!! Doc 3'), ))
+    check_return(results[1], ((1, "!! Doc 1"), (3, " !! Doc 5")))
+    check_return(results[2], ((1, "!! Doc 4"), (4, " !! Doc 5")))
+    check_return(results[3], ((1, "!! Doc 2"),))
+    check_return(results[4], ((1, "!! Doc 6"),))
+    check_return(results[5], ((1, "!! Doc 7"), (3, " !! Doc 8")))
+    check_return(results[6], ((1, "!! Doc 7"), (4, " !! Doc 8")))
+    check_return(results[7], ((1, "!! Doc 3"),))
     check_return(results[8], ())
     check_return(results[9], ())
-    check_return(results[10], ((3, ' !! Doc 9'), (4, ' !! Doc 10')))
+    check_return(results[10], ((3, " !! Doc 9"), (4, " !! Doc 10")))
+
+
+def test_diagnostic_interfaces():
+    """
+    Tests the diagnostics for subroutines and functions with interfaces
+    as arguments
+    """
+    string = write_rpc_request(1, "initialize", {"rootPath": test_dir})
+    file_path = os.path.join(test_dir, "test_diagnostic_int.f90")
+    string += write_rpc_notification(
+        "textDocument/didOpen", {"textDocument": {"uri": file_path}}
+    )
+    # Example of a diagnostics message
+    # string += write_rpc_notification(
+    #     "textDocument/publishDiagnostics",
+    #     {
+    #         "uri": file_path,
+    #         "diagnostics": [
+    #             {
+    #                 "range": {
+    #                     "start": {"line": 0, "character": 0},
+    #                     "end": {"line": 0, "character": 0},
+    #                 },
+    #                 "message": "",
+    #                 "severity": 0,
+    #             }
+    #         ],
+    #     },
+    # )
+    errcode, results = run_request(string)
+    assert errcode == 0
+    # check that the diagnostics list is empty
+    assert not results[1]['diagnostics']
+
 
 if __name__ == "__main__":
     test_init()
@@ -531,3 +642,4 @@ if __name__ == "__main__":
     test_refs()
     test_hover()
     test_docs()
+    test_diagnostic_interfaces()
