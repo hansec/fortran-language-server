@@ -21,7 +21,11 @@ def path_from_uri(uri):
     if not uri.startswith("file://"):
         return uri
     if os.name == "nt":
-        _, path = uri.split("file:///", 1)
+        if uri.startswith("file:///"):
+            _, path = uri.split("file:///", 1)
+        else: # we should have an UNC path
+            _, path = uri.split("file:", 1)
+            return path
     else:
         _, path = uri.split("file://", 1)
     return os.path.normpath(unquote(path))
