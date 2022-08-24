@@ -1,5 +1,6 @@
 import json
 import logging
+import sys
 try:
     import Queue
 except ImportError:
@@ -17,6 +18,12 @@ log = logging.getLogger(__name__)
 
 
 def path_from_uri(uri):
+    #if python version is 2 , chinese uri path fail to identify
+    is_py2 = (sys.version_info[0] == 2)
+    if is_py2:
+        if isinstance(uri,unicode):
+            uri=uri.encode("utf-8")
+
     # Convert file uri to path (strip html like head part)
     if not uri.startswith("file://"):
         return uri
